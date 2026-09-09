@@ -237,6 +237,23 @@ tr.ord-row-despachado:hover td{background:#c3ebc3}
 .fi-logo{height:24px;width:auto;vertical-align:middle;margin-right:8px}
 .stat-click{cursor:pointer}
 .stat-click:hover{box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.pf-table{width:100%;border-collapse:collapse;margin-top:6px}
+.pf-table th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);padding:5px 4px;border-bottom:2px solid var(--brand)}
+.pf-table td{padding:6px 4px;border-bottom:1px solid var(--line);font-size:12.5px}
+.bolsa-badge{display:inline-block;font-weight:700;font-size:13px;padding:6px 14px;border-radius:8px;margin:2px 0 12px;letter-spacing:.02em}
+.bolsa-naranja{background:#ff8c1a;color:#fff}
+.bolsa-verde{background:#2ea043;color:#fff}
+.nv-table{width:100%;border-collapse:collapse;margin-top:6px}
+.nv-table th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);padding:5px 4px;border-bottom:2px solid var(--brand)}
+.nv-table td{padding:6px 4px;border-bottom:1px solid var(--line);font-size:12.5px}
+.pill-estado{display:inline-block;font-weight:700;font-size:11px;padding:3px 10px;border-radius:999px;letter-spacing:.02em;white-space:nowrap}
+.pill-pagada{background:#e3f6ea;color:#1a7a3d}
+.pill-parcial{background:#fdeee0;color:#b5560a}
+.pill-pendiente{background:#eef1f6;color:#475569}
+.pill-vencida{background:#fde3e3;color:#b91c1c}
+.cxc-total-saldo{font-weight:700;color:#b5560a}
+.pv-cuota-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;background:var(--brand-light);border-radius:8px;padding:8px 10px;margin-bottom:6px}
+.pv-total-box{margin-top:8px;font-weight:700;font-size:13.5px;color:var(--brand-dark)}
 </style>
 </head>
 <body>
@@ -499,6 +516,109 @@ tr.ord-row-despachado:hover td{background:#c3ebc3}
     <p class="footnote">Un pedido de venta puede incluir varios productos — cada uno genera su propia orden de producción y lote. El documento (📄) imprime la fórmula de cada producto y el total general de insumos. El seguimiento de fabricación, completado y despacho se hace desde «🏭 Producción → Órdenes de Producción».</p>
   </section>
 
+  <!-- PROFORMAS -->
+  <section id="view-proformas" class="view">
+    <div class="toolbar">
+      <input type="search" id="pfSearch" placeholder="Buscar por cliente, producto o N°…">
+      <div class="spacer"></div>
+      <button class="primary" id="btnNuevaProforma">+ Nueva proforma</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th class="sortable" data-k="creado_en">Fecha</th>
+          <th class="sortable" data-k="numero_proforma">N° Proforma</th>
+          <th class="sortable" data-k="cliente">Cliente</th>
+          <th>Productos</th>
+          <th class="num">Cantidad total (Ton)</th>
+          <th class="num">Total productos (Bs)</th>
+          <th class="num">Flete (Bs)</th>
+          <th class="num">Total general (Bs)</th>
+          <th>Entrega</th>
+          <th>Fecha entrega</th>
+          <th></th>
+          <th></th>
+        </tr></thead>
+        <tbody id="proformasBody"></tbody>
+      </table>
+    </div>
+    <p class="footnote">La proforma toma el precio público directo del sistema (precio de venta con comisión), aplicás el % de descuento por producto y se suma el flete si corresponde. No genera producción ni descuenta stock de insumos — es solo una cotización para el cliente.</p>
+  </section>
+
+  <!-- NOTAS DE VENTA -->
+  <section id="view-notasventa" class="view">
+    <div class="toolbar">
+      <input type="search" id="nvSearch" placeholder="Buscar por cliente, N° nota o N° pedido…">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th class="sortable" data-k="fecha">Fecha</th>
+          <th class="sortable" data-k="numero_nota">N° Nota</th>
+          <th>N° Pedido</th>
+          <th class="sortable" data-k="cliente">Cliente</th>
+          <th class="num">Total (Bs)</th>
+          <th>Cuotas</th>
+          <th class="num">Pagado (Bs)</th>
+          <th class="num">Saldo (Bs)</th>
+          <th>Estado</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="notasVentaBody"></tbody>
+      </table>
+    </div>
+    <p class="footnote">La nota de venta se genera automáticamente al crear un pedido de venta — con el total, la cantidad de cuotas y sus fechas de vencimiento. Para registrar un pago, usá «💳 Pagos».</p>
+  </section>
+
+  <!-- PAGOS -->
+  <section id="view-pagos" class="view">
+    <div class="toolbar">
+      <input type="search" id="pgSearch" placeholder="Buscar por cliente o N° nota…">
+      <label class="inline-field" style="align-items:center;flex-direction:row;gap:6px"><input type="checkbox" id="pgSoloPendientes" checked> Solo con saldo pendiente</label>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>N° Nota</th>
+          <th>Cliente</th>
+          <th class="num">Total (Bs)</th>
+          <th class="num">Pagado (Bs)</th>
+          <th class="num">Saldo (Bs)</th>
+          <th>Próx. vencimiento</th>
+          <th>Estado</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="pagosBody"></tbody>
+      </table>
+    </div>
+    <p class="footnote">Elegí la nota de venta del cliente que está pagando, subí la foto del comprobante (el sistema intenta leer el monto solo) y registrá el pago — el saldo se actualiza al toque.</p>
+  </section>
+
+  <!-- CUENTAS POR COBRAR -->
+  <section id="view-cuentasxcobrar" class="view">
+    <div class="toolbar">
+      <input type="search" id="cxcSearch" placeholder="Buscar por cliente…">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th class="sortable" data-k="cliente">Cliente</th>
+          <th>N° Nota</th>
+          <th>N° Pedido</th>
+          <th class="sortable" data-k="fecha">Fecha</th>
+          <th class="num">Total (Bs)</th>
+          <th class="num">Pagado (Bs)</th>
+          <th class="num">Saldo (Bs)</th>
+          <th>Próx. vencimiento</th>
+          <th>Estado</th>
+        </tr></thead>
+        <tbody id="cxcBody"></tbody>
+        <tfoot id="cxcFoot"></tfoot>
+      </table>
+    </div>
+    <p class="footnote">Todo lo que todavía deben los clientes, en base a las notas de venta con saldo pendiente. «Vencida» significa que ya pasó la fecha de vencimiento de alguna cuota y todavía no está cubierta por los pagos registrados.</p>
+  </section>
+
   <!-- STOCK EN FABRICA (producto terminado, sin despachar) -->
   <section id="view-stockfabrica" class="view">
     <div class="toolbar">
@@ -607,6 +727,15 @@ tr.ord-row-despachado:hover td{background:#c3ebc3}
     <button class="nav-group-head" type="button">📈 Ventas <span class="chev">▾</span></button>
     <div class="nav-group-items">
       <button data-tab="pedidosventa" class="nav-item">🧾 Pedidos de Venta</button>
+      <button data-tab="proformas" class="nav-item">📄 Proformas</button>
+    </div>
+  </div>
+  <div class="nav-group open" data-group="cobranzasgrp">
+    <button class="nav-group-head" type="button">💳 Cobranzas <span class="chev">▾</span></button>
+    <div class="nav-group-items">
+      <button data-tab="notasventa" class="nav-item">📑 Notas de Venta</button>
+      <button data-tab="pagos" class="nav-item">💳 Pagos</button>
+      <button data-tab="cuentasxcobrar" class="nav-item">📊 Cuentas por Cobrar</button>
     </div>
   </div>
   <div class="nav-group open" data-group="produccion">
@@ -791,6 +920,58 @@ tr.ord-row-despachado:hover td{background:#c3ebc3}
   </div>
 </div>
 
+<div id="proformaModalOverlay" class="overlay2">
+  <div class="ocr-box" style="max-width:620px">
+    <div class="ocr-head">
+      <h3>Nueva proforma</h3>
+      <button class="close-x" id="btnCerrarProforma">✕</button>
+    </div>
+    <div id="proformaBody" class="ocr-body"></div>
+  </div>
+</div>
+
+<div id="proformaDocModalOverlay" class="overlay2">
+  <div class="ocr-box" style="max-width:600px">
+    <div class="ocr-head">
+      <h3>Proforma</h3>
+      <button class="close-x" id="btnCerrarProformaDoc">✕</button>
+    </div>
+    <div class="ocr-body">
+      <div id="proformaDocCard" class="fi-card"></div>
+      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+        <button class="primary" id="btnDescargarProformaPdf">⬇ Descargar PDF</button>
+      </div>
+      <p class="footnote">Cotización de precio para el cliente. No genera producción ni descuenta stock — para eso, cargá un pedido de venta.</p>
+    </div>
+  </div>
+</div>
+
+<div id="notaVentaDocModalOverlay" class="overlay2">
+  <div class="ocr-box" style="max-width:600px">
+    <div class="ocr-head">
+      <h3>Nota de venta</h3>
+      <button class="close-x" id="btnCerrarNotaVentaDoc">✕</button>
+    </div>
+    <div class="ocr-body">
+      <div id="notaVentaDocCard" class="fi-card"></div>
+      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+        <button class="primary" id="btnDescargarNotaVentaPdf">⬇ Descargar PDF</button>
+      </div>
+      <p class="footnote">Documento con el detalle del pedido, el total y el plan de cuotas.</p>
+    </div>
+  </div>
+</div>
+
+<div id="pagoModalOverlay" class="overlay2">
+  <div class="ocr-box" style="max-width:520px">
+    <div class="ocr-head">
+      <h3>Registrar pago</h3>
+      <button class="close-x" id="btnCerrarPago">✕</button>
+    </div>
+    <div id="pagoBody" class="ocr-body"></div>
+  </div>
+</div>
+
 <div id="compraModalOverlay" class="overlay2">
   <div class="ocr-box" style="max-width:600px">
     <div class="ocr-head">
@@ -875,6 +1056,16 @@ var despachoState = null;
 var despachoFile = null;
 var ventaState = { loaded:false, rows: [] };
 var pvSort = { k:'fecha_pedido', dir:-1 };
+var proformaState = { loaded:false, rows: [] };
+var pfSort = { k:'creado_en', dir:-1 };
+var pfLineas = [];
+var notaVentaState = { loaded:false, rows: [] };
+var nvSort = { k:'fecha', dir:-1 };
+var cxcSort = { k:'cliente', dir:1 };
+var pvCuotas = []; // [{fecha, monto}]
+var pagoModalState = null; // nota_venta row actual del modal de pago
+var pagoFile = null;
+var notaVentaDocState = null;
 var stockIngState = { rows: [], offset: 0, pageSize: 60, loading:false, loaded:false };
 var comprasState = { loaded:false, rows: [] };
 var comprasSort = { k:'fecha', dir:-1 };
@@ -989,6 +1180,10 @@ document.querySelectorAll('.nav-item').forEach(function(btn){
     if(btn.dataset.tab==='stock'){ renderStock(); renderStockIngresos(!stockIngState.loaded); }
     if(btn.dataset.tab==='ordenes') renderOrdenes(!ordenesState.loaded);
     if(btn.dataset.tab==='pedidosventa') renderPedidosVenta(!ventaState.loaded);
+    if(btn.dataset.tab==='proformas') renderProformas(!proformaState.loaded);
+    if(btn.dataset.tab==='notasventa') renderNotasVenta(!notaVentaState.loaded);
+    if(btn.dataset.tab==='pagos') renderPagos(!notaVentaState.loaded);
+    if(btn.dataset.tab==='cuentasxcobrar') renderCuentasXCobrar(!notaVentaState.loaded);
     if(btn.dataset.tab==='stockfabrica') renderOrdenes(!ordenesState.loaded);
     if(btn.dataset.tab==='compras') renderCompras(!comprasState.loaded);
     if(btn.dataset.tab==='rentabilidad') renderRentabilidad(!ventaState.loaded);
@@ -2446,6 +2641,11 @@ function renderPedidosVentaRows(){
         toast('Pedido de venta eliminado');
         renderPedidosVenta(true);
         fetchProducciones(function(){ if(activeTab()==='ordenes') renderOrdenesRows(); if(activeTab()==='stockfabrica') renderStockFabricaRows(); });
+        fetchNotasVenta(function(){
+          if(activeTab()==='notasventa') renderNotasVentaRows();
+          if(activeTab()==='pagos') renderPagosRows();
+          if(activeTab()==='cuentasxcobrar') renderCuentasXCobrarRows();
+        });
       });
     });
   });
@@ -2484,10 +2684,27 @@ function renderPedidoVentaForm(){
     '<button type="button" id="btnAgregarPvLinea" class="ghost" style="margin-top:4px">+ Agregar producto</button>'+
     '<div id="pv_preview"></div>'+
     '<p class="footnote">Cada producto genera su propia orden de producción y lote, y descuenta el stock de insumos según su fórmula — igual que en 🏭 Producción. El «precio tabla» es el precio de venta con comisión que ya usa el resto de la app — poné un % de descuento si corresponde y el precio final se calcula solo (también podés escribirlo directo).</p>'+
+    '<div class="section-title" style="margin-top:14px">Nota de venta — plan de pago</div>'+
+    '<div class="pv-total-box" id="pv_totalBox"></div>'+
+    '<div class="inline-field"><label>N° de cuotas</label><select id="pv_numCuotas"><option value="1">1 pago</option><option value="2">2 pagos</option><option value="3">3 pagos</option></select></div>'+
+    '<button type="button" class="ghost" id="btnRepartirCuotas" style="margin-top:4px">🔄 Repartir en partes iguales</button>'+
+    '<div id="pv_cuotasWrap" style="margin-top:8px"></div>'+
+    '<p class="footnote">La nota de venta se genera sola al crear el pedido, con este plan de cuotas. Los montos se reparten en partes iguales pero podés editarlos a mano (por ejemplo, para un anticipo distinto).</p>'+
     '<div style="margin-top:16px;display:flex;gap:10px">'+
       '<button class="primary" id="btnCrearPedidoVenta">Crear pedido de venta</button>'+
       '<button id="btnCancelarPedidoVenta2">Cancelar</button>'+
     '</div>';
+  pvCuotas = [{fecha: document.getElementById('pv_fechaEntrega').value || '', monto: 0}];
+  document.getElementById('pv_numCuotas').addEventListener('change', function(){
+    repartirPvCuotas(Number(this.value));
+  });
+  document.getElementById('btnRepartirCuotas').addEventListener('click', function(){
+    repartirPvCuotas(pvCuotas.length);
+  });
+  document.getElementById('pv_fechaEntrega').addEventListener('change', function(){
+    if(pvCuotas.length && !pvCuotas[0]._fechaEditada) pvCuotas[0].fecha = this.value;
+    renderPvCuotas();
+  });
   document.getElementById('btnAgregarPvLinea').addEventListener('click', function(){
     pvLineas.push({producto_hoja:'', cantidad:1, precio:'', usar_stock_id:null, descuentoPct:''});
     renderPvLineas();
@@ -2509,6 +2726,7 @@ function renderPedidoVentaForm(){
   document.getElementById('btnCancelarPedidoVenta2').addEventListener('click', closePedidoVentaModal);
   document.getElementById('btnCrearPedidoVenta').addEventListener('click', submitPedidoVenta);
   renderPvLineas();
+  renderPvCuotas();
 }
 function precioTablaFor(hoja){
   var p = state.productos.find(function(x){return x.hoja===hoja;});
@@ -2521,6 +2739,61 @@ function aplicarDescuentoLinea(idx){
   if(tabla==null) return;
   var desc = Number(l.descuentoPct)||0;
   l.precio = Math.round(tabla*(1-desc/100)*100)/100;
+}
+/* ---- nota de venta: total del pedido y plan de cuotas (1 a 3 pagos) ---- */
+function totalPedidoActual(){
+  var total = 0;
+  pvLineas.forEach(function(l){
+    if(l.usar_stock_id){ /* también cuenta para el total, tiene precio igual */ }
+    var cantidad = Number(l.cantidad)||0;
+    var precio = Number(l.precio)||0;
+    total += cantidad*precio;
+  });
+  return Math.round(total*100)/100;
+}
+function updatePvTotalBox(){
+  var box = document.getElementById('pv_totalBox');
+  if(!box) return;
+  box.textContent = 'Total del pedido: '+fmtBs(totalPedidoActual());
+}
+function addDiasISO(fechaISO, dias){
+  var d = fechaISO ? new Date(fechaISO+'T00:00:00') : new Date();
+  if(isNaN(d.getTime())) d = new Date();
+  d.setDate(d.getDate()+dias);
+  return d.toISOString().slice(0,10);
+}
+function repartirPvCuotas(n){
+  n = Math.max(1, Math.min(3, Number(n)||1));
+  var total = totalPedidoActual();
+  var fechaBase = (document.getElementById('pv_fechaEntrega')||{}).value || new Date().toISOString().slice(0,10);
+  var base = Math.floor((total/n)*100)/100;
+  var acumulado = 0;
+  var partes = [];
+  for(var i=0;i<n;i++){
+    var monto = (i===n-1) ? Math.round((total-acumulado)*100)/100 : base;
+    acumulado += monto;
+    partes.push({ fecha: addDiasISO(fechaBase, i*30), monto: monto });
+  }
+  pvCuotas = partes;
+  var sel = document.getElementById('pv_numCuotas');
+  if(sel) sel.value = String(n);
+  renderPvCuotas();
+}
+function renderPvCuotas(){
+  updatePvTotalBox();
+  var wrap = document.getElementById('pv_cuotasWrap');
+  if(!wrap) return;
+  wrap.innerHTML = pvCuotas.map(function(c, idx){
+    return '<div class="pv-cuota-row" data-idx="'+idx+'">'+
+      '<div class="inline-field"><label>Cuota '+(idx+1)+' — Fecha de pago</label><input type="date" class="pvc-fecha" value="'+(c.fecha||'')+'"></div>'+
+      '<div class="inline-field"><label>Monto (Bs)</label><input type="number" step="0.01" min="0" class="pvc-monto pill-input" value="'+(c.monto!=null?c.monto:'')+'"></div>'+
+    '</div>';
+  }).join('');
+  wrap.querySelectorAll('.pv-cuota-row').forEach(function(row){
+    var idx = Number(row.dataset.idx);
+    row.querySelector('.pvc-fecha').addEventListener('change', function(){ pvCuotas[idx].fecha = this.value; });
+    row.querySelector('.pvc-monto').addEventListener('input', function(){ pvCuotas[idx].monto = parseFloat(this.value)||0; });
+  });
 }
 function stockDisponiblePorHoja(hoja){
   if(!ordenesState.loaded || !hoja) return [];
@@ -2564,14 +2837,15 @@ function renderPvLineas(){
       renderPvLineas();
     });
     var cantInput = row.querySelector('.pvl-cantidad');
-    if(cantInput) cantInput.addEventListener('input', function(){ pvLineas[idx].cantidad = (parseFloat(this.value)||0)/1000; renderPedidoVentaPreview(); });
-    row.querySelector('.pvl-precio').addEventListener('input', function(){ var v=this.value; pvLineas[idx].precio = v===''?'':parseFloat(v); });
+    if(cantInput) cantInput.addEventListener('input', function(){ pvLineas[idx].cantidad = (parseFloat(this.value)||0)/1000; renderPedidoVentaPreview(); updatePvTotalBox(); });
+    row.querySelector('.pvl-precio').addEventListener('input', function(){ var v=this.value; pvLineas[idx].precio = v===''?'':parseFloat(v); updatePvTotalBox(); });
     var descInput = row.querySelector('.pvl-descuento');
     if(descInput) descInput.addEventListener('input', function(){
       pvLineas[idx].descuentoPct = this.value===''?'':parseFloat(this.value);
       aplicarDescuentoLinea(idx);
       var precioInput = row.querySelector('.pvl-precio');
       if(precioInput) precioInput.value = pvLineas[idx].precio===''?'':pvLineas[idx].precio;
+      updatePvTotalBox();
     });
     var rm = row.querySelector('.pv-linea-remove');
     if(rm) rm.addEventListener('click', function(){ pvLineas.splice(idx,1); renderPvLineas(); renderPedidoVentaPreview(); });
@@ -2588,6 +2862,7 @@ function renderPvLineas(){
     if(cancelar) cancelar.addEventListener('click', function(){ pvLineas[idx].usar_stock_id = null; renderPvLineas(); });
   });
   renderPedidoVentaPreview();
+  updatePvTotalBox();
 }
 function renderPedidoVentaPreview(){
   var wrap = document.getElementById('pv_preview');
@@ -2651,11 +2926,23 @@ function submitPedidoVenta(){
     });
   }
   if(!items.length){ toast('Agregá al menos un producto'); return; }
+  var totalPedido = totalPedidoActual();
+  var sumaCuotas = pvCuotas.reduce(function(s,c){ return s + (Number(c.monto)||0); }, 0);
+  sumaCuotas = Math.round(sumaCuotas*100)/100;
+  if(Math.abs(sumaCuotas - totalPedido) > 0.05){
+    toast('La suma de las cuotas ('+fmtBs(sumaCuotas)+') no coincide con el total del pedido ('+fmtBs(totalPedido)+'). Tocá «Repartir en partes iguales» o ajustá los montos.');
+    return;
+  }
+  for(var c=0;c<pvCuotas.length;c++){
+    if(!pvCuotas[c].fecha){ toast('Poné la fecha de la cuota '+(c+1)); return; }
+    if(!pvCuotas[c].monto || pvCuotas[c].monto<=0){ toast('Poné un monto válido en la cuota '+(c+1)); return; }
+  }
+  var cuotasPayload = pvCuotas.map(function(c){ return { fecha_vencimiento: c.fecha, monto_bs: c.monto }; });
   var btn = document.getElementById('btnCrearPedidoVenta');
   btn.disabled = true;
   sb.rpc('crear_pedido_venta', {
     p_cliente: cliente, p_condicion_pago: condicion, p_condicion_pago_nota: condicionNota || null,
-    p_fecha_entrega: fechaEntrega, p_items: items, p_modo_entrega: modoEntrega
+    p_fecha_entrega: fechaEntrega, p_items: items, p_modo_entrega: modoEntrega, p_cuotas: cuotasPayload
   }).then(function(res){
     btn.disabled = false;
     if(res.error){ toast('No se pudo crear el pedido de venta: '+errMsg(res.error)); return; }
@@ -2669,6 +2956,13 @@ function submitPedidoVenta(){
     toast(msg);
     renderPedidosVenta(true);
     fetchProducciones(function(){ if(activeTab()==='ordenes') renderOrdenesRows(); if(activeTab()==='stockfabrica') renderStockFabricaRows(); });
+    fetchNotasVenta(function(){
+      if(activeTab()==='notasventa') renderNotasVentaRows();
+      if(activeTab()==='pagos') renderPagosRows();
+      if(activeTab()==='cuentasxcobrar') renderCuentasXCobrarRows();
+      var nota = notaVentaState.rows.find(function(nv){ return nv.pedido_venta_id===row.id; });
+      if(nota) openNotaVentaDocModal(nota);
+    });
   });
 }
 
@@ -2786,6 +3080,657 @@ document.getElementById('btnDescargarPedidoVentaPdf').addEventListener('click', 
     }).catch(function(err){ btn.disabled=false; toast('No se pudo generar el PDF: '+(err&&err.message?err.message:String(err))); });
   }).catch(function(err){ btn.disabled=false; toast('No se pudo generar el PDF: '+(err&&err.message?err.message:String(err))); });
 });
+
+/* ================= PROFORMAS ================= */
+function renderProformas(forceReload){
+  if(forceReload){
+    sb.from('proformas').select('*, proforma_items(*)').order('creado_en',{ascending:false}).then(function(res){
+      if(res.error){ toast('No se pudieron cargar las proformas: '+errMsg(res.error)); return; }
+      proformaState.rows = res.data || [];
+      proformaState.loaded = true;
+      renderProformasRows();
+    });
+    return;
+  }
+  renderProformasRows();
+}
+function pfItemsOf(pf){
+  return (pf.proforma_items||[]).slice().sort(function(a,b){ return (a.orden||0)-(b.orden||0); });
+}
+function renderProformasRows(){
+  var searchEl = document.getElementById('pfSearch');
+  var q = searchEl ? (searchEl.value||'').toLowerCase() : '';
+  var rows = proformaState.rows.filter(function(pf){
+    if(q){
+      var productos = pfItemsOf(pf).map(function(it){ return it.producto_nombre; }).join(' ');
+      var hay = (productos+' '+(pf.cliente||'')+' '+pf.numero_proforma).toLowerCase();
+      if(hay.indexOf(q)===-1) return false;
+    }
+    return true;
+  });
+  rows.sort(function(a,b){
+    var k=pfSort.k, d=pfSort.dir, av=a[k], bv=b[k];
+    if(av==null) av=''; if(bv==null) bv='';
+    if(typeof av==='string') return av.localeCompare(bv)*d;
+    return (av-bv)*d;
+  });
+  var esAdminPf = currentProfile && currentProfile.rol==='admin';
+  document.getElementById('proformasBody').innerHTML = rows.map(function(pf){
+    var items = pfItemsOf(pf);
+    var cantidadTotal = items.reduce(function(s,it){ return s+(Number(it.cantidad_toneladas)||0); }, 0);
+    var totalProductos = items.reduce(function(s,it){ return s+(Number(it.subtotal_bs)||0); }, 0);
+    var flete = Number(pf.flete_bs)||0;
+    var totalGeneral = totalProductos + flete;
+    var productosCell = '<div class="pv-multi">'+items.map(function(it){
+      return '<div>'+fmt(it.cantidad_toneladas,2)+' Ton — '+escapeHtml(it.producto_nombre)+'</div>';
+    }).join('')+'</div>';
+    var entregaLabel = pf.modo_entrega==='recoge' ? '📦 Recoge cliente' : '🚚 Envío a cliente';
+    var eliminarCell = !esAdminPf ? '' : '<td><button class="ghost danger btn-eliminar-pf" title="Eliminar esta proforma">🗑️</button></td>';
+    return '<tr data-id="'+pf.id+'">'+
+      '<td>'+fmtFecha(pf.creado_en)+'</td>'+
+      '<td><b>'+escapeHtml(pf.numero_proforma)+'</b></td>'+
+      '<td>'+escapeHtml(pf.cliente||'—')+'</td>'+
+      '<td>'+productosCell+'</td>'+
+      '<td class="num">'+fmt(cantidadTotal,2)+'</td>'+
+      '<td class="num">'+fmt(totalProductos,2)+'</td>'+
+      '<td class="num">'+(flete>0?fmt(flete,2):'—')+'</td>'+
+      '<td class="num"><b>'+fmt(totalGeneral,2)+'</b></td>'+
+      '<td>'+entregaLabel+'</td>'+
+      '<td>'+(pf.fecha_entrega?fmtFecha(pf.fecha_entrega):'—')+'</td>'+
+      '<td><button class="ghost btn-doc-pf" title="Ver / descargar proforma">📄</button></td>'+
+      eliminarCell+
+    '</tr>';
+  }).join('') || '<tr><td colspan="'+(esAdminPf?12:11)+'" class="empty">Sin proformas registradas</td></tr>';
+  document.querySelectorAll('.btn-doc-pf').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var id = Number(btn.closest('tr').dataset.id);
+      var pf = proformaState.rows.find(function(x){return x.id===id;});
+      if(pf) openProformaDocModal(pf);
+    });
+  });
+  document.querySelectorAll('.btn-eliminar-pf').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var id = Number(btn.closest('tr').dataset.id);
+      var pf = proformaState.rows.find(function(x){return x.id===id;});
+      if(!pf) return;
+      if(!confirm('¿Eliminar la proforma «'+pf.numero_proforma+'» de '+(pf.cliente||'—')+'?\n\nEsta acción no se puede deshacer.')) return;
+      btn.disabled = true;
+      sb.rpc('eliminar_proforma', {p_id:id}).then(function(res){
+        if(res.error){ toast('No se pudo eliminar: '+errMsg(res.error)); btn.disabled=false; return; }
+        toast('Proforma eliminada');
+        renderProformas(true);
+      });
+    });
+  });
+}
+document.getElementById('pfSearch').addEventListener('input', renderProformasRows);
+document.querySelectorAll('#view-proformas th.sortable').forEach(function(th){
+  th.addEventListener('click', function(){
+    var k = th.dataset.k;
+    if(pfSort.k===k) pfSort.dir *= -1; else { pfSort.k=k; pfSort.dir = (k==='creado_en')?-1:1; }
+    renderProformasRows();
+  });
+});
+
+/* ---- formulario: nueva proforma ---- */
+function renderProformaForm(){
+  pfLineas = [{producto_hoja:'', cantidad:1, descuentoPct:0}];
+  document.getElementById('proformaBody').innerHTML =
+    '<div class="inline-field"><label>Cliente</label><input type="text" id="pf_cliente" style="min-width:220px" placeholder="Nombre del cliente"></div>'+
+    '<div class="inline-field"><label>Fecha de entrega</label><input type="date" id="pf_fechaEntrega"></div>'+
+    '<div class="inline-field"><label>Entrega</label><select id="pf_modoEntrega">'+
+      '<option value="recoge">Recoge cliente</option>'+
+      '<option value="envio">Envío a cliente</option>'+
+    '</select></div>'+
+    '<div class="inline-field" id="pf_fleteWrap" style="display:none"><label>Flete (Bs)</label><input type="number" step="0.01" min="0" id="pf_flete" class="pill-input" value="0"></div>'+
+    '<div class="section-title" style="margin-top:14px">Productos de la proforma</div>'+
+    '<div id="pf_lineasWrap"></div>'+
+    '<button type="button" id="btnAgregarPfLinea" class="ghost" style="margin-top:4px">+ Agregar producto</button>'+
+    '<div id="pf_preview"></div>'+
+    '<p class="footnote">El precio público se toma en vivo del sistema (precio de venta con comisión, el mismo que usa el resto de la app). No genera producción ni descuenta stock de insumos — es solo una cotización.</p>'+
+    '<div style="margin-top:16px;display:flex;gap:10px">'+
+      '<button class="primary" id="btnCrearProforma">Crear proforma</button>'+
+      '<button id="btnCancelarProforma2">Cancelar</button>'+
+    '</div>';
+  document.getElementById('pf_modoEntrega').addEventListener('change', function(){
+    var envio = this.value === 'envio';
+    document.getElementById('pf_fleteWrap').style.display = envio ? '' : 'none';
+    if(!envio) document.getElementById('pf_flete').value = 0;
+    renderProformaPreview();
+  });
+  document.getElementById('pf_flete').addEventListener('input', renderProformaPreview);
+  document.getElementById('btnAgregarPfLinea').addEventListener('click', function(){
+    pfLineas.push({producto_hoja:'', cantidad:1, descuentoPct:0});
+    renderPfLineas();
+  });
+  document.getElementById('btnCancelarProforma2').addEventListener('click', closeProformaModal);
+  document.getElementById('btnCrearProforma').addEventListener('click', submitProforma);
+  renderPfLineas();
+}
+function renderPfLineas(){
+  var wrap = document.getElementById('pf_lineasWrap');
+  wrap.innerHTML = pfLineas.map(function(l, idx){
+    var p = l.producto_hoja ? state.productos.find(function(x){return x.hoja===l.producto_hoja;}) : null;
+    var precioPublico = p ? computeProducto(p).precioVentaConCom : null;
+    var desc = Number(l.descuentoPct)||0;
+    var descMonto = precioPublico!=null ? precioPublico*desc/100 : null;
+    var precioFinal = precioPublico!=null ? precioPublico*(1-desc/100) : null;
+    var subtotal = (precioFinal!=null && l.cantidad>0) ? precioFinal*Number(l.cantidad) : null;
+    return '<div class="pv-linea-row" data-idx="'+idx+'">'+
+      '<div class="inline-field"><label>Producto</label><select class="pfl-producto" style="min-width:220px">'+buildProductoOptions(l.producto_hoja||null)+'</select></div>'+
+      '<div class="inline-field"><label>Cantidad (Ton)</label><input type="number" step="0.01" min="0.01" class="pfl-cantidad pill-input" value="'+l.cantidad+'"></div>'+
+      '<div class="inline-field"><label>Descuento (%)</label><input type="number" step="0.1" min="0" max="99" class="pfl-descuento pill-input" style="max-width:90px" value="'+(l.descuentoPct===''||l.descuentoPct==null?'':l.descuentoPct)+'" placeholder="0"></div>'+
+      (precioPublico!=null ? '<div class="pv-preciotabla">Precio público: '+fmtBs(precioPublico)+(desc>0?' · Descuento: '+fmtBs(descMonto)+'/Ton · Final: '+fmtBs(precioFinal)+'/Ton':'')+(subtotal!=null?' · Subtotal: '+fmtBs(subtotal):'')+'</div>' : '')+
+      (pfLineas.length>1 ? '<button type="button" class="ghost pf-linea-remove" title="Quitar producto">✕</button>' : '')+
+    '</div>';
+  }).join('');
+  wrap.querySelectorAll('.pv-linea-row').forEach(function(row){
+    var idx = Number(row.dataset.idx);
+    row.querySelector('.pfl-producto').addEventListener('change', function(){
+      pfLineas[idx].producto_hoja = this.value;
+      renderPfLineas();
+    });
+    row.querySelector('.pfl-cantidad').addEventListener('input', function(){
+      pfLineas[idx].cantidad = parseFloat(this.value)||0;
+      renderPfLineas();
+    });
+    row.querySelector('.pfl-descuento').addEventListener('input', function(){
+      pfLineas[idx].descuentoPct = this.value===''?0:parseFloat(this.value);
+      renderPfLineas();
+    });
+    var rm = row.querySelector('.pf-linea-remove');
+    if(rm) rm.addEventListener('click', function(){ pfLineas.splice(idx,1); renderPfLineas(); });
+  });
+  renderProformaPreview();
+}
+function renderProformaPreview(){
+  var wrap = document.getElementById('pf_preview');
+  if(!wrap) return;
+  var totalProductos = 0;
+  var hayAlgo = false;
+  pfLineas.forEach(function(l){
+    var p = l.producto_hoja ? state.productos.find(function(x){return x.hoja===l.producto_hoja;}) : null;
+    if(!p || !l.cantidad) return;
+    hayAlgo = true;
+    var precioPublico = computeProducto(p).precioVentaConCom;
+    var desc = Number(l.descuentoPct)||0;
+    var precioFinal = precioPublico*(1-desc/100);
+    totalProductos += precioFinal*Number(l.cantidad);
+  });
+  var modoSel = document.getElementById('pf_modoEntrega');
+  var envio = modoSel && modoSel.value === 'envio';
+  var fleteInput = document.getElementById('pf_flete');
+  var flete = envio && fleteInput ? (parseFloat(fleteInput.value)||0) : 0;
+  if(!hayAlgo){ wrap.innerHTML=''; return; }
+  wrap.innerHTML = '<div class="doc-total-row" style="border:none;padding:8px 0 0">Total productos: '+fmtBs(totalProductos)+(flete>0?' + Flete: '+fmtBs(flete):'')+' = <b>'+fmtBs(totalProductos+flete)+'</b></div>';
+}
+function submitProforma(){
+  var cliente = document.getElementById('pf_cliente').value.trim();
+  var fechaEntrega = document.getElementById('pf_fechaEntrega').value || null;
+  var modoEntrega = document.getElementById('pf_modoEntrega').value;
+  var flete = modoEntrega==='envio' ? (parseFloat(document.getElementById('pf_flete').value)||0) : 0;
+  if(!cliente){ toast('Poné el cliente'); return; }
+  var items = [];
+  for(var i=0;i<pfLineas.length;i++){
+    var l = pfLineas[i];
+    if(!l.producto_hoja){ toast('Elegí el producto en todas las líneas'); return; }
+    if(!l.cantidad || l.cantidad<=0){ toast('Poné una cantidad válida en todas las líneas'); return; }
+    var p = state.productos.find(function(x){return x.hoja===l.producto_hoja;});
+    if(!p){ toast('Producto no encontrado'); return; }
+    var precioPublico = computeProducto(p).precioVentaConCom;
+    var desc = (Number(l.descuentoPct)||0)/100;
+    items.push({
+      producto_hoja: l.producto_hoja,
+      cantidad_toneladas: l.cantidad,
+      precio_publico_ton: precioPublico,
+      descuento_pct: desc
+    });
+  }
+  if(!items.length){ toast('Agregá al menos un producto'); return; }
+  var btn = document.getElementById('btnCrearProforma');
+  btn.disabled = true;
+  sb.rpc('crear_proforma', {
+    p_cliente: cliente, p_fecha_entrega: fechaEntrega, p_modo_entrega: modoEntrega,
+    p_flete_bs: flete, p_items: items
+  }).then(function(res){
+    btn.disabled = false;
+    if(res.error){ toast('No se pudo crear la proforma: '+errMsg(res.error)); return; }
+    var row = Array.isArray(res.data) ? res.data[0] : res.data;
+    closeProformaModal();
+    toast('Proforma '+row.numero_proforma+' creada');
+    renderProformas(true);
+  });
+}
+function openProformaModal(){
+  document.getElementById('proformaModalOverlay').classList.add('active');
+  renderProformaForm();
+}
+function closeProformaModal(){ document.getElementById('proformaModalOverlay').classList.remove('active'); }
+document.getElementById('btnNuevaProforma').addEventListener('click', openProformaModal);
+document.getElementById('btnCerrarProforma').addEventListener('click', closeProformaModal);
+
+/* ---- documento imprimible de la proforma ---- */
+var proformaDocState = null;
+function renderProformaDocCard(pf){
+  var hoy = new Date().toLocaleDateString('es-BO',{day:'2-digit',month:'2-digit',year:'numeric'});
+  var items = pfItemsOf(pf);
+  var totalProductos = items.reduce(function(s,it){ return s+(Number(it.subtotal_bs)||0); }, 0);
+  var flete = Number(pf.flete_bs)||0;
+  var totalGeneral = totalProductos + flete;
+  function metaItem(l,val){ return '<div class="doc-meta-item"><span class="l">'+l+'</span><span class="v">'+escapeHtml(String(val))+'</span></div>'; }
+  var filas = items.map(function(it){
+    var descMonto = Number(it.precio_publico_ton)*Number(it.descuento_pct);
+    return '<tr>'+
+      '<td>'+escapeHtml(it.producto_nombre)+'</td>'+
+      '<td class="num">'+fmt(it.precio_publico_ton,2)+'</td>'+
+      '<td class="num">'+(descMonto>0?fmt(descMonto,2):'—')+'</td>'+
+      '<td class="num"><b>'+fmt(it.precio_final_ton,2)+'</b></td>'+
+      '<td class="num">'+fmt(it.cantidad_toneladas,2)+'</td>'+
+      '<td class="num"><b>'+fmt(it.subtotal_bs,2)+'</b></td>'+
+    '</tr>';
+  }).join('');
+  document.getElementById('proformaDocCard').innerHTML =
+    '<div class="fi-head"><span class="fi-brand"><img src="'+LOGO_DATA_URI+'" class="fi-logo" alt="NOGALMAX"> Proforma</span><span class="fi-date">'+hoy+'</span></div>'+
+    '<div class="fi-nombre">'+escapeHtml(pf.cliente||'—')+'</div>'+
+    '<div class="doc-meta">'+
+      metaItem('N° Proforma', pf.numero_proforma)+
+      metaItem('Fecha', fmtFecha(pf.creado_en))+
+      metaItem('Fecha de entrega', pf.fecha_entrega ? fmtFecha(pf.fecha_entrega) : '—')+
+      metaItem('Cargado por', pf.creado_por_nombre || '—')+
+    '</div>'+
+    '<div class="doc-entrega-box">'+
+      '<span class="doc-entrega-opt'+(pf.modo_entrega==='recoge'?' checked':'')+'">'+(pf.modo_entrega==='recoge'?'☑':'☐')+' Recoge cliente</span>'+
+      '<span class="doc-entrega-opt'+(pf.modo_entrega==='envio'?' checked':'')+'">'+(pf.modo_entrega==='envio'?'☑':'☐')+' Envío a cliente</span>'+
+    '</div>'+
+    '<div class="fi-section">Detalle</div>'+
+    '<table class="pf-table"><thead><tr>'+
+      '<th>Producto</th><th class="num">Precio público (Bs/Ton)</th><th class="num">Descuento (Bs/Ton)</th><th class="num">Precio final (Bs/Ton)</th><th class="num">Cantidad (Ton)</th><th class="num">Subtotal (Bs)</th>'+
+    '</tr></thead><tbody>'+filas+'</tbody></table>'+
+    '<div class="doc-grand-total-box">'+
+      '<div class="doc-meta-item"><span class="l">Total productos</span><span class="v">'+fmtBs(totalProductos)+'</span></div>'+
+      (flete>0 ? '<div class="doc-meta-item"><span class="l">Flete</span><span class="v">'+fmtBs(flete)+'</span></div>' : '')+
+      '<div class="doc-total-row">TOTAL GENERAL: '+fmtBs(totalGeneral)+'</div>'+
+    '</div>'+
+    '<div class="fi-foot">Cotización válida por 15 días desde la fecha de emisión · '+(pf.modo_entrega==='recoge'?'Puesto en planta NOGALMAX (el cliente retira)':'Incluye flete puesto en destino')+' · Generado desde NOGALMAX — Precios y Fórmulas'+(pf.creado_por_nombre?(' · '+escapeHtml(pf.creado_por_nombre)):'')+'</div>';
+}
+function openProformaDocModal(pf){
+  proformaDocState = pf;
+  renderProformaDocCard(pf);
+  document.getElementById('proformaDocModalOverlay').classList.add('active');
+}
+document.getElementById('btnCerrarProformaDoc').addEventListener('click', function(){
+  document.getElementById('proformaDocModalOverlay').classList.remove('active');
+});
+document.getElementById('btnDescargarProformaPdf').addEventListener('click', function(){
+  if(!proformaDocState) return;
+  if(typeof html2canvas === 'undefined'){ toast('No se pudo cargar el generador de documentos (revisá tu conexión a internet).'); return; }
+  var jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
+  if(!jsPDFCtor){ toast('No se pudo cargar el generador de PDF (revisá tu conexión a internet).'); return; }
+  var btn = document.getElementById('btnDescargarProformaPdf');
+  btn.disabled = true;
+  var pf = proformaDocState;
+  html2canvas(document.getElementById('proformaDocCard'), {backgroundColor:'#ffffff', scale:2}).then(function(canvas){
+    var img = canvas.toDataURL('image/png');
+    var doc = new jsPDFCtor({unit:'mm', format:'a4'});
+    addImageFitted(doc, img, canvas);
+    doc.save('proforma_'+(pf.numero_proforma||'proforma')+'_'+slugFilename(pf.cliente||'cliente')+'.pdf');
+    btn.disabled = false;
+    toast('PDF descargado');
+  }).catch(function(err){ btn.disabled=false; toast('No se pudo generar el PDF: '+(err&&err.message?err.message:String(err))); });
+});
+
+/* ================= COBRANZAS: NOTAS DE VENTA / PAGOS / CUENTAS POR COBRAR ================= */
+function fetchNotasVenta(cb){
+  sb.from('notas_venta').select('*, cuotas_venta(*), pagos_venta(*), pedidos_venta(numero_pedido,cliente,condicion_pago,condicion_pago_nota,modo_entrega,fecha_entrega,fecha_pedido,pedido_venta_items(*))').order('creado_en',{ascending:false}).then(function(res){
+    if(res.error){ toast('No se pudieron cargar las notas de venta: '+errMsg(res.error)); return; }
+    notaVentaState.rows = res.data || [];
+    notaVentaState.loaded = true;
+    if(cb) cb();
+  });
+}
+function notaTotales(nota){
+  var cuotas = (nota.cuotas_venta||[]).slice().sort(function(a,b){ return (a.numero_cuota||0)-(b.numero_cuota||0); });
+  var pagos = (nota.pagos_venta||[]).slice();
+  var pagado = Math.round(pagos.reduce(function(s,p){ return s+(Number(p.monto_bs)||0); },0)*100)/100;
+  var total = Number(nota.total_bs)||0;
+  var saldo = Math.round((total-pagado)*100)/100;
+  if(saldo<0) saldo = 0;
+  var hoy = new Date().toISOString().slice(0,10);
+  var acumCuota = 0, proximaFecha = null, vencida = false;
+  cuotas.forEach(function(c){
+    acumCuota += Number(c.monto_bs)||0;
+    var cubierta = pagado >= (acumCuota - 0.01);
+    c._pagada = cubierta;
+    if(!cubierta && proximaFecha===null){
+      proximaFecha = c.fecha_vencimiento;
+      if(c.fecha_vencimiento && c.fecha_vencimiento < hoy) vencida = true;
+    }
+  });
+  var estado, estadoClass;
+  if(saldo<=0.005){ estado='Pagada'; estadoClass='pagada'; }
+  else if(pagado>0){ estado = vencida ? 'Vencida (parcial)' : 'Parcial'; estadoClass = vencida?'vencida':'parcial'; }
+  else { estado = vencida ? 'Vencida' : 'Pendiente'; estadoClass = vencida?'vencida':'pendiente'; }
+  return { cuotas:cuotas, pagos:pagos, pagado:pagado, total:total, saldo:saldo, proximaFecha:proximaFecha, vencida:vencida, estado:estado, estadoClass:estadoClass };
+}
+
+/* ---- Notas de Venta (lista) ---- */
+function renderNotasVenta(forceReload){
+  if(forceReload){ fetchNotasVenta(renderNotasVentaRows); return; }
+  renderNotasVentaRows();
+}
+function renderNotasVentaRows(){
+  var searchEl = document.getElementById('nvSearch');
+  var q = searchEl ? (searchEl.value||'').toLowerCase() : '';
+  var rows = notaVentaState.rows.filter(function(nv){
+    if(q){
+      var hay = ((nv.cliente||'')+' '+(nv.numero_nota||'')+' '+(nv.numero_pedido||'')).toLowerCase();
+      if(hay.indexOf(q)===-1) return false;
+    }
+    return true;
+  });
+  rows.sort(function(a,b){
+    var k=nvSort.k, d=nvSort.dir, av=a[k], bv=b[k];
+    if(av==null) av=''; if(bv==null) bv='';
+    if(typeof av==='string') return av.localeCompare(bv)*d;
+    return (av-bv)*d;
+  });
+  document.getElementById('notasVentaBody').innerHTML = rows.map(function(nv){
+    var t = notaTotales(nv);
+    return '<tr data-id="'+nv.id+'">'+
+      '<td>'+fmtFecha(nv.fecha)+'</td>'+
+      '<td><b>'+escapeHtml(nv.numero_nota)+'</b></td>'+
+      '<td>'+escapeHtml(nv.numero_pedido||'—')+'</td>'+
+      '<td>'+escapeHtml(nv.cliente||'—')+'</td>'+
+      '<td class="num">'+fmt(t.total,2)+'</td>'+
+      '<td>'+nv.numero_cuotas+' '+(nv.numero_cuotas===1?'pago':'pagos')+'</td>'+
+      '<td class="num">'+fmt(t.pagado,2)+'</td>'+
+      '<td class="num"><b>'+fmt(t.saldo,2)+'</b></td>'+
+      '<td><span class="pill-estado pill-'+t.estadoClass+'">'+t.estado+'</span></td>'+
+      '<td><button class="ghost btn-doc-nv" title="Ver / descargar nota de venta">📄</button></td>'+
+    '</tr>';
+  }).join('') || '<tr><td colspan="10" class="empty">Sin notas de venta registradas</td></tr>';
+  document.querySelectorAll('.btn-doc-nv').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var id = Number(btn.closest('tr').dataset.id);
+      var nv = notaVentaState.rows.find(function(x){return x.id===id;});
+      if(nv) openNotaVentaDocModal(nv);
+    });
+  });
+}
+document.getElementById('nvSearch').addEventListener('input', renderNotasVentaRows);
+document.querySelectorAll('#view-notasventa th.sortable').forEach(function(th){
+  th.addEventListener('click', function(){
+    var k = th.dataset.k;
+    if(nvSort.k===k) nvSort.dir *= -1; else { nvSort.k=k; nvSort.dir = (k==='fecha')?-1:1; }
+    renderNotasVentaRows();
+  });
+});
+
+/* ---- Pagos ---- */
+function renderPagos(forceReload){
+  if(forceReload){ fetchNotasVenta(renderPagosRows); return; }
+  renderPagosRows();
+}
+function renderPagosRows(){
+  var searchEl = document.getElementById('pgSearch');
+  var q = searchEl ? (searchEl.value||'').toLowerCase() : '';
+  var soloPendientes = document.getElementById('pgSoloPendientes').checked;
+  var rows = notaVentaState.rows.filter(function(nv){
+    var t = notaTotales(nv);
+    if(soloPendientes && t.saldo<=0.005) return false;
+    if(q && ((nv.cliente||'')+' '+(nv.numero_nota||'')).toLowerCase().indexOf(q)===-1) return false;
+    return true;
+  });
+  rows.sort(function(a,b){
+    var ta=notaTotales(a), tb=notaTotales(b);
+    var fa = ta.proximaFecha||'9999-99-99', fb = tb.proximaFecha||'9999-99-99';
+    return fa<fb?-1:(fa>fb?1:0);
+  });
+  document.getElementById('pagosBody').innerHTML = rows.map(function(nv){
+    var t = notaTotales(nv);
+    return '<tr data-id="'+nv.id+'">'+
+      '<td><b>'+escapeHtml(nv.numero_nota)+'</b></td>'+
+      '<td>'+escapeHtml(nv.cliente||'—')+'</td>'+
+      '<td class="num">'+fmt(t.total,2)+'</td>'+
+      '<td class="num">'+fmt(t.pagado,2)+'</td>'+
+      '<td class="num"><b>'+fmt(t.saldo,2)+'</b></td>'+
+      '<td>'+(t.proximaFecha?fmtFecha(t.proximaFecha):'—')+'</td>'+
+      '<td><span class="pill-estado pill-'+t.estadoClass+'">'+t.estado+'</span></td>'+
+      '<td>'+(t.saldo>0.005 ? '<button class="primary btn-pagar" style="padding:6px 12px;font-size:12px">💳 Registrar pago</button>' : '')+'</td>'+
+    '</tr>';
+  }).join('') || '<tr><td colspan="8" class="empty">Sin notas de venta para mostrar</td></tr>';
+  document.querySelectorAll('.btn-pagar').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var id = Number(btn.closest('tr').dataset.id);
+      var nv = notaVentaState.rows.find(function(x){return x.id===id;});
+      if(nv) openPagoModal(nv);
+    });
+  });
+}
+document.getElementById('pgSearch').addEventListener('input', renderPagosRows);
+document.getElementById('pgSoloPendientes').addEventListener('change', renderPagosRows);
+
+/* ---- Cuentas por Cobrar ---- */
+function renderCuentasXCobrar(forceReload){
+  if(forceReload){ fetchNotasVenta(renderCuentasXCobrarRows); return; }
+  renderCuentasXCobrarRows();
+}
+function renderCuentasXCobrarRows(){
+  var searchEl = document.getElementById('cxcSearch');
+  var q = searchEl ? (searchEl.value||'').toLowerCase() : '';
+  var rows = notaVentaState.rows.filter(function(nv){
+    var t = notaTotales(nv);
+    if(t.saldo<=0.005) return false;
+    if(q && (nv.cliente||'').toLowerCase().indexOf(q)===-1) return false;
+    return true;
+  });
+  rows.sort(function(a,b){
+    var k=cxcSort.k, d=cxcSort.dir, av=a[k], bv=b[k];
+    if(av==null) av=''; if(bv==null) bv='';
+    if(typeof av==='string') return av.localeCompare(bv)*d;
+    return (av-bv)*d;
+  });
+  var totalSaldo = 0;
+  document.getElementById('cxcBody').innerHTML = rows.map(function(nv){
+    var t = notaTotales(nv);
+    totalSaldo += t.saldo;
+    return '<tr>'+
+      '<td>'+escapeHtml(nv.cliente||'—')+'</td>'+
+      '<td>'+escapeHtml(nv.numero_nota)+'</td>'+
+      '<td>'+escapeHtml(nv.numero_pedido||'—')+'</td>'+
+      '<td>'+fmtFecha(nv.fecha)+'</td>'+
+      '<td class="num">'+fmt(t.total,2)+'</td>'+
+      '<td class="num">'+fmt(t.pagado,2)+'</td>'+
+      '<td class="num"><b>'+fmt(t.saldo,2)+'</b></td>'+
+      '<td>'+(t.proximaFecha?fmtFecha(t.proximaFecha):'—')+'</td>'+
+      '<td><span class="pill-estado pill-'+t.estadoClass+'">'+t.estado+'</span></td>'+
+    '</tr>';
+  }).join('') || '<tr><td colspan="9" class="empty">No hay cuentas por cobrar pendientes</td></tr>';
+  document.getElementById('cxcFoot').innerHTML = rows.length ? ('<tr><td colspan="6" style="text-align:right;font-weight:700">TOTAL POR COBRAR</td><td class="num cxc-total-saldo">'+fmt(totalSaldo,2)+'</td><td></td><td></td></tr>') : '';
+}
+document.getElementById('cxcSearch').addEventListener('input', renderCuentasXCobrarRows);
+document.querySelectorAll('#view-cuentasxcobrar th.sortable').forEach(function(th){
+  th.addEventListener('click', function(){
+    var k = th.dataset.k;
+    if(cxcSort.k===k) cxcSort.dir *= -1; else { cxcSort.k=k; cxcSort.dir=1; }
+    renderCuentasXCobrarRows();
+  });
+});
+
+/* ---- Registrar pago (modal) ---- */
+function openPagoModal(nota){
+  pagoModalState = nota;
+  pagoFile = null;
+  renderPagoForm();
+  document.getElementById('pagoModalOverlay').classList.add('active');
+}
+function closePagoModal(){ document.getElementById('pagoModalOverlay').classList.remove('active'); }
+document.getElementById('btnCerrarPago').addEventListener('click', closePagoModal);
+function verComprobantePago(path){
+  document.getElementById('compraImgBody').innerHTML = '<p class="muted">Cargando imagen…</p>';
+  document.getElementById('compraImgModalOverlay').classList.add('active');
+  sb.storage.from('comprobantes-pagos-venta').createSignedUrl(path, 3600).then(function(res){
+    var body = document.getElementById('compraImgBody');
+    if(res.error || !res.data){ body.innerHTML = '<p class="k-warn">No se pudo cargar la imagen.</p>'; return; }
+    body.innerHTML = '<img src="'+res.data.signedUrl+'" style="max-width:100%;border-radius:8px;border:1px solid var(--line)">';
+  });
+}
+function renderPagoForm(){
+  var nota = pagoModalState;
+  var t = notaTotales(nota);
+  var esAdminPg = currentProfile && currentProfile.rol==='admin';
+  var historial = t.pagos.slice().sort(function(a,b){ return (a.fecha_pago<b.fecha_pago)?1:-1; }).map(function(p){
+    return '<div class="line" data-pagoid="'+p.id+'"><span>'+fmtFecha(p.fecha_pago)+' — Bs '+fmt(p.monto_bs,2)+(p.registrado_por_nombre?(' · '+escapeHtml(p.registrado_por_nombre)):'')+'</span><span>'+
+      (p.comprobante_path ? '<button type="button" class="ghost btn-ver-comprobante-pago" data-path="'+escapeHtml(p.comprobante_path)+'" style="padding:2px 8px;font-size:11px">👁 Ver</button>' : '')+
+      (esAdminPg ? ' <button type="button" class="ghost danger btn-eliminar-pago" data-id="'+p.id+'" style="padding:2px 8px;font-size:11px">🗑️</button>' : '')+
+    '</span></div>';
+  }).join('') || '<p class="muted" style="font-size:12px">Todavía no hay pagos registrados en esta nota.</p>';
+  document.getElementById('pagoBody').innerHTML =
+    '<div class="doc-meta">'+
+      '<div class="doc-meta-item"><span class="l">N° Nota</span><span class="v">'+escapeHtml(nota.numero_nota)+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">Cliente</span><span class="v">'+escapeHtml(nota.cliente||'—')+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">Total</span><span class="v">Bs '+fmt(t.total,2)+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">Pagado</span><span class="v">Bs '+fmt(t.pagado,2)+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">Saldo pendiente</span><span class="v"><b>Bs '+fmt(t.saldo,2)+'</b></span></div>'+
+    '</div>'+
+    '<div class="section-title" style="margin-top:12px">Historial de pagos</div>'+
+    historial+
+    (t.saldo>0.005 ?
+      '<div class="section-title" style="margin-top:14px">Nuevo pago</div>'+
+      '<div class="inline-field"><label>Fecha de pago</label><input type="date" id="pg_fecha" value="'+new Date().toISOString().slice(0,10)+'"></div>'+
+      '<div class="inline-field"><label>Monto (Bs)</label><input type="number" step="0.01" min="0.01" id="pg_monto" class="pill-input" placeholder="'+t.saldo+'"></div>'+
+      '<div class="section-title" style="margin-top:10px">Comprobante de pago</div>'+
+      '<div class="inline-field"><input type="file" id="pg_file" accept="image/*"></div>'+
+      '<div id="pg_preview"></div>'+
+      '<button type="button" class="ghost" id="pg_btnDetect" style="margin-top:6px">🔍 Detectar monto en la imagen</button>'+
+      '<div id="pg_chips"></div>'+
+      '<div style="margin-top:16px;display:flex;gap:10px">'+
+        '<button class="primary" id="btnRegistrarPago">Registrar pago</button>'+
+        '<button id="btnCancelarPago2">Cancelar</button>'+
+      '</div>'
+      : '<p class="footnote" style="margin-top:12px">Esta nota de venta ya está totalmente pagada.</p>');
+  document.querySelectorAll('.btn-ver-comprobante-pago').forEach(function(btn){
+    btn.addEventListener('click', function(){ verComprobantePago(btn.dataset.path); });
+  });
+  document.querySelectorAll('.btn-eliminar-pago').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var id = Number(btn.dataset.id);
+      if(!confirm('¿Eliminar este pago? Esta acción no se puede deshacer.')) return;
+      btn.disabled = true;
+      sb.rpc('eliminar_pago_venta', {p_id:id}).then(function(res){
+        if(res.error){ toast('No se pudo eliminar el pago: '+errMsg(res.error)); btn.disabled=false; return; }
+        toast('Pago eliminado');
+        fetchNotasVenta(function(){
+          pagoModalState = notaVentaState.rows.find(function(x){return x.id===pagoModalState.id;}) || pagoModalState;
+          renderPagoForm();
+          if(activeTab()==='pagos') renderPagosRows();
+          if(activeTab()==='cuentasxcobrar') renderCuentasXCobrarRows();
+          if(activeTab()==='notasventa') renderNotasVentaRows();
+        });
+      });
+    });
+  });
+  if(t.saldo>0.005){
+    document.getElementById('btnCancelarPago2').addEventListener('click', closePagoModal);
+    document.getElementById('btnRegistrarPago').addEventListener('click', submitPago);
+    document.getElementById('pg_file').addEventListener('change', function(e){
+      pagoFile = (e.target.files && e.target.files[0]) ? e.target.files[0] : null;
+      document.getElementById('pg_preview').innerHTML = pagoFile ? '<img src="'+URL.createObjectURL(pagoFile)+'" style="max-width:220px;border-radius:8px;margin-top:6px">' : '';
+      document.getElementById('pg_chips').innerHTML = '';
+    });
+    wireCompraOcr('pg_file','pg_chips','pg_monto','pg_btnDetect');
+  }
+}
+function submitPago(){
+  var nota = pagoModalState;
+  var fecha = document.getElementById('pg_fecha').value || null;
+  var monto = parseFloat(document.getElementById('pg_monto').value);
+  if(!monto || isNaN(monto) || monto<=0){ toast('Poné un monto de pago válido'); return; }
+  var btn = document.getElementById('btnRegistrarPago');
+  btn.disabled = true;
+  function conArchivo(path){
+    sb.rpc('registrar_pago_venta', { p_nota_venta_id: nota.id, p_monto_bs: monto, p_fecha_pago: fecha, p_comprobante_path: path }).then(function(res){
+      btn.disabled = false;
+      if(res.error){ toast('No se pudo registrar el pago: '+errMsg(res.error)); return; }
+      toast('Pago registrado');
+      fetchNotasVenta(function(){
+        pagoModalState = notaVentaState.rows.find(function(x){return x.id===nota.id;}) || nota;
+        renderPagoForm();
+        if(activeTab()==='pagos') renderPagosRows();
+        if(activeTab()==='cuentasxcobrar') renderCuentasXCobrarRows();
+        if(activeTab()==='notasventa') renderNotasVentaRows();
+      });
+    });
+  }
+  if(!pagoFile){ conArchivo(null); return; }
+  var ext = ((pagoFile.name||'').split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
+  var path = 'pago_'+nota.id+'_'+Date.now()+'.'+ext;
+  sb.storage.from('comprobantes-pagos-venta').upload(path, pagoFile, {upsert:false}).then(function(res){
+    if(res.error){ toast('No se pudo subir el comprobante: '+errMsg(res.error)); btn.disabled=false; return; }
+    conArchivo(path);
+  });
+}
+
+/* ---- documento imprimible: nota de venta ---- */
+function renderNotaVentaDocCard(nota){
+  var hoy = new Date().toLocaleDateString('es-BO',{day:'2-digit',month:'2-digit',year:'numeric'});
+  var t = notaTotales(nota);
+  var pv = nota.pedidos_venta || {};
+  var items = (pv.pedido_venta_items||[]).slice().sort(function(a,b){ return (a.orden||0)-(b.orden||0); });
+  function metaItem(l,val){ return '<div class="doc-meta-item"><span class="l">'+l+'</span><span class="v">'+escapeHtml(String(val))+'</span></div>'; }
+  var filasProductos = items.map(function(it){
+    return '<tr><td>'+escapeHtml(it.producto_nombre)+'</td><td class="num">'+fmt(it.cantidad_toneladas,2)+'</td><td class="num">'+(it.precio_pactado!=null?fmtBs(it.precio_pactado):'—')+'</td><td class="num">'+(it.total_pactado!=null?fmtBs(it.total_pactado):'—')+'</td></tr>';
+  }).join('');
+  var filasCuotas = t.cuotas.map(function(c){
+    return '<tr><td>Cuota '+c.numero_cuota+'</td><td>'+fmtFecha(c.fecha_vencimiento)+'</td><td class="num">'+fmtBs(c.monto_bs)+'</td><td>'+(c._pagada?'<span class="pill-estado pill-pagada">Pagada</span>':'<span class="pill-estado pill-pendiente">Pendiente</span>')+'</td></tr>';
+  }).join('');
+  document.getElementById('notaVentaDocCard').innerHTML =
+    '<div class="fi-head"><span class="fi-brand"><img src="'+LOGO_DATA_URI+'" class="fi-logo" alt="NOGALMAX"> Nota de Venta</span><span class="fi-date">'+hoy+'</span></div>'+
+    '<div class="fi-nombre">'+escapeHtml(nota.cliente||'—')+'</div>'+
+    '<div class="doc-meta">'+
+      metaItem('N° Nota', nota.numero_nota)+
+      metaItem('N° Pedido', nota.numero_pedido||'—')+
+      metaItem('Fecha', fmtFecha(nota.fecha))+
+      metaItem('Condición de pago', pv.condicion_pago ? (CONDICION_PAGO_LABEL[pv.condicion_pago]||pv.condicion_pago)+(pv.condicion_pago_nota?(' · '+pv.condicion_pago_nota):'') : '—')+
+      metaItem('Entrega', pv.modo_entrega==='recoge' ? 'Recoge cliente' : (pv.modo_entrega==='envio' ? 'Envío a cliente' : '—'))+
+    '</div>'+
+    '<div class="fi-section">Productos</div>'+
+    '<table class="pf-table"><thead><tr><th>Producto</th><th class="num">Cantidad (Ton)</th><th class="num">Precio (Bs/Ton)</th><th class="num">Total (Bs)</th></tr></thead><tbody>'+filasProductos+'</tbody></table>'+
+    '<div class="doc-grand-total-box">'+
+      '<div class="doc-total-row">TOTAL: '+fmtBs(t.total)+'</div>'+
+      '<div class="doc-meta-item"><span class="l">Pagado</span><span class="v">'+fmtBs(t.pagado)+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">Saldo pendiente</span><span class="v"><b>'+fmtBs(t.saldo)+'</b></span></div>'+
+    '</div>'+
+    '<div class="fi-section">Plan de pago</div>'+
+    '<table class="pf-table"><thead><tr><th>Cuota</th><th>Vencimiento</th><th class="num">Monto (Bs)</th><th>Estado</th></tr></thead><tbody>'+filasCuotas+'</tbody></table>'+
+    '<div class="fi-foot">Generado desde NOGALMAX — Precios y Fórmulas</div>';
+}
+function openNotaVentaDocModal(nota){
+  notaVentaDocState = nota;
+  renderNotaVentaDocCard(nota);
+  document.getElementById('notaVentaDocModalOverlay').classList.add('active');
+}
+document.getElementById('btnCerrarNotaVentaDoc').addEventListener('click', function(){
+  document.getElementById('notaVentaDocModalOverlay').classList.remove('active');
+});
+document.getElementById('btnDescargarNotaVentaPdf').addEventListener('click', function(){
+  if(!notaVentaDocState) return;
+  if(typeof html2canvas === 'undefined'){ toast('No se pudo cargar el generador de documentos (revisá tu conexión a internet).'); return; }
+  var jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
+  if(!jsPDFCtor){ toast('No se pudo cargar el generador de PDF (revisá tu conexión a internet).'); return; }
+  var btn = document.getElementById('btnDescargarNotaVentaPdf');
+  btn.disabled = true;
+  var nota = notaVentaDocState;
+  html2canvas(document.getElementById('notaVentaDocCard'), {backgroundColor:'#ffffff', scale:2}).then(function(canvas){
+    var img = canvas.toDataURL('image/png');
+    var doc = new jsPDFCtor({unit:'mm', format:'a4'});
+    addImageFitted(doc, img, canvas);
+    doc.save('nota_venta_'+(nota.numero_nota||'nota')+'_'+slugFilename(nota.cliente||'cliente')+'.pdf');
+    btn.disabled = false;
+    toast('PDF descargado');
+  }).catch(function(err){ btn.disabled=false; toast('No se pudo generar el PDF: '+(err&&err.message?err.message:String(err))); });
+});
+
 function renderProdNuevaForm(){
   var soloStock = currentProfile && currentProfile.rol==='produccion';
   document.getElementById('prodNuevaBody').innerHTML =
@@ -3003,6 +3948,14 @@ document.getElementById('btnCsvRentabilidad').addEventListener('click', function
 });
 
 /* ================= DOCUMENTO DE PRODUCCION (PDF) ================= */
+var CATEGORIAS_BOLSA_NARANJA = ['SALES MINERALES','MINERALES ADITIVADOS','NUCLEOS Y PREMIX'];
+function colorBolsaPorCategoria(categoria){
+  return CATEGORIAS_BOLSA_NARANJA.indexOf(categoria)!==-1 ? 'naranja' : 'verde';
+}
+function colorBolsaParaProducto(productoHoja){
+  var p = state.productos.find(function(x){return x.hoja===productoHoja;});
+  return colorBolsaPorCategoria(p ? p.categoria : null);
+}
 var prodDocState = null;
 function renderProduccionDocCard(o, copiaLabel){
   var hoy = new Date().toLocaleDateString('es-BO',{day:'2-digit',month:'2-digit',year:'numeric'});
@@ -3032,10 +3985,12 @@ function renderProduccionDocCard(o, copiaLabel){
   }
   function metaItem(l,v){ return '<div class="doc-meta-item"><span class="l">'+l+'</span><span class="v">'+escapeHtml(String(v))+'</span></div>'; }
   var clienteLabel = o.es_stock_fabrica ? 'STOCK FÁBRICA' : (o.cliente||'—');
+  var colorBolsa = colorBolsaParaProducto(o.producto_hoja);
   document.getElementById('prodDocCard').innerHTML =
     '<div class="fi-head"><span class="fi-brand"><img src="'+LOGO_DATA_URI+'" class="fi-logo" alt="NOGALMAX"> Orden de Producción</span><span class="fi-date">'+hoy+'</span></div>'+
     '<div class="copy-badge">COPIA: '+escapeHtml(copiaLabel)+'</div>'+
     '<div class="fi-nombre">'+escapeHtml(o.producto_nombre)+'</div>'+
+    '<div class="bolsa-badge bolsa-'+colorBolsa+'">🎒 COLOR DE BOLSA: '+colorBolsa.toUpperCase()+'</div>'+
     '<div class="doc-meta">'+
       metaItem('N° Producción', o.numero_produccion)+
       metaItem('Lote', o.lote)+
