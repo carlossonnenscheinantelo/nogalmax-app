@@ -650,6 +650,33 @@ tr.ord-row-despachado:hover td{background:#c3ebc3}
     <p class="footnote">Acá se ve todo lo que ya se fabricó y todavía no salió de planta. «Disponible para stock» es producto hecho sin cliente asignado — al cargar un pedido de venta nuevo para ese producto, el sistema avisa que hay stock y da la opción de usarlo en vez de generar una producción nueva.</p>
   </section>
 
+  <!-- PRODUCTOS ENTREGADOS (historial de despachos) -->
+  <section id="view-entregados" class="view">
+    <div class="toolbar">
+      <input type="search" id="entSearch" placeholder="Buscar por producto, cliente o N°…">
+      <div class="spacer"></div>
+      <button id="btnCsvEntregados">⬇ Exportar CSV</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th class="sortable" data-k="despachado_en">Fecha de entrega</th>
+          <th class="sortable" data-k="numero_produccion">N° Producción</th>
+          <th>N° Pedido</th>
+          <th class="sortable" data-k="producto_nombre">Producto</th>
+          <th class="num">Cantidad (Ton)</th>
+          <th class="sortable" data-k="cliente">Cliente</th>
+          <th>Entregado por</th>
+          <th></th>
+          <th></th>
+        </tr></thead>
+        <tbody id="entregadosBody"></tbody>
+        <tfoot id="entregadosFoot"></tfoot>
+      </table>
+    </div>
+    <p class="footnote">Historial de todo lo que ya salió de planta hacia el cliente (o hacia stock de fábrica) — se va completando solo, cada vez que marcás un despacho en «Órdenes de Producción» o «Stock en Fábrica». Desde acá podés ver la boleta y el documento de cada entrega, o exportar todo el historial a CSV.</p>
+  </section>
+
   <!-- COMPRAS DE INSUMOS -->
   <section id="view-compras" class="view">
     <div class="toolbar">
@@ -744,6 +771,7 @@ tr.ord-row-despachado:hover td{background:#c3ebc3}
       <button data-tab="stock" class="nav-item">📦 Stock de Insumos</button>
       <button data-tab="ordenes" class="nav-item">🧾 Órdenes de Producción <span id="navBadgeOrdenes" class="nav-badge" hidden>0</span></button>
       <button data-tab="stockfabrica" class="nav-item">🏷️ Stock en Fábrica</button>
+      <button data-tab="entregados" class="nav-item">📬 Productos Entregados</button>
     </div>
   </div>
   <div class="nav-group open" data-group="comprasgrp">
@@ -1185,6 +1213,7 @@ document.querySelectorAll('.nav-item').forEach(function(btn){
     if(btn.dataset.tab==='pagos') renderPagos(!notaVentaState.loaded);
     if(btn.dataset.tab==='cuentasxcobrar') renderCuentasXCobrar(!notaVentaState.loaded);
     if(btn.dataset.tab==='stockfabrica') renderOrdenes(!ordenesState.loaded);
+    if(btn.dataset.tab==='entregados') renderOrdenes(!ordenesState.loaded);
     if(btn.dataset.tab==='compras') renderCompras(!comprasState.loaded);
     if(btn.dataset.tab==='rentabilidad') renderRentabilidad(!ventaState.loaded);
   });
@@ -2359,11 +2388,12 @@ function fetchProducciones(cb){
 }
 function renderOrdenes(forceReload){
   if(forceReload){
-    fetchProducciones(function(){ renderOrdenesRows(); renderStockFabricaRows(); });
+    fetchProducciones(function(){ renderOrdenesRows(); renderStockFabricaRows(); renderEntregadosRows(); });
     return;
   }
   renderOrdenesRows();
   renderStockFabricaRows();
+  renderEntregadosRows();
 }
 function renderOrdenesRows(){
   var q = (document.getElementById('ordSearch').value||'').toLowerCase();
@@ -2463,7 +2493,7 @@ function renderOrdenesRows(){
       sb.rpc('eliminar_produccion', {p_id:id}).then(function(res){
         if(res.error){ toast('No se pudo eliminar: '+errMsg(res.error)); btn.disabled=false; return; }
         toast('Producción eliminada');
-        fetchProducciones(function(){ renderOrdenesRows(); renderStockFabricaRows(); });
+        fetchProducciones(function(){ renderOrdenesRows(); renderStockFabricaRows(); renderEntregadosRows(); });
         if(ventaState.loaded) renderPedidosVenta(true);
       });
     });
@@ -2542,6 +2572,78 @@ function renderStockFabricaRows(){
 }
 var sfSearchEl = document.getElementById('sfSearch');
 if(sfSearchEl) sfSearchEl.addEventListener('input', renderStockFabricaRows);
+
+/* ================= PRODUCTOS ENTREGADOS (historial de despachos) ================= */
+var entSort = { k:'despachado_en', dir:-1 };
+function renderEntregadosRows(){
+  var body = document.getElementById('entregadosBody');
+  if(!body) return;
+  var qEl = document.getElementById('entSearch');
+  var q = qEl ? (qEl.value||'').toLowerCase() : '';
+  var entregados = ordenesState.rows.filter(function(o){ return o.despachado; });
+  var filtrado = entregados.filter(function(o){
+    if(!q) return true;
+    var hay = (o.producto_nombre+' '+(o.cliente||'')+' '+o.numero_produccion+' '+(o.pedido_venta_numero||'')+' '+(o.despachado_por_nombre||'')).toLowerCase();
+    return hay.indexOf(q)!==-1;
+  });
+  filtrado.sort(function(a,b){
+    var k=entSort.k, d=entSort.dir, av=a[k], bv=b[k];
+    if(av==null) av=''; if(bv==null) bv='';
+    if(typeof av==='string') return av.localeCompare(bv)*d;
+    return (av-bv)*d;
+  });
+  var totalTon = filtrado.reduce(function(s,o){ return s+(Number(o.cantidad_toneladas)||0); },0);
+  body.innerHTML = filtrado.map(function(o){
+    var clienteLabel = o.es_stock_fabrica ? '<span class="tag">Stock fábrica</span>' : escapeHtml(o.cliente||'—');
+    return '<tr data-id="'+o.id+'">'+
+      '<td>'+fmtFecha(o.despachado_en)+'</td>'+
+      '<td><b>'+escapeHtml(o.numero_produccion)+'</b></td>'+
+      '<td>'+escapeHtml(o.pedido_venta_numero||'—')+'</td>'+
+      '<td>'+escapeHtml(o.producto_nombre)+'</td>'+
+      '<td class="num">'+fmt(o.cantidad_toneladas,2)+'</td>'+
+      '<td>'+clienteLabel+'</td>'+
+      '<td>'+escapeHtml(o.despachado_por_nombre||'—')+'</td>'+
+      '<td><button class="ghost btn-ver-despacho-ent" title="Ver boleta de despacho">🧾 Boleta</button></td>'+
+      '<td><button class="ghost btn-doc-ord-ent" title="Ver / descargar documento">📄</button></td>'+
+    '</tr>';
+  }).join('') || '<tr><td colspan="9" class="empty">Todavía no hay entregas registradas</td></tr>';
+  var foot = document.getElementById('entregadosFoot');
+  if(foot){
+    foot.innerHTML = filtrado.length ? ('<tr><td colspan="4" style="text-align:right;font-weight:700">Total entregado</td><td class="num" style="font-weight:700">'+fmt(totalTon,2)+'</td><td colspan="4"></td></tr>') : '';
+  }
+  body.querySelectorAll('.btn-ver-despacho-ent').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var id = Number(btn.closest('tr').dataset.id);
+      var o = ordenesState.rows.find(function(x){return x.id===id;});
+      if(o) openDespachoModal(o);
+    });
+  });
+  body.querySelectorAll('.btn-doc-ord-ent').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var id = Number(btn.closest('tr').dataset.id);
+      var o = ordenesState.rows.find(function(x){return x.id===id;});
+      if(o) openProdDocModal(o);
+    });
+  });
+}
+var entSearchEl = document.getElementById('entSearch');
+if(entSearchEl) entSearchEl.addEventListener('input', renderEntregadosRows);
+document.querySelectorAll('#view-entregados th.sortable').forEach(function(th){
+  th.addEventListener('click', function(){
+    var k = th.dataset.k;
+    if(entSort.k===k) entSort.dir *= -1; else { entSort.k=k; entSort.dir = (k==='despachado_en')?-1:1; }
+    renderEntregadosRows();
+  });
+});
+var btnCsvEntregadosEl = document.getElementById('btnCsvEntregados');
+if(btnCsvEntregadosEl) btnCsvEntregadosEl.addEventListener('click', function(){
+  var entregados = ordenesState.rows.filter(function(o){ return o.despachado; }).slice().sort(function(a,b){ return (a.despachado_en<b.despachado_en)?1:-1; });
+  var lines = [['Fecha de entrega','N° Producción','N° Pedido','Producto','Cantidad (Ton)','Cliente','Entregado por'].join(';')];
+  entregados.forEach(function(o){
+    lines.push([fmtFecha(o.despachado_en), o.numero_produccion, o.pedido_venta_numero||'', o.producto_nombre, fmt(o.cantidad_toneladas,2), (o.es_stock_fabrica?'Stock fábrica':(o.cliente||'')), (o.despachado_por_nombre||'')].join(';'));
+  });
+  downloadBlob('productos_entregados_nogalmax.csv', new Blob(["﻿"+lines.join('\n')], {type:'text/csv;charset=utf-8'}));
+});
 
 /* ================= PEDIDOS DE VENTA (multi-producto) ================= */
 var CONDICION_PAGO_LABEL = {contado:'Contado', credito:'Crédito', otro:'Otro'};
@@ -2640,7 +2742,7 @@ function renderPedidosVentaRows(){
         if(res.error){ toast('No se pudo eliminar: '+errMsg(res.error)); btn.disabled=false; return; }
         toast('Pedido de venta eliminado');
         renderPedidosVenta(true);
-        fetchProducciones(function(){ if(activeTab()==='ordenes') renderOrdenesRows(); if(activeTab()==='stockfabrica') renderStockFabricaRows(); });
+        fetchProducciones(function(){ if(activeTab()==='ordenes') renderOrdenesRows(); if(activeTab()==='stockfabrica') renderStockFabricaRows(); if(activeTab()==='entregados') renderEntregadosRows(); });
         fetchNotasVenta(function(){
           if(activeTab()==='notasventa') renderNotasVentaRows();
           if(activeTab()==='pagos') renderPagosRows();
@@ -3957,6 +4059,22 @@ function colorBolsaParaProducto(productoHoja){
   return colorBolsaPorCategoria(p ? p.categoria : null);
 }
 var prodDocState = null;
+function ordinalEs(n){
+  var map = {1:'1ra',2:'2da',3:'3ra',4:'4ta',5:'5ta',6:'6ta',7:'7ma',8:'8va',9:'9na',10:'10ma'};
+  return map[n] || (n+'va');
+}
+// Devuelve el tamaño en Kg de cada batida necesaria para producir cantidadTon —
+// el mezclador/batidora trabaja en batidas de máximo 1000 Kg (1 Ton), así que un
+// pedido de 1500 Kg son 2 batidas: 1000 Kg + 500 Kg.
+function batidasDeProduccion(cantidadTon){
+  var totalKg = Math.round((Number(cantidadTon)||0)*1000);
+  if(totalKg<=0) return [];
+  var sizes = [];
+  var restante = totalKg;
+  while(restante > 1000){ sizes.push(1000); restante -= 1000; }
+  sizes.push(restante);
+  return sizes;
+}
 function renderProduccionDocCard(o, copiaLabel){
   var hoy = new Date().toLocaleDateString('es-BO',{day:'2-digit',month:'2-digit',year:'numeric'});
   var mpEntries=[], envEntries=[], totalMp=0;
@@ -3986,6 +4104,46 @@ function renderProduccionDocCard(o, copiaLabel){
   function metaItem(l,v){ return '<div class="doc-meta-item"><span class="l">'+l+'</span><span class="v">'+escapeHtml(String(v))+'</span></div>'; }
   var clienteLabel = o.es_stock_fabrica ? 'STOCK FÁBRICA' : (o.cliente||'—');
   var colorBolsa = colorBolsaParaProducto(o.producto_hoja);
+  var esPlanta = copiaLabel==='PLANTA';
+  // Copia PLANTA: la cantidad de materias primas se desglosa por batida (máx. 1000 Kg cada una),
+  // escalando la fórmula por Ton al tamaño real de cada batida. La copia ADMINISTRACIÓN
+  // sigue mostrando el total de la orden completa, sin cambios.
+  var materiasPrimasHtml;
+  if(esPlanta){
+    var batchSizes = batidasDeProduccion(o.cantidad_toneladas);
+    function entradasBatida(kg){
+      var factor = kg/1000;
+      return formulaMpEntries.map(function(e){
+        var ins = insumoIndex[e.nombre];
+        return {nombre:e.nombre, qty:e.qty*factor, unidad: ins && ins.unidad ? ins.unidad : 'Kg'};
+      });
+    }
+    if(!batchSizes.length){
+      materiasPrimasHtml = '<div class="fi-section" style="margin-top:10px;font-size:11.5px">Materias primas — por batida (máx. 1000 Kg por batida)</div><div class="fi-empty">Cantidad no disponible</div>';
+    } else {
+      var todasIguales = batchSizes.every(function(s){ return s===batchSizes[0]; });
+      var cuerpo;
+      if(todasIguales){
+        var kgUnico = batchSizes[0];
+        var entradas = entradasBatida(kgUnico);
+        cuerpo = (batchSizes.length>1 ? '<div class="fi-empty" style="font-style:italic;margin-bottom:4px">Preparar '+batchSizes.length+' batidas iguales de '+fmt(kgUnico,0)+' Kg — usar esta misma cantidad de insumos en cada una</div>' : '')+
+          tableRows(entradas)+
+          docTotalRow(entradas, 'TOTAL MATERIAS PRIMAS POR BATIDA ('+fmt(kgUnico,0)+' Kg)');
+      } else {
+        cuerpo = batchSizes.map(function(kg, idx){
+          var entradas = entradasBatida(kg);
+          return '<div class="fi-empty" style="font-weight:700;color:var(--brand-dark);margin-top:'+(idx>0?'10px':'0')+'">'+ordinalEs(idx+1)+' Batida — '+fmt(kg,0)+' Kg</div>'+
+            tableRows(entradas)+
+            docTotalRow(entradas, 'Total materias primas ('+ordinalEs(idx+1)+' batida)');
+        }).join('');
+      }
+      materiasPrimasHtml = '<div class="fi-section" style="margin-top:10px;font-size:11.5px">Materias primas — por batida (máx. 1000 Kg por batida)</div>'+cuerpo;
+    }
+  } else {
+    materiasPrimasHtml = '<div class="fi-section" style="margin-top:10px;font-size:11.5px">Materias primas</div>'+
+      tableRows(mpEntries)+
+      '<div class="doc-total-row">TOTAL MATERIAS PRIMAS: '+fmt(totalMp, totalMp%1===0?0:2)+' Kg</div>';
+  }
   document.getElementById('prodDocCard').innerHTML =
     '<div class="fi-head"><span class="fi-brand"><img src="'+LOGO_DATA_URI+'" class="fi-logo" alt="NOGALMAX"> Orden de Producción</span><span class="fi-date">'+hoy+'</span></div>'+
     '<div class="copy-badge">COPIA: '+escapeHtml(copiaLabel)+'</div>'+
@@ -4009,9 +4167,7 @@ function renderProduccionDocCard(o, copiaLabel){
     '</div>'+
     '<div class="doc-cantidad-box">'+
       '<div class="fi-section">✅ CANTIDAD A PREPARAR AHORA — para '+fmt(o.cantidad_toneladas,2)+' Ton de '+escapeHtml(o.producto_nombre)+'</div>'+
-      '<div class="fi-section" style="margin-top:10px;font-size:11.5px">Materias primas</div>'+
-      tableRows(mpEntries)+
-      '<div class="doc-total-row">TOTAL MATERIAS PRIMAS: '+fmt(totalMp, totalMp%1===0?0:2)+' Kg</div>'+
+      materiasPrimasHtml+
       '<div class="fi-section" style="margin-top:10px;font-size:11.5px">Envases y servicios (en su propia unidad — bolsas/sacos van en UNIDADES, no en Kg)</div>'+
       tableRows(envEntries)+
       docTotalRow(envEntries, 'TOTAL ENVASES Y SERVICIOS')+
@@ -4101,6 +4257,7 @@ function renderDespachoModalBody(){
         var idx = ordenesState.rows.findIndex(function(x){return x.id===row.id;});
         if(idx!==-1) ordenesState.rows[idx] = row;
         renderOrdenesRows();
+        if(typeof renderEntregadosRows==='function') renderEntregadosRows();
         toast('Despacho deshecho');
         closeDespachoModal();
       });
@@ -4144,6 +4301,7 @@ function submitDespacho(){
       var idx = ordenesState.rows.findIndex(function(x){return x.id===row.id;});
       if(idx!==-1) ordenesState.rows[idx] = row;
       renderOrdenesRows();
+      if(typeof renderEntregadosRows==='function') renderEntregadosRows();
       toast('Despacho registrado');
       closeDespachoModal();
     });
@@ -4285,7 +4443,7 @@ function submitEditarPvHeader(){
     if(res.error){ toast('No se pudo guardar: '+errMsg(res.error)); return; }
     toast('Datos del pedido actualizados');
     renderPedidosVenta(true);
-    fetchProducciones(function(){ if(activeTab()==='ordenes') renderOrdenesRows(); });
+    fetchProducciones(function(){ if(activeTab()==='ordenes') renderOrdenesRows(); if(activeTab()==='entregados') renderEntregadosRows(); });
     closeEditarPvModal();
   });
 }
@@ -4621,6 +4779,7 @@ function applyProduccionChange(payload){
   }
   if(activeTab()==='ordenes') renderOrdenesRows();
   if(activeTab()==='stockfabrica') renderStockFabricaRows();
+  if(activeTab()==='entregados') renderEntregadosRows();
 }
 function applyInsumoChange(payload){
   if(payload.eventType==='DELETE'){
@@ -4813,6 +4972,34 @@ function iniciarConexionSupabase(){
     showAuthMsg(elAuthError, 'No se pudo conectar con el servidor. Revisá tu conexión a internet y recargá la página.');
     return;
   }
+  // Si la pestaña quedó abierta mucho tiempo (o la compu se durmió), el token de acceso
+  // puede vencer antes de que se renueve solo en segundo plano — cualquier acción (crear
+  // pedido, registrar pago, etc.) fallaba con "JWT expired" sin ninguna salida para el
+  // usuario. Ahora, cuando eso pasa, se intenta renovar la sesión sola y se reintenta la
+  // misma acción una vez; si ni así se puede renovar (la sesión venció de verdad), se
+  // cierra sesión y se muestra un mensaje claro en vez del error crudo.
+  function pareceJwtExpirado(err){
+    var msg = ((err && (err.message||err.msg||err.error_description))||'').toLowerCase();
+    return msg.indexOf('jwt expired')!==-1 || msg.indexOf('jwt is expired')!==-1 || msg.indexOf('invalid jwt')!==-1 || (err && err.code==='PGRST301');
+  }
+  var _rpcOriginal = sb.rpc.bind(sb);
+  sb.rpc = function(fn, args){
+    return _rpcOriginal(fn, args).then(function(res){
+      if(res && res.error && pareceJwtExpirado(res.error)){
+        return sb.auth.refreshSession().then(function(refreshRes){
+          if(refreshRes && refreshRes.data && refreshRes.data.session && !refreshRes.error){
+            return _rpcOriginal(fn, args); // reintenta la misma acción una sola vez, ya con el token renovado
+          }
+          sb.auth.signOut();
+          return {data:null, error:{message:'Tu sesión venció por inactividad — volvé a iniciar sesión.'}};
+        }).catch(function(){
+          sb.auth.signOut();
+          return {data:null, error:{message:'Tu sesión venció por inactividad — volvé a iniciar sesión.'}};
+        });
+      }
+      return res;
+    });
+  };
   sb.auth.onAuthStateChange(function(event, session){
     if(session && session.user) onSignedIn(session);
     else onSignedOut();
