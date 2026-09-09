@@ -5032,6 +5032,23 @@ function iniciarConexionSupabase(){
     if(session && session.user) onSignedIn(session);
     else onSignedOut();
   });
+  // Refresco proactivo: en vez de esperar a que una acción falle por token vencido y recién ahí
+  // reaccionar (el mecanismo de arriba, que se deja como red de seguridad), se intenta mantener
+  // la sesión renovada SOLA de antemano — cada vez que la pestaña vuelve a estar visible/en foco
+  // (se cambió de pestaña, se minimizó, la compu se durmió y se despertó) y también cada pocos
+  // minutos mientras la pestaña queda abierta. Así, en el uso normal, el usuario prácticamente
+  // nunca debería llegar a ver el cartel de "tu sesión venció" — Supabase renueva la sesión sin
+  // que se note, mucho antes de que el usuario llegue a tocar un botón.
+  function refrescoProactivoSilencioso(){
+    if(!sb || !currentUser) return; // solo si ya hay una sesión iniciada
+    sb.auth.getSession().catch(function(){});
+  }
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'visible') refrescoProactivoSilencioso();
+  });
+  window.addEventListener('focus', refrescoProactivoSilencioso);
+  window.addEventListener('online', refrescoProactivoSilencioso);
+  setInterval(refrescoProactivoSilencioso, 4*60*1000);
 }
 var elScriptSupabase = document.getElementById('scriptSupabase');
 elScriptSupabase.addEventListener('load', iniciarConexionSupabase);
