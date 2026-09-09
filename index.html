@@ -2786,17 +2786,21 @@ function renderPedidoVentaForm(){
     '<button type="button" id="btnAgregarPvLinea" class="ghost" style="margin-top:4px">+ Agregar producto</button>'+
     '<div id="pv_preview"></div>'+
     '<p class="footnote">Cada producto genera su propia orden de producción y lote, y descuenta el stock de insumos según su fórmula — igual que en 🏭 Producción. El «precio tabla» es el precio de venta con comisión que ya usa el resto de la app — poné un % de descuento si corresponde y el precio final se calcula solo (también podés escribirlo directo).</p>'+
-    '<div class="section-title" style="margin-top:14px">Nota de venta — plan de pago</div>'+
-    '<div class="pv-total-box" id="pv_totalBox"></div>'+
-    '<div class="inline-field"><label>N° de cuotas</label><select id="pv_numCuotas"><option value="1">1 pago</option><option value="2">2 pagos</option><option value="3">3 pagos</option></select></div>'+
-    '<button type="button" class="ghost" id="btnRepartirCuotas" style="margin-top:4px">🔄 Repartir en partes iguales</button>'+
-    '<div id="pv_cuotasWrap" style="margin-top:8px"></div>'+
-    '<p class="footnote">La nota de venta se genera sola al crear el pedido, con este plan de cuotas. Los montos se reparten en partes iguales pero podés editarlos a mano (por ejemplo, para un anticipo distinto).</p>'+
+    '<div class="pv-total-box" id="pv_totalBoxContado" style="display:none"></div>'+
+    '<div id="pv_planPagoWrap">'+
+      '<div class="section-title" style="margin-top:14px">Nota de venta — plan de pago</div>'+
+      '<div class="pv-total-box" id="pv_totalBox"></div>'+
+      '<div class="inline-field"><label>N° de cuotas</label><select id="pv_numCuotas"><option value="1">1 pago</option><option value="2">2 pagos</option><option value="3">3 pagos</option></select></div>'+
+      '<button type="button" class="ghost" id="btnRepartirCuotas" style="margin-top:4px">🔄 Repartir en partes iguales</button>'+
+      '<div id="pv_cuotasWrap" style="margin-top:8px"></div>'+
+      '<p class="footnote">La nota de venta se genera sola al crear el pedido, con este plan de cuotas. Los montos se reparten en partes iguales pero podés editarlos a mano (por ejemplo, para un anticipo distinto).</p>'+
+    '</div>'+
     '<div style="margin-top:16px;display:flex;gap:10px">'+
       '<button class="primary" id="btnCrearPedidoVenta">Crear pedido de venta</button>'+
       '<button id="btnCancelarPedidoVenta2">Cancelar</button>'+
     '</div>';
   pvCuotas = [{fecha: document.getElementById('pv_fechaEntrega').value || '', monto: 0}];
+  document.getElementById('pv_condicion').addEventListener('change', actualizarPlanPagoVisibilidad);
   document.getElementById('pv_numCuotas').addEventListener('change', function(){
     repartirPvCuotas(Number(this.value));
   });
@@ -2829,6 +2833,18 @@ function renderPedidoVentaForm(){
   document.getElementById('btnCrearPedidoVenta').addEventListener('click', submitPedidoVenta);
   renderPvLineas();
   renderPvCuotas();
+  actualizarPlanPagoVisibilidad();
+}
+/* al contado se cobra al recoger — no tiene sentido pedir un plan de cuotas, se oculta y se genera 1 solo pago por el total */
+function actualizarPlanPagoVisibilidad(){
+  var condicionEl = document.getElementById('pv_condicion');
+  var wrap = document.getElementById('pv_planPagoWrap');
+  var boxContado = document.getElementById('pv_totalBoxContado');
+  if(!condicionEl || !wrap) return;
+  var esContado = condicionEl.value === 'contado';
+  wrap.style.display = esContado ? 'none' : '';
+  if(boxContado) boxContado.style.display = esContado ? '' : 'none';
+  updatePvTotalBox();
 }
 function precioTablaFor(hoja){
   var p = state.productos.find(function(x){return x.hoja===hoja;});
@@ -2854,9 +2870,11 @@ function totalPedidoActual(){
   return Math.round(total*100)/100;
 }
 function updatePvTotalBox(){
+  var total = totalPedidoActual();
   var box = document.getElementById('pv_totalBox');
-  if(!box) return;
-  box.textContent = 'Total del pedido: '+fmtBs(totalPedidoActual());
+  if(box) box.textContent = 'Total del pedido: '+fmtBs(total);
+  var boxContado = document.getElementById('pv_totalBoxContado');
+  if(boxContado) boxContado.textContent = 'Total del pedido (al contado, se paga al recoger): '+fmtBs(total);
 }
 function addDiasISO(fechaISO, dias){
   var d = fechaISO ? new Date(fechaISO+'T00:00:00') : new Date();
@@ -3029,17 +3047,24 @@ function submitPedidoVenta(){
   }
   if(!items.length){ toast('Agregá al menos un producto'); return; }
   var totalPedido = totalPedidoActual();
-  var sumaCuotas = pvCuotas.reduce(function(s,c){ return s + (Number(c.monto)||0); }, 0);
-  sumaCuotas = Math.round(sumaCuotas*100)/100;
-  if(Math.abs(sumaCuotas - totalPedido) > 0.05){
-    toast('La suma de las cuotas ('+fmtBs(sumaCuotas)+') no coincide con el total del pedido ('+fmtBs(totalPedido)+'). Tocá «Repartir en partes iguales» o ajustá los montos.');
-    return;
+  var cuotasPayload;
+  if(condicion === 'contado'){
+    /* al contado = se paga al recoger, un solo pago por el total, sin plan de cuotas */
+    if(totalPedido<=0){ toast('Poné los precios de los productos antes de crear el pedido.'); return; }
+    cuotasPayload = [{ fecha_vencimiento: fechaEntrega || new Date().toISOString().slice(0,10), monto_bs: totalPedido }];
+  } else {
+    var sumaCuotas = pvCuotas.reduce(function(s,c){ return s + (Number(c.monto)||0); }, 0);
+    sumaCuotas = Math.round(sumaCuotas*100)/100;
+    if(Math.abs(sumaCuotas - totalPedido) > 0.05){
+      toast('La suma de las cuotas ('+fmtBs(sumaCuotas)+') no coincide con el total del pedido ('+fmtBs(totalPedido)+'). Tocá «Repartir en partes iguales» o ajustá los montos.');
+      return;
+    }
+    for(var c=0;c<pvCuotas.length;c++){
+      if(!pvCuotas[c].fecha){ toast('Poné la fecha de la cuota '+(c+1)); return; }
+      if(!pvCuotas[c].monto || pvCuotas[c].monto<=0){ toast('Poné un monto válido en la cuota '+(c+1)); return; }
+    }
+    cuotasPayload = pvCuotas.map(function(c){ return { fecha_vencimiento: c.fecha, monto_bs: c.monto }; });
   }
-  for(var c=0;c<pvCuotas.length;c++){
-    if(!pvCuotas[c].fecha){ toast('Poné la fecha de la cuota '+(c+1)); return; }
-    if(!pvCuotas[c].monto || pvCuotas[c].monto<=0){ toast('Poné un monto válido en la cuota '+(c+1)); return; }
-  }
-  var cuotasPayload = pvCuotas.map(function(c){ return { fecha_vencimiento: c.fecha, monto_bs: c.monto }; });
   var btn = document.getElementById('btnCrearPedidoVenta');
   btn.disabled = true;
   sb.rpc('crear_pedido_venta', {
@@ -3786,6 +3811,10 @@ function renderNotaVentaDocCard(nota){
   var filasCuotas = t.cuotas.map(function(c){
     return '<tr><td>Cuota '+c.numero_cuota+'</td><td>'+fmtFecha(c.fecha_vencimiento)+'</td><td class="num">'+fmtBs(c.monto_bs)+'</td><td>'+(c._pagada?'<span class="pill-estado pill-pagada">Pagada</span>':'<span class="pill-estado pill-pendiente">Pendiente</span>')+'</td></tr>';
   }).join('');
+  /* al contado se paga de una sola vez al recoger — no tiene sentido mostrar un "plan de pago" con cuotas */
+  var planPagoHtml = (pv.condicion_pago === 'contado') ? '' :
+    '<div class="fi-section">Plan de pago</div>'+
+    '<table class="pf-table"><thead><tr><th>Cuota</th><th>Vencimiento</th><th class="num">Monto (Bs)</th><th>Estado</th></tr></thead><tbody>'+filasCuotas+'</tbody></table>';
   document.getElementById('notaVentaDocCard').innerHTML =
     '<div class="fi-head"><span class="fi-brand"><img src="'+LOGO_DATA_URI+'" class="fi-logo" alt="NOGALMAX"> Nota de Venta</span><span class="fi-date">'+hoy+'</span></div>'+
     '<div class="fi-nombre">'+escapeHtml(nota.cliente||'—')+'</div>'+
@@ -3803,8 +3832,7 @@ function renderNotaVentaDocCard(nota){
       '<div class="doc-meta-item"><span class="l">Pagado</span><span class="v">'+fmtBs(t.pagado)+'</span></div>'+
       '<div class="doc-meta-item"><span class="l">Saldo pendiente</span><span class="v"><b>'+fmtBs(t.saldo)+'</b></span></div>'+
     '</div>'+
-    '<div class="fi-section">Plan de pago</div>'+
-    '<table class="pf-table"><thead><tr><th>Cuota</th><th>Vencimiento</th><th class="num">Monto (Bs)</th><th>Estado</th></tr></thead><tbody>'+filasCuotas+'</tbody></table>'+
+    planPagoHtml+
     '<div class="fi-foot">Generado desde NOGALMAX — Precios y Fórmulas</div>';
 }
 function openNotaVentaDocModal(nota){
