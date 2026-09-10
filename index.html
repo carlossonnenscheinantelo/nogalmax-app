@@ -694,6 +694,7 @@ tr.ord-row-despachado:hover td{background:#c3ebc3}
           <th class="num">Precio unit.</th>
           <th class="num">Total</th>
           <th class="num">Flete</th>
+          <th>Condición</th>
           <th>Comprobantes</th>
           <th>Notas</th>
         </tr></thead>
@@ -701,6 +702,98 @@ tr.ord-row-despachado:hover td{background:#c3ebc3}
       </table>
     </div>
     <p class="footnote">Registrá acá cada compra de insumo junto con su comprobante (factura o recibo) — el sistema ayuda a detectar los montos de la imagen. El flete, cuando corresponde, se registra con su propio comprobante separado. Cada compra suma al stock del insumo y, si marcás la casilla, también actualiza su precio (igual que en «📦 Stock de Insumos»).</p>
+  </section>
+
+  <!-- PAGOS DE COMPRAS -->
+  <section id="view-pagoscompra" class="view">
+    <div class="toolbar">
+      <input type="search" id="pgcSearch" placeholder="Buscar por proveedor o insumo…">
+      <label class="inline-field" style="align-items:center;flex-direction:row;gap:6px"><input type="checkbox" id="pgcSoloPendientes" checked> Solo con saldo pendiente</label>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Fecha</th>
+          <th>Proveedor</th>
+          <th>Insumo</th>
+          <th>Condición</th>
+          <th class="num">Total (Bs)</th>
+          <th class="num">Pagado (Bs)</th>
+          <th class="num">Saldo (Bs)</th>
+          <th>Vencimiento</th>
+          <th>Estado</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="pagosCompraBody"></tbody>
+      </table>
+    </div>
+    <p class="footnote">Elegí la compra que se está pagando, subí la foto del comprobante de pago (el sistema intenta leer el monto solo) y registrá el pago junto con la cuenta de origen del dinero — el saldo se actualiza al toque.</p>
+  </section>
+
+  <!-- CUENTAS POR PAGAR -->
+  <section id="view-cxpagar" class="view">
+    <div class="toolbar">
+      <input type="search" id="cxpSearch" placeholder="Buscar por proveedor…">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th class="sortable" data-k="proveedor">Proveedor</th>
+          <th>Insumo</th>
+          <th class="sortable" data-k="fecha">Fecha</th>
+          <th class="num">Total (Bs)</th>
+          <th class="num">Pagado (Bs)</th>
+          <th class="num">Saldo (Bs)</th>
+          <th>Vencimiento</th>
+          <th>Estado</th>
+        </tr></thead>
+        <tbody id="cxpBody"></tbody>
+        <tfoot id="cxpFoot"></tfoot>
+      </table>
+    </div>
+    <p class="footnote">Todo lo que todavía debemos a proveedores, en base a las compras al crédito con saldo pendiente. «Vencida» significa que ya pasó la fecha de vencimiento y todavía no está cubierta por los pagos registrados.</p>
+  </section>
+
+  <!-- CLIENTES: CARDEX -->
+  <section id="view-clientescardex" class="view">
+    <div class="toolbar">
+      <input type="search" id="clcxSearch" placeholder="Buscar cliente…">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th class="sortable" data-k="nombre">Cliente</th>
+          <th class="num">Pedidos</th>
+          <th class="num">Total facturado (Bs)</th>
+          <th class="num">Pagado (Bs)</th>
+          <th class="num">Deuda actual (Bs)</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="clientesCardexBody"></tbody>
+      </table>
+    </div>
+    <p class="footnote">Cada cliente que aparece en un pedido de venta queda guardado acá — tocá «Ver cardex» para ver su historial completo de pedidos y pagos con fecha.</p>
+  </section>
+
+  <!-- PROVEEDORES: CARDEX -->
+  <section id="view-proveedorescardex" class="view">
+    <div class="toolbar">
+      <input type="search" id="prcxSearch" placeholder="Buscar proveedor…">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th class="sortable" data-k="nombre">Proveedor</th>
+          <th class="num">Compras</th>
+          <th class="num">Total comprado (Bs)</th>
+          <th class="num">Pagado (Bs)</th>
+          <th class="num">Deuda actual (Bs)</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="proveedoresCardexBody"></tbody>
+      </table>
+    </div>
+    <p class="footnote">Cada proveedor que aparece en una compra de insumo queda guardado acá — tocá «Ver cardex» para ver su historial completo de compras y pagos con fecha.</p>
   </section>
 
   <!-- RENTABILIDAD REAL (contabilidad) -->
@@ -778,6 +871,15 @@ tr.ord-row-despachado:hover td{background:#c3ebc3}
     <button class="nav-group-head" type="button">🛒 Compras <span class="chev">▾</span></button>
     <div class="nav-group-items">
       <button data-tab="compras" class="nav-item">🧾 Compras de Insumos</button>
+      <button data-tab="pagoscompra" class="nav-item">💳 Pagos de Compras</button>
+      <button data-tab="cxpagar" class="nav-item">📊 Cuentas por Pagar</button>
+    </div>
+  </div>
+  <div class="nav-group open" data-group="clientesproveedoresgrp">
+    <button class="nav-group-head" type="button">👥 Clientes y Proveedores <span class="chev">▾</span></button>
+    <div class="nav-group-items">
+      <button data-tab="clientescardex" class="nav-item">🧑‍💼 Clientes</button>
+      <button data-tab="proveedorescardex" class="nav-item">🚚 Proveedores</button>
     </div>
   </div>
   <div class="nav-group open" data-group="contabilidadgrp">
@@ -1020,6 +1122,29 @@ tr.ord-row-despachado:hover td{background:#c3ebc3}
   </div>
 </div>
 
+<div id="pagoCompraModalOverlay" class="overlay2">
+  <div class="ocr-box" style="max-width:520px">
+    <div class="ocr-head">
+      <h3>Registrar pago a proveedor</h3>
+      <button class="close-x" id="btnCerrarPagoCompra">✕</button>
+    </div>
+    <div id="pagoCompraBody" class="ocr-body"></div>
+  </div>
+</div>
+
+<div id="cardexModalOverlay" class="overlay2">
+  <div class="ocr-box" style="max-width:640px">
+    <div class="ocr-head">
+      <h3 id="cardexTitle">Cardex</h3>
+      <button class="close-x" id="btnCerrarCardex">✕</button>
+    </div>
+    <div id="cardexBody" class="ocr-body"></div>
+  </div>
+</div>
+
+<datalist id="clientesDatalist"></datalist>
+<datalist id="proveedoresDatalist"></datalist>
+
 <div id="despachoModalOverlay" class="overlay2">
   <div class="ocr-box" style="max-width:460px">
     <div class="ocr-head">
@@ -1099,6 +1224,12 @@ var comprasState = { loaded:false, rows: [] };
 var comprasSort = { k:'fecha', dir:-1 };
 var compraFile = null;
 var compraFleteFile = null;
+var compraPagoFile = null;
+var clientesState = { loaded:false, rows: [] };
+var proveedoresState = { loaded:false, rows: [] };
+var cxpSort = { k:'fecha', dir:-1 };
+var pagoCompraModalState = null; // compra_insumos row actual del modal de pago a proveedor
+var pagoCompraFile = null;
 var insumoIndex = {}; // nombre -> insumo obj
 function reindexInsumos(){
   insumoIndex = {};
@@ -1215,6 +1346,10 @@ document.querySelectorAll('.nav-item').forEach(function(btn){
     if(btn.dataset.tab==='stockfabrica') renderOrdenes(!ordenesState.loaded);
     if(btn.dataset.tab==='entregados') renderOrdenes(!ordenesState.loaded);
     if(btn.dataset.tab==='compras') renderCompras(!comprasState.loaded);
+    if(btn.dataset.tab==='pagoscompra') renderPagosCompra(!comprasState.loaded);
+    if(btn.dataset.tab==='cxpagar') renderCXPagar(!comprasState.loaded);
+    if(btn.dataset.tab==='clientescardex') renderClientesCardex(!clientesState.loaded || !notaVentaState.loaded);
+    if(btn.dataset.tab==='proveedorescardex') renderProveedoresCardex(!proveedoresState.loaded || !comprasState.loaded);
     if(btn.dataset.tab==='rentabilidad') renderRentabilidad(!ventaState.loaded);
   });
 });
@@ -2765,7 +2900,7 @@ document.querySelectorAll('#view-pedidosventa th.sortable').forEach(function(th)
 function renderPedidoVentaForm(){
   pvLineas = [{producto_hoja:'', cantidad:1, precio:'', usar_stock_id:null, descuentoPct:''}];
   document.getElementById('pedidoVentaBody').innerHTML =
-    '<div class="inline-field"><label>Cliente</label><input type="text" id="pv_cliente" style="min-width:220px" placeholder="Nombre del cliente"></div>'+
+    '<div class="inline-field"><label>Cliente</label><input type="text" id="pv_cliente" list="clientesDatalist" style="min-width:220px" placeholder="Nombre del cliente"></div>'+
     '<div class="inline-field"><label>Condición de pago</label><select id="pv_condicion">'+
       '<option value="">— Sin especificar —</option>'+
       '<option value="contado">Contado</option>'+
@@ -2834,6 +2969,7 @@ function renderPedidoVentaForm(){
   renderPvLineas();
   renderPvCuotas();
   actualizarPlanPagoVisibilidad();
+  fetchClientes(populateClientesDatalist);
 }
 /* al contado se cobra al recoger — no tiene sentido pedir un plan de cuotas, se oculta y se genera 1 solo pago por el total */
 function actualizarPlanPagoVisibilidad(){
@@ -3303,7 +3439,7 @@ document.querySelectorAll('#view-proformas th.sortable').forEach(function(th){
 function renderProformaForm(){
   pfLineas = [{producto_hoja:'', cantidad:1, descuentoPct:0}];
   document.getElementById('proformaBody').innerHTML =
-    '<div class="inline-field"><label>Cliente</label><input type="text" id="pf_cliente" style="min-width:220px" placeholder="Nombre del cliente"></div>'+
+    '<div class="inline-field"><label>Cliente</label><input type="text" id="pf_cliente" list="clientesDatalist" style="min-width:220px" placeholder="Nombre del cliente"></div>'+
     '<div class="inline-field"><label>Fecha de entrega</label><input type="date" id="pf_fechaEntrega"></div>'+
     '<div class="inline-field"><label>Entrega</label><select id="pf_modoEntrega">'+
       '<option value="recoge">Recoge cliente</option>'+
@@ -3333,6 +3469,7 @@ function renderProformaForm(){
   document.getElementById('btnCancelarProforma2').addEventListener('click', closeProformaModal);
   document.getElementById('btnCrearProforma').addEventListener('click', submitProforma);
   renderPfLineas();
+  fetchClientes(populateClientesDatalist);
 }
 function renderPfLineas(){
   var wrap = document.getElementById('pf_lineasWrap');
@@ -4498,16 +4635,30 @@ function submitEditarPvLinea(itemId, btn){
 
 /* ================= COMPRAS DE INSUMOS ================= */
 function renderCompras(forceReload){
-  if(forceReload){
-    sb.from('compras_insumos').select('*').order('fecha',{ascending:false}).order('id',{ascending:false}).then(function(res){
-      if(res.error){ toast('No se pudieron cargar las compras: '+errMsg(res.error)); return; }
-      comprasState.rows = res.data || [];
-      comprasState.loaded = true;
-      renderComprasRows();
-    });
-    return;
-  }
+  if(forceReload){ fetchCompras(renderComprasRows); return; }
   renderComprasRows();
+}
+function fetchCompras(cb){
+  sb.from('compras_insumos').select('*, pagos_compra(*)').order('fecha',{ascending:false}).order('id',{ascending:false}).then(function(res){
+    if(res.error){ toast('No se pudieron cargar las compras: '+errMsg(res.error)); return; }
+    comprasState.rows = res.data || [];
+    comprasState.loaded = true;
+    if(cb) cb();
+  });
+}
+function compraTotales(compra){
+  var pagos = (compra.pagos_compra||[]).slice();
+  var pagado = Math.round(pagos.reduce(function(s,p){ return s+(Number(p.monto_bs)||0); },0)*100)/100;
+  var total = Number(compra.monto_total)||0;
+  var saldo = Math.round((total-pagado)*100)/100;
+  if(saldo<0) saldo = 0;
+  var hoy = new Date().toISOString().slice(0,10);
+  var vencida = !!(compra.condicion_pago==='credito' && compra.fecha_vencimiento_pago && compra.fecha_vencimiento_pago<hoy && saldo>0.005);
+  var estado, estadoClass;
+  if(saldo<=0.005){ estado='Pagada'; estadoClass='pagada'; }
+  else if(pagado>0){ estado = vencida?'Vencida (parcial)':'Parcial'; estadoClass = vencida?'vencida':'parcial'; }
+  else { estado = vencida?'Vencida':'Pendiente'; estadoClass = vencida?'vencida':'pendiente'; }
+  return { pagos:pagos, pagado:pagado, total:total, saldo:saldo, vencida:vencida, estado:estado, estadoClass:estadoClass };
 }
 function renderComprasRows(){
   var q = (document.getElementById('comprasSearch').value||'').toLowerCase();
@@ -4525,8 +4676,10 @@ function renderComprasRows(){
   document.getElementById('comprasBody').innerHTML = rows.map(function(c){
     var comprobantes = '';
     if(c.comprobante_compra_path) comprobantes += '<button class="ghost btn-ver-comprobante" data-path="'+escapeHtml(c.comprobante_compra_path)+'" data-titulo="Comprobante de compra">🧾 Compra</button> ';
-    if(c.comprobante_flete_path) comprobantes += '<button class="ghost btn-ver-comprobante" data-path="'+escapeHtml(c.comprobante_flete_path)+'" data-titulo="Comprobante de flete">🚚 Flete</button>';
+    if(c.comprobante_flete_path) comprobantes += '<button class="ghost btn-ver-comprobante" data-path="'+escapeHtml(c.comprobante_flete_path)+'" data-titulo="Comprobante de flete">🚚 Flete</button> ';
+    if(c.comprobante_pago_path) comprobantes += '<button class="ghost btn-ver-comprobante-pago-c" data-path="'+escapeHtml(c.comprobante_pago_path)+'" data-titulo="Comprobante de pago">💳 Pago</button>';
     if(!comprobantes) comprobantes = '<span class="muted">—</span>';
+    var condTxt = c.condicion_pago==='credito' ? ('Crédito'+(c.dias_credito?(' a '+c.dias_credito+' días'):'')+(c.fecha_vencimiento_pago?('<br><span class="muted" style="font-size:11px">vence '+fmtFecha(c.fecha_vencimiento_pago)+'</span>'):'')) : 'Contado';
     return '<tr data-id="'+c.id+'">'+
       '<td>'+fmtFecha(c.fecha)+'</td>'+
       '<td>'+escapeHtml(c.insumo_nombre)+'</td>'+
@@ -4535,12 +4688,16 @@ function renderComprasRows(){
       '<td class="num">'+fmt(c.precio_unitario,2)+'</td>'+
       '<td class="num">'+fmt(c.monto_total,2)+'</td>'+
       '<td class="num">'+(c.monto_flete?fmt(c.monto_flete,2):'—')+'</td>'+
+      '<td>'+condTxt+'</td>'+
       '<td>'+comprobantes+'</td>'+
       '<td>'+escapeHtml(c.notas||'—')+'</td>'+
     '</tr>';
-  }).join('') || '<tr><td colspan="9" class="empty">Sin compras registradas</td></tr>';
+  }).join('') || '<tr><td colspan="10" class="empty">Sin compras registradas</td></tr>';
   document.querySelectorAll('.btn-ver-comprobante').forEach(function(btn){
     btn.addEventListener('click', function(){ verComprobante(btn.dataset.path, btn.dataset.titulo); });
+  });
+  document.querySelectorAll('.btn-ver-comprobante-pago-c').forEach(function(btn){
+    btn.addEventListener('click', function(){ verComprobantePagoCompra(btn.dataset.path, btn.dataset.titulo); });
   });
 }
 document.getElementById('comprasSearch').addEventListener('input', renderComprasRows);
@@ -4594,10 +4751,10 @@ function wireCompraOcr(inputId, chipWrapId, targetFieldId, btnId){
   });
 }
 function renderCompraForm(){
-  compraFile = null; compraFleteFile = null;
+  compraFile = null; compraFleteFile = null; compraPagoFile = null;
   document.getElementById('compraBody').innerHTML =
     '<div class="inline-field"><label>Insumo</label><select id="cp_insumo" style="min-width:240px">'+buildInsumoOptionsPlain(null)+'</select></div>'+
-    '<div class="inline-field"><label>Proveedor</label><input type="text" id="cp_proveedor" style="min-width:200px" placeholder="Nombre del proveedor"></div>'+
+    '<div class="inline-field"><label>Proveedor</label><input type="text" id="cp_proveedor" list="proveedoresDatalist" style="min-width:200px" placeholder="Nombre del proveedor"></div>'+
     '<div class="inline-field"><label>Fecha</label><input type="date" id="cp_fecha" value="'+new Date().toISOString().slice(0,10)+'"></div>'+
     '<div class="inline-field"><label>Cantidad</label><input type="number" step="0.01" min="0.01" id="cp_cantidad" class="pill-input"></div>'+
     '<div class="inline-field"><label>Precio unitario</label><input type="number" step="0.01" min="0" id="cp_precio" class="pill-input"></div>'+
@@ -4613,6 +4770,19 @@ function renderCompraForm(){
     '<div id="cp_previewFlete"></div>'+
     '<button type="button" class="ghost" id="cp_btnDetectFlete" style="margin-top:6px">🔍 Detectar montos en la imagen</button>'+
     '<div id="cp_chipsFlete"></div>'+
+    '<div class="section-title" style="margin-top:14px">Condición de pago</div>'+
+    '<div class="inline-field"><label>¿Cómo se paga?</label><select id="cp_condicion">'+
+      '<option value="contado">Contado</option>'+
+      '<option value="credito">Crédito</option>'+
+    '</select></div>'+
+    '<div class="inline-field" id="cp_diasCreditoWrap"><label>¿A cuántos días?</label><input type="number" step="1" min="1" id="cp_diasCredito" class="pill-input" placeholder="Ej: 30"></div>'+
+    '<div id="cp_pagoContadoWrap">'+
+      '<div class="section-title" style="margin-top:14px">Comprobante de pago (distinto del comprobante de compra)</div>'+
+      '<div class="inline-field"><input type="file" id="cp_filePago" accept="image/*"></div>'+
+      '<div id="cp_previewPago"></div>'+
+      '<div class="inline-field" style="margin-top:10px"><label>Cuenta de origen (de dónde salió el dinero)</label><input type="text" id="cp_cuentaOrigen" style="min-width:220px" placeholder="Ej: Banco XX cta. 123 — Juan Pérez"></div>'+
+    '</div>'+
+    '<p class="footnote" id="cp_pagoCreditoNota" style="display:none">Como es al crédito, el comprobante de pago y la cuenta de origen se registran después, cuando se pague, desde «💳 Pagos de Compras».</p>'+
     '<div class="inline-field" style="margin-top:14px"><label>Notas (opcional)</label><input type="text" id="cp_notas" style="min-width:220px"></div>'+
     '<div style="margin-top:16px;display:flex;gap:10px">'+
       '<button class="primary" id="btnGuardarCompra">Registrar compra</button>'+
@@ -4630,8 +4800,22 @@ function renderCompraForm(){
     document.getElementById('cp_previewFlete').innerHTML = compraFleteFile ? '<img src="'+URL.createObjectURL(compraFleteFile)+'" style="max-width:220px;border-radius:8px;margin-top:6px">' : '';
     document.getElementById('cp_chipsFlete').innerHTML = '';
   });
+  document.getElementById('cp_filePago').addEventListener('change', function(e){
+    compraPagoFile = (e.target.files && e.target.files[0]) ? e.target.files[0] : null;
+    document.getElementById('cp_previewPago').innerHTML = compraPagoFile ? '<img src="'+URL.createObjectURL(compraPagoFile)+'" style="max-width:220px;border-radius:8px;margin-top:6px">' : '';
+  });
   wireCompraOcr('cp_fileCompra','cp_chipsCompra','cp_precio','cp_btnDetectCompra');
   wireCompraOcr('cp_fileFlete','cp_chipsFlete','cp_flete','cp_btnDetectFlete');
+  document.getElementById('cp_condicion').addEventListener('change', actualizarCondicionPagoCompraVisibilidad);
+  actualizarCondicionPagoCompraVisibilidad();
+  fetchProveedores(populateProveedoresDatalist);
+}
+/* al crédito, el comprobante de pago y la cuenta de origen se registran después (en Pagos de Compras) */
+function actualizarCondicionPagoCompraVisibilidad(){
+  var esCredito = document.getElementById('cp_condicion').value === 'credito';
+  document.getElementById('cp_diasCreditoWrap').style.display = esCredito ? '' : 'none';
+  document.getElementById('cp_pagoContadoWrap').style.display = esCredito ? 'none' : '';
+  document.getElementById('cp_pagoCreditoNota').style.display = esCredito ? '' : 'none';
 }
 function openCompraModal(){
   renderCompraForm();
@@ -4650,48 +4834,437 @@ function submitCompra(){
   var fleteStr = document.getElementById('cp_flete').value;
   var flete = fleteStr==='' ? null : parseFloat(fleteStr);
   var notas = document.getElementById('cp_notas').value.trim();
+  var condicion = document.getElementById('cp_condicion').value;
+  var esCredito = condicion === 'credito';
+  var diasCredito = esCredito ? parseInt(document.getElementById('cp_diasCredito').value, 10) : null;
+  var cuentaOrigen = esCredito ? null : document.getElementById('cp_cuentaOrigen').value.trim();
   if(!insumoId){ toast('Elegí un insumo'); return; }
   if(!cantidad || cantidad<=0){ toast('Poné una cantidad válida'); return; }
   if(!precio || isNaN(precio) || precio<0){ toast('Poné un precio unitario válido'); return; }
+  if(esCredito && (!diasCredito || isNaN(diasCredito) || diasCredito<=0)){ toast('Indicá a cuántos días de crédito corresponde'); return; }
   var btn = document.getElementById('btnGuardarCompra');
   btn.disabled = true;
-  function conArchivos(pathCompra, pathFlete){
+  function conArchivos(pathCompra, pathFlete, pathPago){
     sb.rpc('registrar_compra_insumo', {
       p_insumo_id: insumoId, p_proveedor: proveedor||null, p_fecha: fecha, p_cantidad: cantidad,
       p_precio_unitario: precio, p_actualizar_precio: actualizarPrecio,
       p_monto_flete: (flete===null||isNaN(flete))?null:flete,
-      p_comprobante_compra_path: pathCompra, p_comprobante_flete_path: pathFlete, p_notas: notas||null
+      p_comprobante_compra_path: pathCompra, p_comprobante_flete_path: pathFlete, p_notas: notas||null,
+      p_condicion_pago: condicion, p_dias_credito: (esCredito?diasCredito:null),
+      p_comprobante_pago_path: pathPago, p_cuenta_origen: cuentaOrigen||null
     }).then(function(res){
       btn.disabled = false;
       if(res.error){ toast('No se pudo registrar la compra: '+errMsg(res.error)); return; }
       var row = Array.isArray(res.data) ? res.data[0] : res.data;
-      comprasState.rows.unshift(row);
-      comprasState.loaded = true;
-      closeCompraModal();
-      renderComprasRows();
+      fetchCompras(function(){
+        closeCompraModal();
+        if(activeTab()==='compras') renderComprasRows();
+        if(activeTab()==='pagoscompra') renderPagosCompraRows();
+        if(activeTab()==='cxpagar') renderCXPagarRows();
+      });
       toast('Compra registrada — stock actualizado');
     });
   }
-  var tareas = [];
-  var pathCompra = null, pathFlete = null;
+  var pathCompra = null, pathFlete = null, pathPago = null;
   var ts = Date.now();
-  function subir(file, sufijo, cb){
+  function subir(file, sufijo, bucket, cb){
     if(!file){ cb(null); return; }
     var ext = ((file.name||'').split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
     var path = 'compra_'+ts+'_'+sufijo+'.'+ext;
-    sb.storage.from('comprobantes-compras').upload(path, file, {upsert:false}).then(function(res){
+    sb.storage.from(bucket).upload(path, file, {upsert:false}).then(function(res){
       if(res.error){ toast('No se pudo subir el comprobante: '+errMsg(res.error)); btn.disabled=false; cb(false); return; }
       cb(path);
     });
   }
-  subir(compraFile, 'compra', function(p1){
+  subir(compraFile, 'compra', 'comprobantes-compras', function(p1){
     if(p1===false) return;
     pathCompra = p1;
-    subir(compraFleteFile, 'flete', function(p2){
+    subir(compraFleteFile, 'flete', 'comprobantes-compras', function(p2){
       if(p2===false) return;
       pathFlete = p2;
-      conArchivos(pathCompra, pathFlete);
+      subir(esCredito?null:compraPagoFile, 'pago', 'comprobantes-pagos-compra', function(p3){
+        if(p3===false) return;
+        pathPago = p3;
+        conArchivos(pathCompra, pathFlete, pathPago);
+      });
     });
+  });
+}
+
+/* ================= CLIENTES Y PROVEEDORES (listas + cardex) ================= */
+function fetchClientes(cb){
+  sb.from('clientes').select('nombre').order('nombre').then(function(res){
+    if(res.error){ toast('No se pudieron cargar los clientes: '+errMsg(res.error)); return; }
+    clientesState.rows = res.data || [];
+    clientesState.loaded = true;
+    if(cb) cb();
+  });
+}
+function fetchProveedores(cb){
+  sb.from('proveedores').select('nombre').order('nombre').then(function(res){
+    if(res.error){ toast('No se pudieron cargar los proveedores: '+errMsg(res.error)); return; }
+    proveedoresState.rows = res.data || [];
+    proveedoresState.loaded = true;
+    if(cb) cb();
+  });
+}
+function populateClientesDatalist(){
+  document.getElementById('clientesDatalist').innerHTML = clientesState.rows.map(function(c){ return '<option value="'+escapeHtml(c.nombre)+'">'; }).join('');
+}
+function populateProveedoresDatalist(){
+  document.getElementById('proveedoresDatalist').innerHTML = proveedoresState.rows.map(function(p){ return '<option value="'+escapeHtml(p.nombre)+'">'; }).join('');
+}
+var clcxSort = { dir:1 };
+var prcxSort = { dir:1 };
+function buildClientesCardexList(){
+  var names = {};
+  clientesState.rows.forEach(function(c){ var k=(c.nombre||'').trim(); if(k) names[k.toLowerCase()] = k; });
+  notaVentaState.rows.forEach(function(nv){ var k=(nv.cliente||'').trim(); if(k && !names[k.toLowerCase()]) names[k.toLowerCase()] = k; });
+  return Object.keys(names).map(function(k){ return names[k]; });
+}
+function buildProveedoresCardexList(){
+  var names = {};
+  proveedoresState.rows.forEach(function(p){ var k=(p.nombre||'').trim(); if(k) names[k.toLowerCase()] = k; });
+  comprasState.rows.forEach(function(c){ var k=(c.proveedor||'').trim(); if(k && !names[k.toLowerCase()]) names[k.toLowerCase()] = k; });
+  return Object.keys(names).map(function(k){ return names[k]; });
+}
+function clienteResumen(nombre){
+  var key = nombre.trim().toLowerCase();
+  var notas = notaVentaState.rows.filter(function(nv){ return (nv.cliente||'').trim().toLowerCase()===key; });
+  var total=0, pagado=0, saldo=0;
+  notas.forEach(function(nv){ var t=notaTotales(nv); total+=t.total; pagado+=t.pagado; saldo+=t.saldo; });
+  return { nombre:nombre, notas:notas, pedidos:notas.length, total:Math.round(total*100)/100, pagado:Math.round(pagado*100)/100, saldo:Math.round(saldo*100)/100 };
+}
+function proveedorResumen(nombre){
+  var key = nombre.trim().toLowerCase();
+  var compras = comprasState.rows.filter(function(c){ return (c.proveedor||'').trim().toLowerCase()===key; });
+  var total=0, pagado=0, saldo=0;
+  compras.forEach(function(c){ var t=compraTotales(c); total+=t.total; pagado+=t.pagado; saldo+=t.saldo; });
+  return { nombre:nombre, compras:compras, cantidad:compras.length, total:Math.round(total*100)/100, pagado:Math.round(pagado*100)/100, saldo:Math.round(saldo*100)/100 };
+}
+function renderClientesCardex(forceReload){
+  if(forceReload){
+    var pending = 2;
+    function done(){ pending--; if(pending===0) renderClientesCardexRows(); }
+    fetchClientes(done);
+    fetchNotasVenta(done);
+    return;
+  }
+  renderClientesCardexRows();
+}
+function renderClientesCardexRows(){
+  var q = (document.getElementById('clcxSearch').value||'').toLowerCase();
+  var resumenes = buildClientesCardexList().filter(function(n){ return !q || n.toLowerCase().indexOf(q)!==-1; }).map(clienteResumen);
+  resumenes.sort(function(a,b){ return a.nombre.localeCompare(b.nombre)*clcxSort.dir; });
+  document.getElementById('clientesCardexBody').innerHTML = resumenes.map(function(r){
+    return '<tr data-nombre="'+escapeHtml(r.nombre)+'">'+
+      '<td>'+escapeHtml(r.nombre)+'</td>'+
+      '<td class="num">'+r.pedidos+'</td>'+
+      '<td class="num">'+fmt(r.total,2)+'</td>'+
+      '<td class="num">'+fmt(r.pagado,2)+'</td>'+
+      '<td class="num"><b>'+fmt(r.saldo,2)+'</b></td>'+
+      '<td><button class="ghost btn-ver-cardex-cliente" style="padding:6px 12px;font-size:12px">📋 Ver cardex</button></td>'+
+    '</tr>';
+  }).join('') || '<tr><td colspan="6" class="empty">Todavía no hay clientes registrados</td></tr>';
+  document.querySelectorAll('.btn-ver-cardex-cliente').forEach(function(btn){
+    btn.addEventListener('click', function(){ openClienteCardexModal(btn.closest('tr').dataset.nombre); });
+  });
+}
+document.getElementById('clcxSearch').addEventListener('input', renderClientesCardexRows);
+document.querySelectorAll('#view-clientescardex th.sortable').forEach(function(th){
+  th.addEventListener('click', function(){ clcxSort.dir *= -1; renderClientesCardexRows(); });
+});
+function openClienteCardexModal(nombre){
+  var r = clienteResumen(nombre);
+  document.getElementById('cardexTitle').textContent = 'Cardex — '+nombre;
+  var eventos = [];
+  r.notas.forEach(function(nv){
+    var t = notaTotales(nv);
+    eventos.push({fecha: nv.fecha, orden:0, label:'Pedido '+(nv.numero_pedido||'—')+' / Nota '+nv.numero_nota, monto: t.total});
+    t.pagos.forEach(function(p){
+      eventos.push({fecha: p.fecha_pago, orden:1, label:'Pago — Nota '+nv.numero_nota+(p.registrado_por_nombre?(' · '+p.registrado_por_nombre):''), monto: -(Number(p.monto_bs)||0)});
+    });
+  });
+  eventos.sort(function(a,b){ return (a.fecha<b.fecha)?-1:(a.fecha>b.fecha?1:(a.orden-b.orden)); });
+  var filas = eventos.map(function(e){
+    return '<div class="line"><span>'+fmtFecha(e.fecha)+' — '+escapeHtml(e.label)+'</span><span>'+(e.monto>=0?('Bs '+fmt(e.monto,2)):('-Bs '+fmt(Math.abs(e.monto),2)))+'</span></div>';
+  }).join('') || '<p class="muted" style="font-size:12px">Todavía no hay pedidos registrados para este cliente.</p>';
+  document.getElementById('cardexBody').innerHTML =
+    '<div class="doc-meta">'+
+      '<div class="doc-meta-item"><span class="l">Pedidos</span><span class="v">'+r.pedidos+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">Total facturado</span><span class="v">Bs '+fmt(r.total,2)+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">Pagado</span><span class="v">Bs '+fmt(r.pagado,2)+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">Deuda actual</span><span class="v"><b>Bs '+fmt(r.saldo,2)+'</b></span></div>'+
+    '</div>'+
+    '<div class="section-title" style="margin-top:12px">Historial (pedidos y pagos)</div>'+
+    filas;
+  document.getElementById('cardexModalOverlay').classList.add('active');
+}
+function renderProveedoresCardex(forceReload){
+  if(forceReload){
+    var pending = 2;
+    function done(){ pending--; if(pending===0) renderProveedoresCardexRows(); }
+    fetchProveedores(done);
+    fetchCompras(done);
+    return;
+  }
+  renderProveedoresCardexRows();
+}
+function renderProveedoresCardexRows(){
+  var q = (document.getElementById('prcxSearch').value||'').toLowerCase();
+  var resumenes = buildProveedoresCardexList().filter(function(n){ return !q || n.toLowerCase().indexOf(q)!==-1; }).map(proveedorResumen);
+  resumenes.sort(function(a,b){ return a.nombre.localeCompare(b.nombre)*prcxSort.dir; });
+  document.getElementById('proveedoresCardexBody').innerHTML = resumenes.map(function(r){
+    return '<tr data-nombre="'+escapeHtml(r.nombre)+'">'+
+      '<td>'+escapeHtml(r.nombre)+'</td>'+
+      '<td class="num">'+r.cantidad+'</td>'+
+      '<td class="num">'+fmt(r.total,2)+'</td>'+
+      '<td class="num">'+fmt(r.pagado,2)+'</td>'+
+      '<td class="num"><b>'+fmt(r.saldo,2)+'</b></td>'+
+      '<td><button class="ghost btn-ver-cardex-proveedor" style="padding:6px 12px;font-size:12px">📋 Ver cardex</button></td>'+
+    '</tr>';
+  }).join('') || '<tr><td colspan="6" class="empty">Todavía no hay proveedores registrados</td></tr>';
+  document.querySelectorAll('.btn-ver-cardex-proveedor').forEach(function(btn){
+    btn.addEventListener('click', function(){ openProveedorCardexModal(btn.closest('tr').dataset.nombre); });
+  });
+}
+document.getElementById('prcxSearch').addEventListener('input', renderProveedoresCardexRows);
+document.querySelectorAll('#view-proveedorescardex th.sortable').forEach(function(th){
+  th.addEventListener('click', function(){ prcxSort.dir *= -1; renderProveedoresCardexRows(); });
+});
+function openProveedorCardexModal(nombre){
+  var r = proveedorResumen(nombre);
+  document.getElementById('cardexTitle').textContent = 'Cardex — '+nombre;
+  var eventos = [];
+  r.compras.forEach(function(c){
+    var t = compraTotales(c);
+    eventos.push({fecha: c.fecha, orden:0, label:'Compra '+escapeHtml(c.insumo_nombre)+(c.condicion_pago==='credito'?' (crédito'+(c.dias_credito?(' a '+c.dias_credito+' días'):'')+')':' (contado)'), monto: t.total});
+    t.pagos.forEach(function(p){
+      eventos.push({fecha: p.fecha_pago, orden:1, label:'Pago — '+escapeHtml(c.insumo_nombre)+(p.cuenta_origen?(' · '+escapeHtml(p.cuenta_origen)):''), monto: -(Number(p.monto_bs)||0)});
+    });
+  });
+  eventos.sort(function(a,b){ return (a.fecha<b.fecha)?-1:(a.fecha>b.fecha?1:(a.orden-b.orden)); });
+  var filas = eventos.map(function(e){
+    return '<div class="line"><span>'+fmtFecha(e.fecha)+' — '+e.label+'</span><span>'+(e.monto>=0?('Bs '+fmt(e.monto,2)):('-Bs '+fmt(Math.abs(e.monto),2)))+'</span></div>';
+  }).join('') || '<p class="muted" style="font-size:12px">Todavía no hay compras registradas para este proveedor.</p>';
+  document.getElementById('cardexBody').innerHTML =
+    '<div class="doc-meta">'+
+      '<div class="doc-meta-item"><span class="l">Compras</span><span class="v">'+r.cantidad+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">Total comprado</span><span class="v">Bs '+fmt(r.total,2)+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">Pagado</span><span class="v">Bs '+fmt(r.pagado,2)+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">Deuda actual</span><span class="v"><b>Bs '+fmt(r.saldo,2)+'</b></span></div>'+
+    '</div>'+
+    '<div class="section-title" style="margin-top:12px">Historial (compras y pagos)</div>'+
+    filas;
+  document.getElementById('cardexModalOverlay').classList.add('active');
+}
+document.getElementById('btnCerrarCardex').addEventListener('click', function(){
+  document.getElementById('cardexModalOverlay').classList.remove('active');
+});
+
+/* ================= PAGOS DE COMPRAS / CUENTAS POR PAGAR ================= */
+function renderPagosCompra(forceReload){
+  if(forceReload){ fetchCompras(renderPagosCompraRows); return; }
+  renderPagosCompraRows();
+}
+function renderPagosCompraRows(){
+  var q = (document.getElementById('pgcSearch').value||'').toLowerCase();
+  var soloPendientes = document.getElementById('pgcSoloPendientes').checked;
+  var rows = comprasState.rows.filter(function(c){
+    var t = compraTotales(c);
+    if(soloPendientes && t.saldo<=0.005) return false;
+    if(q && ((c.proveedor||'')+' '+(c.insumo_nombre||'')).toLowerCase().indexOf(q)===-1) return false;
+    return true;
+  });
+  rows.sort(function(a,b){
+    var fa = (a.condicion_pago==='credito' && a.fecha_vencimiento_pago) ? a.fecha_vencimiento_pago : '9999-99-99';
+    var fb = (b.condicion_pago==='credito' && b.fecha_vencimiento_pago) ? b.fecha_vencimiento_pago : '9999-99-99';
+    return fa<fb?-1:(fa>fb?1:0);
+  });
+  document.getElementById('pagosCompraBody').innerHTML = rows.map(function(c){
+    var t = compraTotales(c);
+    var condTxt = c.condicion_pago==='credito' ? ('Crédito'+(c.dias_credito?(' a '+c.dias_credito+' días'):'')) : 'Contado';
+    return '<tr data-id="'+c.id+'">'+
+      '<td>'+fmtFecha(c.fecha)+'</td>'+
+      '<td>'+escapeHtml(c.proveedor||'—')+'</td>'+
+      '<td>'+escapeHtml(c.insumo_nombre)+'</td>'+
+      '<td>'+condTxt+'</td>'+
+      '<td class="num">'+fmt(t.total,2)+'</td>'+
+      '<td class="num">'+fmt(t.pagado,2)+'</td>'+
+      '<td class="num"><b>'+fmt(t.saldo,2)+'</b></td>'+
+      '<td>'+(c.fecha_vencimiento_pago?fmtFecha(c.fecha_vencimiento_pago):'—')+'</td>'+
+      '<td><span class="pill-estado pill-'+t.estadoClass+'">'+t.estado+'</span></td>'+
+      '<td>'+(t.saldo>0.005 ? '<button class="primary btn-pagar-compra" style="padding:6px 12px;font-size:12px">💳 Registrar pago</button>' : '')+'</td>'+
+    '</tr>';
+  }).join('') || '<tr><td colspan="10" class="empty">Sin compras para mostrar</td></tr>';
+  document.querySelectorAll('.btn-pagar-compra').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var id = Number(btn.closest('tr').dataset.id);
+      var c = comprasState.rows.find(function(x){return x.id===id;});
+      if(c) openPagoCompraModal(c);
+    });
+  });
+}
+document.getElementById('pgcSearch').addEventListener('input', renderPagosCompraRows);
+document.getElementById('pgcSoloPendientes').addEventListener('change', renderPagosCompraRows);
+
+function renderCXPagar(forceReload){
+  if(forceReload){ fetchCompras(renderCXPagarRows); return; }
+  renderCXPagarRows();
+}
+function renderCXPagarRows(){
+  var q = (document.getElementById('cxpSearch').value||'').toLowerCase();
+  var rows = comprasState.rows.filter(function(c){
+    var t = compraTotales(c);
+    if(t.saldo<=0.005) return false;
+    if(q && (c.proveedor||'').toLowerCase().indexOf(q)===-1) return false;
+    return true;
+  });
+  rows.sort(function(a,b){
+    var k=cxpSort.k, d=cxpSort.dir, av=a[k], bv=b[k];
+    if(av==null) av=''; if(bv==null) bv='';
+    if(typeof av==='string') return av.localeCompare(bv)*d;
+    return (av-bv)*d;
+  });
+  var totalSaldo = 0;
+  document.getElementById('cxpBody').innerHTML = rows.map(function(c){
+    var t = compraTotales(c);
+    totalSaldo += t.saldo;
+    return '<tr>'+
+      '<td>'+escapeHtml(c.proveedor||'—')+'</td>'+
+      '<td>'+escapeHtml(c.insumo_nombre)+'</td>'+
+      '<td>'+fmtFecha(c.fecha)+'</td>'+
+      '<td class="num">'+fmt(t.total,2)+'</td>'+
+      '<td class="num">'+fmt(t.pagado,2)+'</td>'+
+      '<td class="num"><b>'+fmt(t.saldo,2)+'</b></td>'+
+      '<td>'+(c.fecha_vencimiento_pago?fmtFecha(c.fecha_vencimiento_pago):'—')+'</td>'+
+      '<td><span class="pill-estado pill-'+t.estadoClass+'">'+t.estado+'</span></td>'+
+    '</tr>';
+  }).join('') || '<tr><td colspan="8" class="empty">No hay cuentas por pagar pendientes</td></tr>';
+  document.getElementById('cxpFoot').innerHTML = rows.length ? ('<tr><td colspan="5" style="text-align:right;font-weight:700">TOTAL POR PAGAR</td><td class="num">'+fmt(totalSaldo,2)+'</td><td></td><td></td></tr>') : '';
+}
+document.getElementById('cxpSearch').addEventListener('input', renderCXPagarRows);
+document.querySelectorAll('#view-cxpagar th.sortable').forEach(function(th){
+  th.addEventListener('click', function(){
+    var k = th.dataset.k;
+    if(cxpSort.k===k) cxpSort.dir *= -1; else { cxpSort.k=k; cxpSort.dir=1; }
+    renderCXPagarRows();
+  });
+});
+
+function openPagoCompraModal(compra){
+  pagoCompraModalState = compra;
+  pagoCompraFile = null;
+  renderPagoCompraForm();
+  document.getElementById('pagoCompraModalOverlay').classList.add('active');
+}
+function closePagoCompraModal(){ document.getElementById('pagoCompraModalOverlay').classList.remove('active'); }
+document.getElementById('btnCerrarPagoCompra').addEventListener('click', closePagoCompraModal);
+function verComprobantePagoCompra(path, titulo){
+  document.getElementById('compraImgTitle').textContent = titulo || 'Comprobante de pago';
+  document.getElementById('compraImgBody').innerHTML = '<p class="muted">Cargando imagen…</p>';
+  document.getElementById('compraImgModalOverlay').classList.add('active');
+  sb.storage.from('comprobantes-pagos-compra').createSignedUrl(path, 3600).then(function(res){
+    var body = document.getElementById('compraImgBody');
+    if(res.error || !res.data){ body.innerHTML = '<p class="k-warn">No se pudo cargar la imagen.</p>'; return; }
+    body.innerHTML = '<img src="'+res.data.signedUrl+'" style="max-width:100%;border-radius:8px;border:1px solid var(--line)">';
+  });
+}
+function renderPagoCompraForm(){
+  var compra = pagoCompraModalState;
+  var t = compraTotales(compra);
+  var esAdminPgc = currentProfile && currentProfile.rol==='admin';
+  var historial = t.pagos.slice().sort(function(a,b){ return (a.fecha_pago<b.fecha_pago)?1:-1; }).map(function(p){
+    return '<div class="line" data-pagoid="'+p.id+'"><span>'+fmtFecha(p.fecha_pago)+' — Bs '+fmt(p.monto_bs,2)+(p.cuenta_origen?(' · '+escapeHtml(p.cuenta_origen)):'')+(p.registrado_por_nombre?(' · '+escapeHtml(p.registrado_por_nombre)):'')+'</span><span>'+
+      (p.comprobante_pago_path ? '<button type="button" class="ghost btn-ver-comprobante-pago-compra" data-path="'+escapeHtml(p.comprobante_pago_path)+'" style="padding:2px 8px;font-size:11px">👁 Ver</button>' : '')+
+      (esAdminPgc ? ' <button type="button" class="ghost danger btn-eliminar-pago-compra" data-id="'+p.id+'" style="padding:2px 8px;font-size:11px">🗑️</button>' : '')+
+    '</span></div>';
+  }).join('') || '<p class="muted" style="font-size:12px">Todavía no hay pagos registrados en esta compra.</p>';
+  document.getElementById('pagoCompraBody').innerHTML =
+    '<div class="doc-meta">'+
+      '<div class="doc-meta-item"><span class="l">Proveedor</span><span class="v">'+escapeHtml(compra.proveedor||'—')+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">Insumo</span><span class="v">'+escapeHtml(compra.insumo_nombre)+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">Total</span><span class="v">Bs '+fmt(t.total,2)+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">Pagado</span><span class="v">Bs '+fmt(t.pagado,2)+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">Saldo pendiente</span><span class="v"><b>Bs '+fmt(t.saldo,2)+'</b></span></div>'+
+    '</div>'+
+    '<div class="section-title" style="margin-top:12px">Historial de pagos</div>'+
+    historial+
+    (t.saldo>0.005 ?
+      '<div class="section-title" style="margin-top:14px">Nuevo pago</div>'+
+      '<div class="inline-field"><label>Fecha de pago</label><input type="date" id="pgc_fecha" value="'+new Date().toISOString().slice(0,10)+'"></div>'+
+      '<div class="inline-field"><label>Monto (Bs)</label><input type="number" step="0.01" min="0.01" id="pgc_monto" class="pill-input" placeholder="'+t.saldo+'"></div>'+
+      '<div class="inline-field"><label>Cuenta de origen</label><input type="text" id="pgc_cuentaOrigen" style="min-width:220px" placeholder="Ej: Banco XX cta. 123 — Juan Pérez"></div>'+
+      '<div class="section-title" style="margin-top:10px">Comprobante de pago</div>'+
+      '<div class="inline-field"><input type="file" id="pgc_file" accept="image/*"></div>'+
+      '<div id="pgc_preview"></div>'+
+      '<button type="button" class="ghost" id="pgc_btnDetect" style="margin-top:6px">🔍 Detectar monto en la imagen</button>'+
+      '<div id="pgc_chips"></div>'+
+      '<div style="margin-top:16px;display:flex;gap:10px">'+
+        '<button class="primary" id="btnRegistrarPagoCompra">Registrar pago</button>'+
+        '<button id="btnCancelarPagoCompra2">Cancelar</button>'+
+      '</div>'
+      : '<p class="footnote" style="margin-top:12px">Esta compra ya está totalmente pagada.</p>');
+  document.querySelectorAll('.btn-ver-comprobante-pago-compra').forEach(function(btn){
+    btn.addEventListener('click', function(){ verComprobantePagoCompra(btn.dataset.path); });
+  });
+  document.querySelectorAll('.btn-eliminar-pago-compra').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var id = Number(btn.dataset.id);
+      if(!confirm('¿Eliminar este pago? Esta acción no se puede deshacer.')) return;
+      btn.disabled = true;
+      sb.rpc('eliminar_pago_compra', {p_id:id}).then(function(res){
+        if(res.error){ toast('No se pudo eliminar el pago: '+errMsg(res.error)); btn.disabled=false; return; }
+        toast('Pago eliminado');
+        fetchCompras(function(){
+          pagoCompraModalState = comprasState.rows.find(function(x){return x.id===pagoCompraModalState.id;}) || pagoCompraModalState;
+          renderPagoCompraForm();
+          if(activeTab()==='pagoscompra') renderPagosCompraRows();
+          if(activeTab()==='cxpagar') renderCXPagarRows();
+          if(activeTab()==='compras') renderComprasRows();
+        });
+      });
+    });
+  });
+  if(t.saldo>0.005){
+    document.getElementById('btnCancelarPagoCompra2').addEventListener('click', closePagoCompraModal);
+    document.getElementById('btnRegistrarPagoCompra').addEventListener('click', submitPagoCompra);
+    document.getElementById('pgc_file').addEventListener('change', function(e){
+      pagoCompraFile = (e.target.files && e.target.files[0]) ? e.target.files[0] : null;
+      document.getElementById('pgc_preview').innerHTML = pagoCompraFile ? '<img src="'+URL.createObjectURL(pagoCompraFile)+'" style="max-width:220px;border-radius:8px;margin-top:6px">' : '';
+      document.getElementById('pgc_chips').innerHTML = '';
+    });
+    wireCompraOcr('pgc_file','pgc_chips','pgc_monto','pgc_btnDetect');
+  }
+}
+function submitPagoCompra(){
+  var compra = pagoCompraModalState;
+  var fecha = document.getElementById('pgc_fecha').value || null;
+  var monto = parseFloat(document.getElementById('pgc_monto').value);
+  var cuentaOrigen = document.getElementById('pgc_cuentaOrigen').value.trim();
+  if(!monto || isNaN(monto) || monto<=0){ toast('Poné un monto de pago válido'); return; }
+  var btn = document.getElementById('btnRegistrarPagoCompra');
+  btn.disabled = true;
+  function conArchivo(path){
+    sb.rpc('registrar_pago_compra', { p_compra_id: compra.id, p_monto_bs: monto, p_fecha_pago: fecha, p_comprobante_pago_path: path, p_cuenta_origen: cuentaOrigen||null }).then(function(res){
+      btn.disabled = false;
+      if(res.error){ toast('No se pudo registrar el pago: '+errMsg(res.error)); return; }
+      toast('Pago registrado');
+      fetchCompras(function(){
+        pagoCompraModalState = comprasState.rows.find(function(x){return x.id===compra.id;}) || compra;
+        renderPagoCompraForm();
+        if(activeTab()==='pagoscompra') renderPagosCompraRows();
+        if(activeTab()==='cxpagar') renderCXPagarRows();
+        if(activeTab()==='compras') renderComprasRows();
+      });
+    });
+  }
+  if(!pagoCompraFile){ conArchivo(null); return; }
+  var ext = ((pagoCompraFile.name||'').split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
+  var path = 'pago_'+compra.id+'_'+Date.now()+'.'+ext;
+  sb.storage.from('comprobantes-pagos-compra').upload(path, pagoCompraFile, {upsert:false}).then(function(res){
+    if(res.error){ toast('No se pudo subir el comprobante: '+errMsg(res.error)); btn.disabled=false; return; }
+    conArchivo(path);
   });
 }
 
