@@ -3348,11 +3348,11 @@ document.getElementById('btnDescargarPedidoVentaPdf').addEventListener('click', 
   var v = pedidoVentaDocState;
   renderPedidoVentaDocCard(v, 'PLANTA');
   html2canvas(document.getElementById('pedidoVentaDocCard'), {backgroundColor:'#ffffff', scale:2}).then(function(canvas1){
-    var img1 = canvas1.toDataURL('image/png');
+    var img1 = canvas1.toDataURL('image/jpeg', 0.85);
     renderPedidoVentaDocCard(v, 'ADMINISTRACIÓN');
     html2canvas(document.getElementById('pedidoVentaDocCard'), {backgroundColor:'#ffffff', scale:2}).then(function(canvas2){
-      var img2 = canvas2.toDataURL('image/png');
-      var doc = new jsPDFCtor({unit:'mm', format:'a4'});
+      var img2 = canvas2.toDataURL('image/jpeg', 0.85);
+      var doc = new jsPDFCtor({unit:'mm', format:'a4', compress:true});
       addImageFitted(doc, img1, canvas1);
       doc.addPage();
       addImageFitted(doc, img2, canvas2);
@@ -3654,8 +3654,8 @@ document.getElementById('btnDescargarProformaPdf').addEventListener('click', fun
   btn.disabled = true;
   var pf = proformaDocState;
   html2canvas(document.getElementById('proformaDocCard'), {backgroundColor:'#ffffff', scale:2}).then(function(canvas){
-    var img = canvas.toDataURL('image/png');
-    var doc = new jsPDFCtor({unit:'mm', format:'a4'});
+    var img = canvas.toDataURL('image/jpeg', 0.85);
+    var doc = new jsPDFCtor({unit:'mm', format:'a4', compress:true});
     addImageFitted(doc, img, canvas);
     doc.save('proforma_'+(pf.numero_proforma||'proforma')+'_'+slugFilename(pf.cliente||'cliente')+'.pdf');
     btn.disabled = false;
@@ -4013,8 +4013,8 @@ document.getElementById('btnDescargarNotaVentaPdf').addEventListener('click', fu
   btn.disabled = true;
   var nota = notaVentaDocState;
   html2canvas(document.getElementById('notaVentaDocCard'), {backgroundColor:'#ffffff', scale:2}).then(function(canvas){
-    var img = canvas.toDataURL('image/png');
-    var doc = new jsPDFCtor({unit:'mm', format:'a4'});
+    var img = canvas.toDataURL('image/jpeg', 0.85);
+    var doc = new jsPDFCtor({unit:'mm', format:'a4', compress:true});
     addImageFitted(doc, img, canvas);
     doc.save('nota_venta_'+(nota.numero_nota||'nota')+'_'+slugFilename(nota.cliente||'cliente')+'.pdf');
     btn.disabled = false;
@@ -4386,7 +4386,7 @@ function addImageFitted(doc, dataUrl, canvas){
   var w = maxW, h = w/ratio;
   if(h > maxH){ h = maxH; w = h*ratio; }
   var x = (pageW - w)/2, y = margin;
-  doc.addImage(dataUrl, 'PNG', x, y, w, h);
+  doc.addImage(dataUrl, 'JPEG', x, y, w, h);
 }
 document.getElementById('btnDescargarProdPdf').addEventListener('click', function(){
   if(!prodDocState) return;
@@ -4398,11 +4398,11 @@ document.getElementById('btnDescargarProdPdf').addEventListener('click', functio
   var o = prodDocState;
   renderProduccionDocCard(o, 'PLANTA');
   html2canvas(document.getElementById('prodDocCard'), {backgroundColor:'#ffffff', scale:2}).then(function(canvas1){
-    var img1 = canvas1.toDataURL('image/png');
+    var img1 = canvas1.toDataURL('image/jpeg', 0.85);
     renderProduccionDocCard(o, 'ADMINISTRACIÓN');
     html2canvas(document.getElementById('prodDocCard'), {backgroundColor:'#ffffff', scale:2}).then(function(canvas2){
-      var img2 = canvas2.toDataURL('image/png');
-      var doc = new jsPDFCtor({unit:'mm', format:'a4'});
+      var img2 = canvas2.toDataURL('image/jpeg', 0.85);
+      var doc = new jsPDFCtor({unit:'mm', format:'a4', compress:true});
       addImageFitted(doc, img1, canvas1);
       doc.addPage();
       addImageFitted(doc, img2, canvas2);
