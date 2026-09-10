@@ -2914,6 +2914,7 @@ function renderPedidoVentaForm(){
       '<option value="recoge">Recoge cliente</option>'+
       '<option value="envio">Envío a cliente</option>'+
     '</select></div>'+
+    '<div class="inline-field" id="pv_fleteWrap" style="display:none"><label>Flete (Bs)</label><input type="number" step="0.01" min="0" id="pv_flete" class="pill-input" value="0"></div>'+
     '<button type="button" class="ghost" id="btnPvVerPrecios" style="margin-top:8px">📋 Ver lista de precios</button>'+
     '<div id="pv_listaPrecios" class="pv-lista-precios" style="display:none"></div>'+
     '<div class="section-title" style="margin-top:14px">Productos del pedido</div>'+
@@ -2936,6 +2937,13 @@ function renderPedidoVentaForm(){
     '</div>';
   pvCuotas = [{fecha: document.getElementById('pv_fechaEntrega').value || '', monto: 0}];
   document.getElementById('pv_condicion').addEventListener('change', actualizarPlanPagoVisibilidad);
+  document.getElementById('pv_modoEntrega').addEventListener('change', function(){
+    var envio = this.value === 'envio';
+    document.getElementById('pv_fleteWrap').style.display = envio ? '' : 'none';
+    if(!envio) document.getElementById('pv_flete').value = 0;
+    updatePvTotalBox();
+  });
+  document.getElementById('pv_flete').addEventListener('input', updatePvTotalBox);
   document.getElementById('pv_numCuotas').addEventListener('change', function(){
     repartirPvCuotas(Number(this.value));
   });
@@ -2995,6 +3003,12 @@ function aplicarDescuentoLinea(idx){
   l.precio = Math.round(tabla*(1-desc/100)*100)/100;
 }
 /* ---- nota de venta: total del pedido y plan de cuotas (1 a 3 pagos) ---- */
+function fletePedidoActual(){
+  var modoEl = document.getElementById('pv_modoEntrega');
+  var fleteEl = document.getElementById('pv_flete');
+  if(!modoEl || modoEl.value!=='envio' || !fleteEl) return 0;
+  return Number(fleteEl.value)||0;
+}
 function totalPedidoActual(){
   var total = 0;
   pvLineas.forEach(function(l){
@@ -3003,14 +3017,17 @@ function totalPedidoActual(){
     var precio = Number(l.precio)||0;
     total += cantidad*precio;
   });
+  total += fletePedidoActual();
   return Math.round(total*100)/100;
 }
 function updatePvTotalBox(){
   var total = totalPedidoActual();
+  var flete = fletePedidoActual();
+  var sufijoFlete = flete>0 ? ' (incluye flete: '+fmtBs(flete)+')' : '';
   var box = document.getElementById('pv_totalBox');
-  if(box) box.textContent = 'Total del pedido: '+fmtBs(total);
+  if(box) box.textContent = 'Total del pedido: '+fmtBs(total)+sufijoFlete;
   var boxContado = document.getElementById('pv_totalBoxContado');
-  if(boxContado) boxContado.textContent = 'Total del pedido (al contado, se paga al recoger): '+fmtBs(total);
+  if(boxContado) boxContado.textContent = 'Total del pedido (al contado, se paga al recoger): '+fmtBs(total)+sufijoFlete;
 }
 function addDiasISO(fechaISO, dias){
   var d = fechaISO ? new Date(fechaISO+'T00:00:00') : new Date();
@@ -3168,6 +3185,7 @@ function submitPedidoVenta(){
   var condicionNota = document.getElementById('pv_condicionNota').value.trim();
   var fechaEntrega = document.getElementById('pv_fechaEntrega').value || null;
   var modoEntrega = document.getElementById('pv_modoEntrega').value || null;
+  var flete = fletePedidoActual();
   if(!cliente){ toast('Poné el cliente'); return; }
   var items = [];
   for(var i=0;i<pvLineas.length;i++){
@@ -3205,7 +3223,8 @@ function submitPedidoVenta(){
   btn.disabled = true;
   sb.rpc('crear_pedido_venta', {
     p_cliente: cliente, p_condicion_pago: condicion, p_condicion_pago_nota: condicionNota || null,
-    p_fecha_entrega: fechaEntrega, p_items: items, p_modo_entrega: modoEntrega, p_cuotas: cuotasPayload
+    p_fecha_entrega: fechaEntrega, p_items: items, p_modo_entrega: modoEntrega, p_cuotas: cuotasPayload,
+    p_flete_bs: flete
   }).then(function(res){
     btn.disabled = false;
     if(res.error){ toast('No se pudo crear el pedido de venta: '+errMsg(res.error)); return; }
@@ -3299,6 +3318,7 @@ function renderPedidoVentaDocCard(v, copiaLabel){
     '<div class="doc-entrega-box">'+
       '<span class="doc-entrega-opt'+(v.modo_entrega==='recoge'?' checked':'')+'">'+(v.modo_entrega==='recoge'?'☑':'☐')+' Recoge cliente</span>'+
       '<span class="doc-entrega-opt'+(v.modo_entrega==='envio'?' checked':'')+'">'+(v.modo_entrega==='envio'?'☑':'☐')+' Envío a cliente</span>'+
+      (v.modo_entrega==='envio' && Number(v.flete_bs)>0 ? '<span class="doc-entrega-opt">🚚 Flete: '+fmtBs(v.flete_bs)+'</span>' : '')+
     '</div>'+
     '<div class="fi-section">Productos del pedido (receta de cada uno)</div>'+
     productosBoxes+
@@ -3645,7 +3665,7 @@ document.getElementById('btnDescargarProformaPdf').addEventListener('click', fun
 
 /* ================= COBRANZAS: NOTAS DE VENTA / PAGOS / CUENTAS POR COBRAR ================= */
 function fetchNotasVenta(cb){
-  sb.from('notas_venta').select('*, cuotas_venta(*), pagos_venta(*), pedidos_venta(numero_pedido,cliente,condicion_pago,condicion_pago_nota,modo_entrega,fecha_entrega,fecha_pedido,pedido_venta_items(*))').order('creado_en',{ascending:false}).then(function(res){
+  sb.from('notas_venta').select('*, cuotas_venta(*), pagos_venta(*), pedidos_venta(numero_pedido,cliente,condicion_pago,condicion_pago_nota,modo_entrega,flete_bs,fecha_entrega,fecha_pedido,pedido_venta_items(*))').order('creado_en',{ascending:false}).then(function(res){
     if(res.error){ toast('No se pudieron cargar las notas de venta: '+errMsg(res.error)); return; }
     notaVentaState.rows = res.data || [];
     notaVentaState.loaded = true;
@@ -3945,6 +3965,8 @@ function renderNotaVentaDocCard(nota){
   var filasProductos = items.map(function(it){
     return '<tr><td>'+escapeHtml(it.producto_nombre)+'</td><td class="num">'+fmt(it.cantidad_toneladas,2)+'</td><td class="num">'+(it.precio_pactado!=null?fmtBs(it.precio_pactado):'—')+'</td><td class="num">'+(it.total_pactado!=null?fmtBs(it.total_pactado):'—')+'</td></tr>';
   }).join('');
+  var flete = Number(pv.flete_bs)||0;
+  var totalProductos = Math.round((t.total-flete)*100)/100;
   var filasCuotas = t.cuotas.map(function(c){
     return '<tr><td>Cuota '+c.numero_cuota+'</td><td>'+fmtFecha(c.fecha_vencimiento)+'</td><td class="num">'+fmtBs(c.monto_bs)+'</td><td>'+(c._pagada?'<span class="pill-estado pill-pagada">Pagada</span>':'<span class="pill-estado pill-pendiente">Pendiente</span>')+'</td></tr>';
   }).join('');
@@ -3965,6 +3987,8 @@ function renderNotaVentaDocCard(nota){
     '<div class="fi-section">Productos</div>'+
     '<table class="pf-table"><thead><tr><th>Producto</th><th class="num">Cantidad (Ton)</th><th class="num">Precio (Bs/Ton)</th><th class="num">Total (Bs)</th></tr></thead><tbody>'+filasProductos+'</tbody></table>'+
     '<div class="doc-grand-total-box">'+
+      (flete>0 ? ('<div class="doc-meta-item"><span class="l">Total productos</span><span class="v">'+fmtBs(totalProductos)+'</span></div>'+
+        '<div class="doc-meta-item"><span class="l">Flete</span><span class="v">'+fmtBs(flete)+'</span></div>') : '')+
       '<div class="doc-total-row">TOTAL: '+fmtBs(t.total)+'</div>'+
       '<div class="doc-meta-item"><span class="l">Pagado</span><span class="v">'+fmtBs(t.pagado)+'</span></div>'+
       '<div class="doc-meta-item"><span class="l">Saldo pendiente</span><span class="v"><b>'+fmtBs(t.saldo)+'</b></span></div>'+
@@ -4224,10 +4248,6 @@ function colorBolsaParaProducto(productoHoja){
   return colorBolsaPorCategoria(p ? p.categoria : null);
 }
 var prodDocState = null;
-function ordinalEs(n){
-  var map = {1:'1ra',2:'2da',3:'3ra',4:'4ta',5:'5ta',6:'6ta',7:'7ma',8:'8va',9:'9na',10:'10ma'};
-  return map[n] || (n+'va');
-}
 // Devuelve el tamaño en Kg de cada batida necesaria para producir cantidadTon —
 // el mezclador/batidora trabaja en batidas de máximo 1000 Kg (1 Ton), así que un
 // pedido de 1500 Kg son 2 batidas: 1000 Kg + 500 Kg.
@@ -4286,21 +4306,30 @@ function renderProduccionDocCard(o, copiaLabel){
     if(!batchSizes.length){
       materiasPrimasHtml = '<div class="fi-section" style="margin-top:10px;font-size:11.5px">Materias primas — por batida (máx. 1000 Kg por batida)</div><div class="fi-empty">Cantidad no disponible</div>';
     } else {
-      var todasIguales = batchSizes.every(function(s){ return s===batchSizes[0]; });
+      // Batidas completas de 1000 Kg — se muestra la cantidad UNA sola vez (con nota de cuántas hay que preparar).
+      // Si además queda un resto (no es múltiplo exacto de 1000), va en un segundo cuadro aparte — 2 cuadros como máximo.
+      var fullCount = batchSizes.filter(function(s){ return s===1000; }).length;
+      var resto = batchSizes.filter(function(s){ return s!==1000; })[0] || 0;
       var cuerpo;
-      if(todasIguales){
-        var kgUnico = batchSizes[0];
-        var entradas = entradasBatida(kgUnico);
-        cuerpo = (batchSizes.length>1 ? '<div class="fi-empty" style="font-style:italic;margin-bottom:4px">Preparar '+batchSizes.length+' batidas iguales de '+fmt(kgUnico,0)+' Kg — usar esta misma cantidad de insumos en cada una</div>' : '')+
+      if(resto===0){
+        var entradas = entradasBatida(1000);
+        cuerpo = (fullCount>1 ? '<div class="fi-empty" style="font-style:italic;margin-bottom:4px">Preparar '+fullCount+' batidas iguales de 1000 Kg — usar esta misma cantidad de insumos en cada una</div>' : '')+
           tableRows(entradas)+
-          docTotalRow(entradas, 'TOTAL MATERIAS PRIMAS POR BATIDA ('+fmt(kgUnico,0)+' Kg)');
+          docTotalRow(entradas, 'TOTAL MATERIAS PRIMAS POR BATIDA (1000 Kg)');
+      } else if(fullCount===0){
+        var entradas = entradasBatida(resto);
+        cuerpo = tableRows(entradas)+
+          docTotalRow(entradas, 'TOTAL MATERIAS PRIMAS POR BATIDA ('+fmt(resto,0)+' Kg)');
       } else {
-        cuerpo = batchSizes.map(function(kg, idx){
-          var entradas = entradasBatida(kg);
-          return '<div class="fi-empty" style="font-weight:700;color:var(--brand-dark);margin-top:'+(idx>0?'10px':'0')+'">'+ordinalEs(idx+1)+' Batida — '+fmt(kg,0)+' Kg</div>'+
-            tableRows(entradas)+
-            docTotalRow(entradas, 'Total materias primas ('+ordinalEs(idx+1)+' batida)');
-        }).join('');
+        var entradasFull = entradasBatida(1000);
+        var entradasResto = entradasBatida(resto);
+        cuerpo =
+          '<div class="fi-empty" style="font-weight:700;color:var(--brand-dark)">'+(fullCount>1 ? ('Batidas de 1000 Kg — preparar '+fullCount+' iguales') : 'Batida de 1000 Kg')+'</div>'+
+          tableRows(entradasFull)+
+          docTotalRow(entradasFull, 'Total materias primas (por batida de 1000 Kg)')+
+          '<div class="fi-empty" style="font-weight:700;color:var(--brand-dark);margin-top:10px">Batida final — '+fmt(resto,0)+' Kg</div>'+
+          tableRows(entradasResto)+
+          docTotalRow(entradasResto, 'Total materias primas (batida final)');
       }
       materiasPrimasHtml = '<div class="fi-section" style="margin-top:10px;font-size:11.5px">Materias primas — por batida (máx. 1000 Kg por batida)</div>'+cuerpo;
     }
@@ -4572,6 +4601,7 @@ function renderEditarPvModalBody(){
       '<option value="recoge"'+(v.modo_entrega==='recoge'?' selected':'')+'>Recoge cliente</option>'+
       '<option value="envio"'+(v.modo_entrega==='envio'?' selected':'')+'>Envío a cliente</option>'+
     '</select></div>'+
+    '<div class="inline-field" id="epv_fleteWrap" style="display:'+(v.modo_entrega==='envio'?'':'none')+'"><label>Flete (Bs)</label><input type="number" step="0.01" min="0" id="epv_flete" class="pill-input" value="'+(Number(v.flete_bs)||0)+'"></div>'+
     '<div style="margin:8px 0 16px"><button class="primary" id="btnGuardarEditarPvHeader">Guardar datos del pedido</button></div>'+
     '<div class="section-title">Productos del pedido</div>'+
     items.map(function(it){
@@ -4588,6 +4618,11 @@ function renderEditarPvModalBody(){
     '<div style="margin-top:16px"><button id="btnCerrarEditarPv2">Cerrar</button></div>';
   document.getElementById('btnCerrarEditarPv2').addEventListener('click', closeEditarPvModal);
   document.getElementById('btnGuardarEditarPvHeader').addEventListener('click', submitEditarPvHeader);
+  document.getElementById('epv_modoEntrega').addEventListener('change', function(){
+    var envio = this.value === 'envio';
+    document.getElementById('epv_fleteWrap').style.display = envio ? '' : 'none';
+    if(!envio) document.getElementById('epv_flete').value = 0;
+  });
   document.querySelectorAll('.btn-guardar-linea-pv').forEach(function(btn){
     btn.addEventListener('click', function(){ submitEditarPvLinea(Number(btn.dataset.itemid), btn); });
   });
@@ -4601,9 +4636,11 @@ function submitEditarPvHeader(){
   var condicionNota = document.getElementById('epv_condicionNota').value.trim();
   var fecha = document.getElementById('epv_fechaEntrega').value || null;
   var modoEntrega = document.getElementById('epv_modoEntrega').value || null;
+  var fleteEl = document.getElementById('epv_flete');
+  var flete = (modoEntrega==='envio' && fleteEl) ? (parseFloat(fleteEl.value)||0) : 0;
   var btn = document.getElementById('btnGuardarEditarPvHeader');
   btn.disabled = true;
-  sb.rpc('editar_pedido_venta_header', {p_id:v.id, p_cliente:cliente, p_condicion_pago:condicion, p_condicion_pago_nota:condicionNota||null, p_fecha_entrega:fecha, p_modo_entrega:modoEntrega}).then(function(res){
+  sb.rpc('editar_pedido_venta_header', {p_id:v.id, p_cliente:cliente, p_condicion_pago:condicion, p_condicion_pago_nota:condicionNota||null, p_fecha_entrega:fecha, p_modo_entrega:modoEntrega, p_flete_bs:flete}).then(function(res){
     btn.disabled = false;
     if(res.error){ toast('No se pudo guardar: '+errMsg(res.error)); return; }
     toast('Datos del pedido actualizados');
