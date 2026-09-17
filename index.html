@@ -191,10 +191,13 @@ th.num,td.num{text-align:right}
 .ord-estado-chk{display:flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap}
 .nav-badge{display:inline-block;min-width:16px;text-align:center;background:var(--danger);color:#fff;font-size:10px;font-weight:700;line-height:16px;padding:0 5px;border-radius:999px;margin-left:6px;vertical-align:middle}
 .despacho-pend{color:var(--muted);font-size:12px}
+.despacho-parcial{color:var(--accent);font-size:12px;font-weight:700}
 tr.ord-row-completada td{background:#fff6cc}
 tr.ord-row-despachado td{background:#d9f2d9}
+tr.ord-row-parcial td{background:#fbe6cc}
 tr.ord-row-completada:hover td{background:#fdedb0}
 tr.ord-row-despachado:hover td{background:#c3ebc3}
+tr.ord-row-parcial:hover td{background:#f6d6a8}
 .pv-link{font-size:11.5px;color:var(--muted)}
 .pv-multi div{white-space:nowrap}
 .pv-multi div+div{margin-top:3px}
@@ -237,9 +240,11 @@ tr.ord-row-despachado:hover td{background:#c3ebc3}
 .fi-logo{height:24px;width:auto;vertical-align:middle;margin-right:8px}
 .stat-click{cursor:pointer}
 .stat-click:hover{box-shadow:0 2px 10px rgba(0,0,0,.08)}
-.pf-table{width:100%;border-collapse:collapse;margin-top:6px}
-.pf-table th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);padding:5px 4px;border-bottom:2px solid var(--brand)}
-.pf-table td{padding:6px 4px;border-bottom:1px solid var(--line);font-size:12.5px}
+.pf-table{width:100%;border-collapse:collapse;margin-top:6px;table-layout:fixed}
+.pf-table th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.02em;color:var(--muted);padding:5px 3px;border-bottom:2px solid var(--brand);white-space:normal;line-height:1.25;word-break:break-word}
+.pf-table td{padding:6px 3px;border-bottom:1px solid var(--line);font-size:12px;white-space:normal;word-break:break-word}
+.pf-table td.num{white-space:nowrap}
+.pf-table th:first-child,.pf-table td:first-child{width:20%}
 .bolsa-badge{display:inline-block;font-weight:700;font-size:13px;padding:6px 14px;border-radius:8px;margin:2px 0 12px;letter-spacing:.02em}
 .bolsa-naranja{background:#ff8c1a;color:#fff}
 .bolsa-verde{background:#2ea043;color:#fff}
@@ -1061,7 +1066,7 @@ tr.ord-row-despachado:hover td{background:#c3ebc3}
 </div>
 
 <div id="proformaDocModalOverlay" class="overlay2">
-  <div class="ocr-box" style="max-width:600px">
+  <div class="ocr-box" style="max-width:680px">
     <div class="ocr-head">
       <h3>Proforma</h3>
       <button class="close-x" id="btnCerrarProformaDoc">✕</button>
@@ -2554,17 +2559,21 @@ function renderOrdenesRows(){
     var estadoCell = puedeCompletar
       ? '<label class="ord-estado-chk"><input type="checkbox" class="ord-check" '+(o.estado==='completada'?'checked':'')+'> '+(o.estado==='completada'?'Completada':'Pendiente')+'</label>'
       : (o.estado==='completada' ? '<span class="tag">Completada</span>' : '<span class="despacho-pend">Pendiente</span>');
+    var despCant = Number(o.despachado_cantidad)||0;
+    var saldoDesp = Math.max(0, (Number(o.cantidad_toneladas)||0) - despCant);
     var despachoCell = o.despachado
       ? '<button class="ghost btn-ver-despacho" title="Ver boleta de despacho">✅ Despachado</button>'
-      : '<button class="ghost btn-despachar" title="Marcar despachado y subir boleta">🚚 Marcar</button>';
-    var puedeEliminarOrd = o.estado!=='completada' && !o.despachado;
+      : (despCant>0
+        ? '<button class="ghost btn-despachar" title="Despachado parcialmente — saldo por despachar: '+fmt(saldoDesp,2)+' Ton">🚚 <span class="despacho-parcial">Parcial: saldo '+fmt(saldoDesp,2)+' Ton</span></button>'
+        : '<button class="ghost btn-despachar" title="Marcar despachado y subir boleta">🚚 Marcar</button>');
+    var puedeEliminarOrd = o.estado!=='completada' && !o.despachado && despCant===0;
     var eliminarCell = !esAdminOrd ? '' : (puedeEliminarOrd
       ? '<button class="ghost danger btn-eliminar-ord" title="Eliminar esta producción">🗑️</button>'
-      : '<button class="ghost" disabled title="Ya está completada o despachada — no se puede eliminar">🗑️</button>');
+      : '<button class="ghost" disabled title="Ya está completada, despachada o con despacho parcial — no se puede eliminar">🗑️</button>');
     var editarCell = !esAdminOrd ? '' : (puedeEliminarOrd
       ? '<button class="ghost btn-editar-ord" title="Editar esta producción">✏️</button>'
-      : '<button class="ghost" disabled title="Ya está completada o despachada — no se puede editar">✏️</button>');
-    var rowClass = o.despachado ? 'ord-row-despachado' : (o.estado==='completada' ? 'ord-row-completada' : '');
+      : '<button class="ghost" disabled title="Ya está completada, despachada o con despacho parcial — no se puede editar">✏️</button>');
+    var rowClass = o.despachado ? 'ord-row-despachado' : (despCant>0 ? 'ord-row-parcial' : (o.estado==='completada' ? 'ord-row-completada' : ''));
     return '<tr data-id="'+o.id+'"'+(rowClass?' class="'+rowClass+'"':'')+'>'+
       '<td>'+fmtFecha(o.fecha_pedido)+'</td>'+
       '<td><b>'+escapeHtml(o.numero_produccion)+'</b></td>'+
@@ -2674,10 +2683,14 @@ function renderStockFabricaRows(){
   bodyDet.innerHTML = filtrado.map(function(o){
     var destino = o.es_stock_fabrica ? '<span class="tag">Disponible para stock</span>' : (escapeHtml(o.cliente||'—')+(o.desde_stock_existente?' <span class="tag">📦 desde stock</span>':''));
     var estadoCell = '<span class="tag">Completada</span>';
+    var despCantSf = Number(o.despachado_cantidad)||0;
+    var saldoDespSf = Math.max(0, (Number(o.cantidad_toneladas)||0) - despCantSf);
     var despachoCell = o.despachado
       ? '<button class="ghost btn-ver-despacho-sf" title="Ver boleta de despacho">✅ Despachado</button>'
-      : '<button class="ghost btn-despachar-sf" title="Marcar despachado y subir boleta">🚚 Marcar</button>';
-    var rowClass = o.despachado ? 'ord-row-despachado' : (o.estado==='completada' ? 'ord-row-completada' : '');
+      : (despCantSf>0
+        ? '<button class="ghost btn-despachar-sf" title="Despachado parcialmente — saldo por despachar: '+fmt(saldoDespSf,2)+' Ton">🚚 <span class="despacho-parcial">Parcial: saldo '+fmt(saldoDespSf,2)+' Ton</span></button>'
+        : '<button class="ghost btn-despachar-sf" title="Marcar despachado y subir boleta">🚚 Marcar</button>');
+    var rowClass = o.despachado ? 'ord-row-despachado' : (despCantSf>0 ? 'ord-row-parcial' : (o.estado==='completada' ? 'ord-row-completada' : ''));
     return '<tr data-id="'+o.id+'"'+(rowClass?' class="'+rowClass+'"':'')+'>'+
       '<td><b>'+escapeHtml(o.numero_produccion)+'</b></td>'+
       '<td>'+escapeHtml(o.lote)+'</td>'+
@@ -3628,7 +3641,7 @@ function renderProformaDocCard(pf){
     '</div>'+
     '<div class="fi-section">Detalle</div>'+
     '<table class="pf-table"><thead><tr>'+
-      '<th>Producto</th><th class="num">Precio público (Bs/Ton)</th><th class="num">Descuento (Bs/Ton)</th><th class="num">Precio final (Bs/Ton)</th><th class="num">Cantidad (Ton)</th><th class="num">Subtotal (Bs)</th>'+
+      '<th>Producto</th><th class="num">Precio público<br>(Bs/Ton)</th><th class="num">Descuento<br>(Bs/Ton)</th><th class="num">Precio final<br>(Bs/Ton)</th><th class="num">Cantidad<br>(Ton)</th><th class="num">Subtotal<br>(Bs)</th>'+
     '</tr></thead><tbody>'+filas+'</tbody></table>'+
     '<div class="doc-grand-total-box">'+
       '<div class="doc-meta-item"><span class="l">Total productos</span><span class="v">'+fmtBs(totalProductos)+'</span></div>'+
@@ -3655,8 +3668,7 @@ document.getElementById('btnDescargarProformaPdf').addEventListener('click', fun
   var pf = proformaDocState;
   html2canvas(document.getElementById('proformaDocCard'), {backgroundColor:'#ffffff', scale:2}).then(function(canvas){
     var img = canvas.toDataURL('image/jpeg', 0.85);
-    var doc = new jsPDFCtor({unit:'mm', format:'a4', compress:true});
-    addImageFitted(doc, img, canvas);
+    var doc = makeCompactPdfFromCanvas(jsPDFCtor, img, canvas);
     doc.save('proforma_'+(pf.numero_proforma||'proforma')+'_'+slugFilename(pf.cliente||'cliente')+'.pdf');
     btn.disabled = false;
     toast('PDF descargado');
@@ -4366,7 +4378,8 @@ function renderProduccionDocCard(o, copiaLabel){
       tableRows(envEntries)+
       docTotalRow(envEntries, 'TOTAL ENVASES Y SERVICIOS')+
     '</div>'+
-    (o.despachado ? '<div class="fi-section">Despacho</div><div class="fi-empty" style="color:var(--brand-dark);font-weight:600">Despachado el '+fmtFecha(o.despachado_en)+(o.despachado_por_nombre?(' · '+escapeHtml(o.despachado_por_nombre)):'')+'</div>' : '')+
+    (o.despachado ? '<div class="fi-section">Despacho</div><div class="fi-empty" style="color:var(--brand-dark);font-weight:600">Despachado el '+fmtFecha(o.despachado_en)+(o.despachado_por_nombre?(' · '+escapeHtml(o.despachado_por_nombre)):'')+'</div>'
+      : ((Number(o.despachado_cantidad)||0)>0 ? '<div class="fi-section">Despacho</div><div class="fi-empty" style="color:var(--accent);font-weight:600">Despachado parcialmente: '+fmt(o.despachado_cantidad,2)+' de '+fmt(o.cantidad_toneladas,2)+' Ton · Saldo por despachar: '+fmt(Math.max(0,(Number(o.cantidad_toneladas)||0)-(Number(o.despachado_cantidad)||0)),2)+' Ton'+(o.despachado_por_nombre?(' · último despacho '+fmtFecha(o.despachado_en)+' por '+escapeHtml(o.despachado_por_nombre)):'')+'</div>' : ''))+
     '<div class="fi-foot">Generado desde NOGALMAX — Precios y Fórmulas'+(o.creado_por_nombre?(' · '+escapeHtml(o.creado_por_nombre)):'')+'</div>';
 }
 function openProdDocModal(o){
@@ -4377,6 +4390,16 @@ function openProdDocModal(o){
 document.getElementById('btnCerrarProdDoc').addEventListener('click', function(){
   document.getElementById('prodDocModalOverlay').classList.remove('active');
 });
+function makeCompactPdfFromCanvas(jsPDFCtor, dataUrl, canvas){
+  // Página del PDF ajustada al tamaño del contenido (tipo nota/recibo), no una hoja A4 completa con espacio en blanco.
+  var margin = 8, maxW = 190; // mm — mismo ancho de contenido útil que una A4 con margen
+  var ratio = canvas.width / canvas.height;
+  var w = maxW, h = w/ratio;
+  var pageW = w + margin*2, pageH = h + margin*2;
+  var doc = new jsPDFCtor({unit:'mm', format:[pageW, pageH], compress:true});
+  doc.addImage(dataUrl, 'JPEG', margin, margin, w, h);
+  return doc;
+}
 function addImageFitted(doc, dataUrl, canvas){
   var pageW = doc.internal.pageSize.getWidth();
   var pageH = doc.internal.pageSize.getHeight();
@@ -4426,6 +4449,23 @@ function closeDespachoModal(){
   despachoState = null; despachoFile = null;
 }
 document.getElementById('btnCerrarDespacho').addEventListener('click', closeDespachoModal);
+function refreshDespachoRow(row){
+  var idx = ordenesState.rows.findIndex(function(x){return x.id===row.id;});
+  if(idx!==-1) ordenesState.rows[idx] = row;
+  renderOrdenesRows();
+  renderStockFabricaRows();
+  if(typeof renderEntregadosRows==='function') renderEntregadosRows();
+}
+function deshacerUltimoDespacho(o, cb){
+  if(!confirm('¿Deshacer el último despacho registrado para «'+o.numero_produccion+'»?')) return;
+  sb.rpc('deshacer_ultimo_despacho', {p_id:o.id}).then(function(res){
+    if(res.error){ toast('No se pudo deshacer el despacho: '+errMsg(res.error)); if(cb) cb(false); return; }
+    var row = Array.isArray(res.data) ? res.data[0] : res.data;
+    refreshDespachoRow(row);
+    toast('Despacho deshecho');
+    if(cb) cb(true, row);
+  });
+}
 function renderDespachoModalBody(){
   var o = despachoState;
   if(!o) return;
@@ -4433,27 +4473,23 @@ function renderDespachoModalBody(){
   var info = '<div class="doc-meta-item"><span class="l">N° Producción</span><span class="v">'+escapeHtml(o.numero_produccion)+'</span></div>'+
     '<div class="doc-meta-item"><span class="l">Producto</span><span class="v">'+escapeHtml(o.producto_nombre)+'</span></div>'+
     '<div class="doc-meta-item"><span class="l">Cliente</span><span class="v">'+escapeHtml(o.es_stock_fabrica?'Stock fábrica':(o.cliente||'—'))+'</span></div>';
+  var despCant = Number(o.despachado_cantidad)||0;
+  var saldo = Math.round(Math.max(0, (Number(o.cantidad_toneladas)||0) - despCant)*10000)/10000;
   if(o.despachado){
     body.innerHTML = info +
+      '<div class="doc-meta-item"><span class="l">Total despachado</span><span class="v">'+fmt(o.cantidad_toneladas,2)+' Ton</span></div>'+
       '<p class="footnote">Despachado el '+fmtFecha(o.despachado_en)+(o.despachado_por_nombre?(' por '+escapeHtml(o.despachado_por_nombre)):'')+'</p>'+
       '<div id="despachoImgWrap" class="muted">'+(o.boleta_despacho_path?'Cargando boleta…':'No se adjuntó imagen de la boleta.')+'</div>'+
-      '<div style="margin-top:16px;display:flex;gap:10px">'+
-        '<button id="btnDeshacerDespacho">Deshacer despacho</button>'+
+      '<div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">'+
+        '<button id="btnDeshacerDespacho">Deshacer último despacho</button>'+
         '<button id="btnCerrarDespacho2">Cerrar</button>'+
       '</div>';
     document.getElementById('btnCerrarDespacho2').addEventListener('click', closeDespachoModal);
     document.getElementById('btnDeshacerDespacho').addEventListener('click', function(){
       var btn = this; btn.disabled = true;
-      sb.rpc('marcar_produccion_despachada', {p_id:o.id, p_despachado:false}).then(function(res){
+      deshacerUltimoDespacho(o, function(ok, row){
         btn.disabled = false;
-        if(res.error){ toast('No se pudo deshacer el despacho: '+errMsg(res.error)); return; }
-        var row = Array.isArray(res.data) ? res.data[0] : res.data;
-        var idx = ordenesState.rows.findIndex(function(x){return x.id===row.id;});
-        if(idx!==-1) ordenesState.rows[idx] = row;
-        renderOrdenesRows();
-        if(typeof renderEntregadosRows==='function') renderEntregadosRows();
-        toast('Despacho deshecho');
-        closeDespachoModal();
+        if(ok){ despachoState = row; renderDespachoModalBody(); }
       });
     });
     if(o.boleta_despacho_path){
@@ -4465,14 +4501,33 @@ function renderDespachoModalBody(){
       });
     }
   } else {
-    body.innerHTML = info +
+    var saldoInfo = despCant>0
+      ? '<div class="doc-meta-item"><span class="l">Cantidad total</span><span class="v">'+fmt(o.cantidad_toneladas,2)+' Ton</span></div>'+
+        '<div class="doc-meta-item"><span class="l">Ya despachado</span><span class="v">'+fmt(despCant,2)+' Ton</span></div>'+
+        '<div class="doc-meta-item"><span class="l">Saldo por despachar</span><span class="v" style="color:var(--accent)">'+fmt(saldo,2)+' Ton</span></div>'
+      : '<div class="doc-meta-item"><span class="l">Cantidad total</span><span class="v">'+fmt(o.cantidad_toneladas,2)+' Ton</span></div>';
+    body.innerHTML = info + saldoInfo +
+      '<div class="inline-field" style="margin-top:12px"><label>Tipo de despacho</label>'+
+        '<div style="display:flex;gap:18px;margin-top:6px;flex-wrap:wrap">'+
+          '<label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer"><input type="radio" name="desp_tipo" id="desp_tipo_total" value="total" checked> Despacho total (saldo completo: '+fmt(saldo,2)+' Ton)</label>'+
+          '<label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer"><input type="radio" name="desp_tipo" id="desp_tipo_parcial" value="parcial"> Despacho parcial</label>'+
+        '</div>'+
+      '</div>'+
+      '<div class="inline-field" id="desp_cantidad_wrap" style="margin-top:10px;display:none"><label>Cantidad a despachar (Ton)</label><input type="number" id="desp_cantidad" min="0.01" max="'+saldo+'" step="0.01" placeholder="Máx. '+fmt(saldo,2)+' Ton"></div>'+
       '<div class="inline-field" style="margin-top:12px"><label>Foto de la boleta de despacho (opcional)</label><input type="file" id="desp_file" accept="image/*"></div>'+
       '<div id="desp_preview"></div>'+
-      '<div style="margin-top:16px;display:flex;gap:10px">'+
+      '<div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">'+
         '<button class="primary" id="btnConfirmarDespacho">Confirmar despacho</button>'+
+        (despCant>0 ? '<button id="btnDeshacerDespacho">Deshacer último despacho</button>' : '')+
         '<button id="btnCerrarDespacho2">Cancelar</button>'+
       '</div>';
     document.getElementById('btnCerrarDespacho2').addEventListener('click', closeDespachoModal);
+    function toggleDespCantidad(){
+      var esParcial = document.getElementById('desp_tipo_parcial').checked;
+      document.getElementById('desp_cantidad_wrap').style.display = esParcial ? '' : 'none';
+    }
+    document.getElementById('desp_tipo_total').addEventListener('change', toggleDespCantidad);
+    document.getElementById('desp_tipo_parcial').addEventListener('change', toggleDespCantidad);
     document.getElementById('desp_file').addEventListener('change', function(e){
       despachoFile = (e.target.files && e.target.files[0]) ? e.target.files[0] : null;
       var prev = document.getElementById('desp_preview');
@@ -4480,23 +4535,39 @@ function renderDespachoModalBody(){
       else { prev.innerHTML = ''; }
     });
     document.getElementById('btnConfirmarDespacho').addEventListener('click', submitDespacho);
+    if(despCant>0){
+      document.getElementById('btnDeshacerDespacho').addEventListener('click', function(){
+        var btn = this; btn.disabled = true;
+        deshacerUltimoDespacho(o, function(ok, row){
+          btn.disabled = false;
+          if(ok){ despachoState = row; renderDespachoModalBody(); }
+        });
+      });
+    }
   }
 }
 function submitDespacho(){
   var o = despachoState;
   if(!o) return;
+  var tipoEl = document.querySelector('input[name="desp_tipo"]:checked');
+  var tipo = tipoEl ? tipoEl.value : 'total';
+  var cantidad = null;
+  var saldoDisp = Math.round(Math.max(0, (Number(o.cantidad_toneladas)||0) - (Number(o.despachado_cantidad)||0))*10000)/10000;
+  if(tipo==='parcial'){
+    var cantEl = document.getElementById('desp_cantidad');
+    cantidad = cantEl ? parseFloat(cantEl.value) : NaN;
+    if(!cantidad || isNaN(cantidad) || cantidad<=0){ toast('Indicá una cantidad válida para el despacho parcial.'); return; }
+    if(cantidad > saldoDisp + 0.001){ toast('La cantidad no puede superar el saldo pendiente ('+fmt(saldoDisp,2)+' Ton).'); return; }
+  }
   var btn = document.getElementById('btnConfirmarDespacho');
   btn.disabled = true;
   function guardar(path){
-    sb.rpc('marcar_produccion_despachada', {p_id:o.id, p_despachado:true, p_boleta_path: path}).then(function(res){
+    sb.rpc('registrar_despacho', {p_id:o.id, p_tipo:tipo, p_cantidad:cantidad, p_boleta_path: path}).then(function(res){
       btn.disabled = false;
       if(res.error){ toast('No se pudo registrar el despacho: '+errMsg(res.error)); return; }
       var row = Array.isArray(res.data) ? res.data[0] : res.data;
-      var idx = ordenesState.rows.findIndex(function(x){return x.id===row.id;});
-      if(idx!==-1) ordenesState.rows[idx] = row;
-      renderOrdenesRows();
-      if(typeof renderEntregadosRows==='function') renderEntregadosRows();
-      toast('Despacho registrado');
+      refreshDespachoRow(row);
+      toast(tipo==='parcial' ? 'Despacho parcial registrado — saldo por despachar: '+fmt(Math.max(0,(Number(row.cantidad_toneladas)||0)-(Number(row.despachado_cantidad)||0)),2)+' Ton' : 'Despacho registrado');
       closeDespachoModal();
     });
   }
