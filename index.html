@@ -4391,10 +4391,15 @@ document.getElementById('btnCerrarProdDoc').addEventListener('click', function()
   document.getElementById('prodDocModalOverlay').classList.remove('active');
 });
 function makeCompactPdfFromCanvas(jsPDFCtor, dataUrl, canvas){
-  // Página del PDF ajustada al tamaño del contenido (tipo nota/recibo), no una hoja A4 completa con espacio en blanco.
-  var margin = 8, maxW = 190; // mm — mismo ancho de contenido útil que una A4 con margen
-  var ratio = canvas.width / canvas.height;
-  var w = maxW, h = w/ratio;
+  // Página del PDF ajustada al tamaño real del contenido (tipo nota/recibo), no una hoja A4 completa.
+  // El canvas viene de html2canvas con scale:2, así que sus px son el doble de los px CSS reales.
+  var margin = 8; // mm
+  var pxToMm = 25.4/96; // 96 px CSS = 1 pulgada
+  var cssWpx = canvas.width/2, cssHpx = canvas.height/2;
+  var contentWmm = cssWpx*pxToMm, contentHmm = cssHpx*pxToMm;
+  var maxW = 190; // mm — tope, por si la tarjeta se renderiza muy ancha (no fuerza a estirarse a este ancho)
+  var w = Math.min(contentWmm, maxW);
+  var h = w*(contentHmm/contentWmm);
   var pageW = w + margin*2, pageH = h + margin*2;
   var doc = new jsPDFCtor({unit:'mm', format:[pageW, pageH], compress:true});
   doc.addImage(dataUrl, 'JPEG', margin, margin, w, h);
