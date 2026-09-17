@@ -119,7 +119,7 @@ th.num,td.num{text-align:right}
 .file-input-hidden{display:none}
 .overlay2{position:fixed;inset:0;background:rgba(17,24,28,.55);display:none;align-items:flex-start;justify-content:center;z-index:150;padding:30px 14px;overflow:auto}
 .overlay2.active{display:flex}
-.ocr-box{background:#fff;border-radius:14px;max-width:760px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden}
+.ocr-box{background:#fff;border-radius:14px;max-width:760px;width:100%;min-width:0;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden}
 .ocr-head{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
 .ocr-head h3{flex:1}
 .ocr-body{padding:18px 20px;max-height:70vh;overflow:auto}
@@ -3640,9 +3640,11 @@ function renderProformaDocCard(pf){
       '<span class="doc-entrega-opt'+(pf.modo_entrega==='envio'?' checked':'')+'">'+(pf.modo_entrega==='envio'?'☑':'☐')+' Envío a cliente</span>'+
     '</div>'+
     '<div class="fi-section">Detalle</div>'+
+    '<div style="overflow-x:auto">'+
     '<table class="pf-table"><thead><tr>'+
       '<th>Producto</th><th class="num">Precio público<br>(Bs/Ton)</th><th class="num">Descuento<br>(Bs/Ton)</th><th class="num">Precio final<br>(Bs/Ton)</th><th class="num">Cantidad<br>(Ton)</th><th class="num">Subtotal<br>(Bs)</th>'+
     '</tr></thead><tbody>'+filas+'</tbody></table>'+
+    '</div>'+
     '<div class="doc-grand-total-box">'+
       '<div class="doc-meta-item"><span class="l">Total productos</span><span class="v">'+fmtBs(totalProductos)+'</span></div>'+
       (flete>0 ? '<div class="doc-meta-item"><span class="l">Flete</span><span class="v">'+fmtBs(flete)+'</span></div>' : '')+
