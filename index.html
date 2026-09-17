@@ -4396,13 +4396,15 @@ document.getElementById('btnCerrarProdDoc').addEventListener('click', function()
 function makeCompactPdfFromCanvas(jsPDFCtor, dataUrl, canvas){
   // Hoja horizontal tipo A4 (297mm de ancho) para que las columnas entren siempre,
   // pero con el alto recortado al contenido real (no queda espacio en blanco abajo).
+  // OJO: jsPDF, si no le decimos la orientación, invierte solo un format:[w,h] para
+  // forzar vertical cuando w>h — por eso hay que pasarle 'l' (landscape) explícito.
   var margin = 10; // mm
   var pageWmm = 297; // ancho fijo, generoso (A4 horizontal)
   var w = pageWmm - margin*2;
   var ratio = canvas.width / canvas.height;
   var h = w/ratio;
   var pageH = h + margin*2;
-  var doc = new jsPDFCtor({unit:'mm', format:[pageWmm, pageH], compress:true});
+  var doc = new jsPDFCtor({orientation:'l', unit:'mm', format:[pageWmm, pageH], compress:true});
   doc.addImage(dataUrl, 'JPEG', margin, margin, w, h);
   return doc;
 }
