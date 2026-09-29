@@ -3210,6 +3210,7 @@ function submitPedidoVenta(){
       producto_hoja: l.producto_hoja,
       cantidad_toneladas: l.cantidad,
       precio_pactado: (l.precio===''||l.precio==null||isNaN(l.precio)) ? null : l.precio,
+      precio_lista: (function(){ var t=precioTablaFor(l.producto_hoja); return t==null?null:Math.round(t*100)/100; })(),
       usar_stock_id: l.usar_stock_id || null
     });
   }
@@ -3977,9 +3978,36 @@ function renderNotaVentaDocCard(nota){
   var pv = nota.pedidos_venta || {};
   var items = (pv.pedido_venta_items||[]).slice().sort(function(a,b){ return (a.orden||0)-(b.orden||0); });
   function metaItem(l,val){ return '<div class="doc-meta-item"><span class="l">'+l+'</span><span class="v">'+escapeHtml(String(val))+'</span></div>'; }
+  /* descuento por línea = precio de lista (guardado al crear el pedido) − precio pactado */
+  function descLinea(it){
+    if(it.precio_lista==null || it.precio_pactado==null) return 0;
+    var d = Number(it.precio_lista) - Number(it.precio_pactado);
+    return d > 0.004 ? Math.round(d*100)/100 : 0;
+  }
+  var hayDescuento = items.some(function(it){ return descLinea(it) > 0; });
+  var totalDescuento = 0, totalSinDescuento = 0;
   var filasProductos = items.map(function(it){
-    return '<tr><td>'+escapeHtml(it.producto_nombre)+'</td><td class="num">'+fmt(it.cantidad_toneladas,2)+'</td><td class="num">'+(it.precio_pactado!=null?fmtBs(it.precio_pactado):'—')+'</td><td class="num">'+(it.total_pactado!=null?fmtBs(it.total_pactado):'—')+'</td></tr>';
+    var cant = Number(it.cantidad_toneladas)||0;
+    var d = descLinea(it);
+    var precioFinal = it.precio_pactado!=null?fmtBs(it.precio_pactado):'—';
+    var total = it.total_pactado!=null?fmtBs(it.total_pactado):'—';
+    if(!hayDescuento){
+      return '<tr><td>'+escapeHtml(it.producto_nombre)+'</td><td class="num">'+fmt(cant,2)+'</td><td class="num">'+precioFinal+'</td><td class="num">'+total+'</td></tr>';
+    }
+    var lista = it.precio_lista!=null ? Number(it.precio_lista) : (it.precio_pactado!=null?Number(it.precio_pactado):null);
+    if(lista!=null) totalSinDescuento += lista*cant;
+    totalDescuento += d*cant;
+    var pct = (d>0 && lista) ? (d/lista*100) : 0;
+    return '<tr><td>'+escapeHtml(it.producto_nombre)+'</td><td class="num">'+fmt(cant,2)+'</td>'+
+      '<td class="num">'+(lista!=null?fmtBs(lista):'—')+'</td>'+
+      '<td class="num">'+(d>0?(fmtBs(d)+'<br><span style="font-size:10px;color:var(--muted)">('+fmt(pct,1)+'%)</span>'):'—')+'</td>'+
+      '<td class="num">'+precioFinal+'</td><td class="num">'+total+'</td></tr>';
   }).join('');
+  totalDescuento = Math.round(totalDescuento*100)/100;
+  totalSinDescuento = Math.round(totalSinDescuento*100)/100;
+  var theadProductos = hayDescuento
+    ? '<th>Producto</th><th class="num">Cantidad (Ton)</th><th class="num">Precio lista (Bs/Ton)</th><th class="num">Descuento (Bs/Ton)</th><th class="num">Precio final (Bs/Ton)</th><th class="num">Total (Bs)</th>'
+    : '<th>Producto</th><th class="num">Cantidad (Ton)</th><th class="num">Precio (Bs/Ton)</th><th class="num">Total (Bs)</th>';
   var flete = Number(pv.flete_bs)||0;
   var totalProductos = Math.round((t.total-flete)*100)/100;
   var filasCuotas = t.cuotas.map(function(c){
@@ -4000,10 +4028,12 @@ function renderNotaVentaDocCard(nota){
       metaItem('Entrega', pv.modo_entrega==='recoge' ? 'Recoge cliente' : (pv.modo_entrega==='envio' ? 'Envío a cliente' : '—'))+
     '</div>'+
     '<div class="fi-section">Productos</div>'+
-    '<table class="pf-table"><thead><tr><th>Producto</th><th class="num">Cantidad (Ton)</th><th class="num">Precio (Bs/Ton)</th><th class="num">Total (Bs)</th></tr></thead><tbody>'+filasProductos+'</tbody></table>'+
+    '<table class="pf-table"><thead><tr>'+theadProductos+'</tr></thead><tbody>'+filasProductos+'</tbody></table>'+
     '<div class="doc-grand-total-box">'+
-      (flete>0 ? ('<div class="doc-meta-item"><span class="l">Total productos</span><span class="v">'+fmtBs(totalProductos)+'</span></div>'+
-        '<div class="doc-meta-item"><span class="l">Flete</span><span class="v">'+fmtBs(flete)+'</span></div>') : '')+
+      (hayDescuento ? ('<div class="doc-meta-item"><span class="l">Subtotal a precio de lista</span><span class="v">'+fmtBs(totalSinDescuento)+'</span></div>'+
+        '<div class="doc-meta-item"><span class="l">Descuento aplicado</span><span class="v" style="color:#b42318">− '+fmtBs(totalDescuento)+'</span></div>') : '')+
+      ((flete>0 || hayDescuento) ? ('<div class="doc-meta-item"><span class="l">Total productos'+(hayDescuento?' (con descuento)':'')+'</span><span class="v">'+fmtBs(totalProductos)+'</span></div>') : '')+
+      (flete>0 ? ('<div class="doc-meta-item"><span class="l">Flete</span><span class="v">'+fmtBs(flete)+'</span></div>') : '')+
       '<div class="doc-total-row">TOTAL: '+fmtBs(t.total)+'</div>'+
       '<div class="doc-meta-item"><span class="l">Pagado</span><span class="v">'+fmtBs(t.pagado)+'</span></div>'+
       '<div class="doc-meta-item"><span class="l">Saldo pendiente</span><span class="v"><b>'+fmtBs(t.saldo)+'</b></span></div>'+
