@@ -4083,10 +4083,9 @@ function renderNotaVentaDocCard(nota){
     if(!hayDescuento){
       return '<tr><td>'+escapeHtml(it.producto_nombre)+'</td><td class="num">'+fmt(it.cantidad_toneladas,2)+'</td><td class="num">'+(it.precio_pactado!=null?fmtBs(it.precio_pactado):'—')+'</td><td class="num">'+total+'</td></tr>';
     }
-    var pct = (d>0 && Number(it.precio_lista)>0) ? ' <span style="font-size:11px;color:#b45309">(-'+fmt(d/Number(it.precio_lista)*100,1)+'%)</span>' : '';
     return '<tr><td>'+escapeHtml(it.producto_nombre)+'</td><td class="num">'+fmt(it.cantidad_toneladas,2)+'</td>'+
       '<td class="num">'+(it.precio_lista!=null?fmtBs(it.precio_lista):(it.precio_pactado!=null?fmtBs(it.precio_pactado):'—'))+'</td>'+
-      '<td class="num">'+(d>0?fmtBs(d)+pct:'—')+'</td>'+
+      '<td class="num">'+(d>0?fmtBs(d):'—')+'</td>'+
       '<td class="num">'+(it.precio_pactado!=null?fmtBs(it.precio_pactado):'—')+'</td>'+
       '<td class="num">'+total+'</td></tr>';
   }).join('');
