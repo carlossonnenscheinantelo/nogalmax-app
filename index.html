@@ -1,10 +1,12 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NOGALMAX — Precios y Fórmulas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/7.0.0/tesseract.min.js" defer></script>
 <script id="scriptSupabase" src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
@@ -12,71 +14,82 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style>
 :root{
-  --bg:#f4f5f7; --panel:#ffffff; --ink:#1c2128; --muted:#6b7280; --line:#e5e7eb;
-  --brand:#2f6f4f; --brand-dark:#204f38; --brand-light:#eaf3ee;
+  --bg:#f3f5f4; --panel:#ffffff; --ink:#1a2420; --muted:#6b7680; --line:#e6e9e7;
+  --brand:#2f6f4f; --brand-dark:#1e4a34; --brand-light:#eaf3ee; --brand-mid:#3d8562;
   --accent:#b5651d; --danger:#b3261e; --danger-light:#fdecea;
-  --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+  --radius-sm:8px; --radius-md:12px; --radius-lg:16px;
+  --shadow-sm:0 1px 2px rgba(16,24,40,.05),0 1px 2px rgba(16,24,40,.06);
+  --shadow:0 2px 6px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.05);
+  --shadow-lg:0 12px 28px rgba(20,40,30,.14),0 4px 10px rgba(20,40,30,.08);
+  --ease:cubic-bezier(.2,.7,.3,1);
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.45}
-h1,h2,h3{margin:0 0 4px;font-weight:600}
+html{scrollbar-color:var(--brand-mid) var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#c7d2cb;border-radius:99px;border:2px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:var(--brand-mid)}
+h1,h2,h3{margin:0 0 4px;font-weight:700;letter-spacing:-.01em}
 a{color:var(--brand)}
-button{font-family:inherit;font-size:13px;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:#fff;padding:8px 14px;color:var(--ink);transition:background .12s,border-color .12s}
-button:hover{background:#f3f4f6}
-button.primary{background:var(--brand);border-color:var(--brand);color:#fff}
-button.primary:hover{background:var(--brand-dark)}
+button{font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;border-radius:var(--radius-sm);border:1px solid var(--line);background:#fff;padding:8px 15px;color:var(--ink);transition:background .15s var(--ease),border-color .15s var(--ease),box-shadow .15s var(--ease),transform .1s var(--ease)}
+button:hover{background:#f3f4f6;border-color:#d7dbd8}
+button:active{transform:translateY(1px)}
+button.primary{background:linear-gradient(180deg,var(--brand-mid),var(--brand));border-color:var(--brand);color:#fff;box-shadow:0 1px 2px rgba(30,74,52,.15),0 4px 10px rgba(30,74,52,.18)}
+button.primary:hover{background:linear-gradient(180deg,var(--brand),var(--brand-dark));box-shadow:0 2px 4px rgba(30,74,52,.2),0 6px 14px rgba(30,74,52,.24)}
 button.danger{border-color:var(--danger);color:var(--danger)}
 button.danger:hover{background:var(--danger-light)}
-button.ghost{border-color:transparent;background:transparent}
-button:disabled{opacity:.45;cursor:not-allowed}
-input,select{font-family:inherit;font-size:13px;padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink)}
-input:focus,select:focus{outline:2px solid var(--brand-light);border-color:var(--brand)}
+button.ghost{border-color:transparent;background:transparent;box-shadow:none}
+button:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+input,select{font-family:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius-sm);background:#fff;color:var(--ink);transition:border-color .15s var(--ease),box-shadow .15s var(--ease)}
+input:focus,select:focus{outline:none;border-color:var(--brand-mid);box-shadow:0 0 0 3px var(--brand-light)}
 table{border-collapse:collapse;width:100%}
-th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
-th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;background:#fafbfc;position:sticky;top:0}
-tbody tr:hover{background:#fafbfc}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;background:#f8faf9;position:sticky;top:0}
+tbody tr{transition:background .1s var(--ease)}
+tbody tr:nth-child(even){background:#fafbfa}
+tbody tr:hover{background:var(--brand-light)}
 .num{text-align:right;font-variant-numeric:tabular-nums}
 .muted{color:var(--muted)}
 .tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:600;background:var(--brand-light);color:var(--brand-dark)}
 .pill-input{width:80px}
 /* layout */
-#topbar{position:sticky;top:0;z-index:30;background:var(--brand-dark);color:#fff;padding:10px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-#topbar .brand{font-weight:700;font-size:16px;letter-spacing:.02em;margin-right:auto;display:flex;align-items:center;gap:8px}
-#topbar .brand .sub{font-weight:400;font-size:11px;opacity:.75}
-#topbar button{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.25);color:#fff;font-size:12px;padding:7px 11px}
-#topbar button:hover{background:rgba(255,255,255,.18)}
+#topbar{position:sticky;top:0;z-index:30;background:linear-gradient(105deg,var(--brand-dark),var(--brand) 130%);color:#fff;padding:12px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 2px 10px rgba(0,0,0,.14)}
+#topbar .brand{font-weight:800;font-size:16px;letter-spacing:.01em;margin-right:auto;display:flex;align-items:center;gap:8px}
+#topbar .brand .sub{font-weight:400;font-size:11px;opacity:.8}
+#topbar button{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.22);color:#fff;font-size:12px;padding:7px 12px;box-shadow:none}
+#topbar button:hover{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.35)}
 #appBody{display:flex;align-items:flex-start;max-width:1620px;margin:0 auto}
-main{padding:20px;flex:1;min-width:0}
-#sideNav{width:240px;flex-shrink:0;background:var(--panel);border-left:1px solid var(--line);margin:20px 20px 20px 0}
+main{padding:22px;flex:1;min-width:0}
+#sideNav{width:240px;flex-shrink:0;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-md);margin:20px 20px 20px 0;box-shadow:var(--shadow-sm);overflow:hidden}
 .nav-group{border-bottom:1px solid var(--line)}
 .nav-group:last-child{border-bottom:none}
-.nav-group-head{width:100%;text-align:left;background:transparent;border:none;border-radius:0;padding:13px 16px;font-weight:700;font-size:13px;color:var(--brand-dark);display:flex;justify-content:space-between;align-items:center}
+.nav-group-head{width:100%;text-align:left;background:transparent;border:none;border-radius:0;padding:13px 16px;font-weight:700;font-size:13px;color:var(--brand-dark);display:flex;justify-content:space-between;align-items:center;transition:background .12s var(--ease)}
 .nav-group-head:hover{background:var(--brand-light)}
-.nav-group-head .chev{transition:transform .15s;color:var(--muted);font-size:11px}
+.nav-group-head .chev{transition:transform .15s var(--ease);color:var(--muted);font-size:11px}
 .nav-group:not(.open) .nav-group-items{display:none}
 .nav-group:not(.open) .chev{transform:rotate(-90deg)}
-.nav-group-items{display:flex;flex-direction:column;padding-bottom:6px}
-.nav-item{border:none;border-radius:0;text-align:left;background:transparent;padding:9px 16px 9px 28px;font-size:12.5px;color:var(--ink);font-weight:400;border-left:3px solid transparent}
+.nav-group-items{display:flex;flex-direction:column;padding:2px 8px 8px}
+.nav-item{border:none;border-radius:var(--radius-sm);text-align:left;background:transparent;padding:9px 12px;margin:1px 0;font-size:12.5px;color:var(--ink);font-weight:500;transition:background .12s var(--ease),color .12s var(--ease)}
 .nav-item:hover{background:var(--brand-light)}
-.nav-item.active{background:var(--brand-light);color:var(--brand-dark);font-weight:700;border-left-color:var(--brand)}
+.nav-item.active{background:linear-gradient(180deg,var(--brand-mid),var(--brand));color:#fff;font-weight:700;box-shadow:0 2px 6px rgba(30,74,52,.25)}
 @media (max-width:940px){
   #appBody{flex-direction:column}
-  #sideNav{width:auto;margin:0 20px 20px}
+  #sideNav{width:auto;margin:16px 20px}
   .nav-group-items{flex-direction:row;flex-wrap:wrap}
-  .nav-item{border-left:none;border-bottom:3px solid transparent;padding:8px 12px}
-  .nav-item.active{border-left:none;border-bottom-color:var(--brand)}
+  .nav-item{padding:8px 12px}
 }
 .view{display:none}
 .view.active{display:block}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:18px}
-.grid-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:18px}
-.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow)}
-.stat .n{font-size:26px;font-weight:700;color:var(--brand-dark)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-lg);box-shadow:var(--shadow);padding:20px}
+.grid-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:18px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-md);padding:16px 18px;box-shadow:var(--shadow);transition:box-shadow .15s var(--ease),transform .15s var(--ease)}
+.stat .n{font-size:27px;font-weight:800;color:var(--brand-dark);letter-spacing:-.01em}
 .stat .l{font-size:12px;color:var(--muted);margin-top:2px}
 .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
 .toolbar input[type=search]{width:260px}
 .spacer{flex:1}
-.table-wrap{overflow:auto;max-height:70vh;border:1px solid var(--line);border-radius:10px}
+.table-wrap{overflow:auto;max-height:70vh;border:1px solid var(--line);border-radius:var(--radius-md)}
 .badge-cat{display:inline-block;padding:1px 8px;border-radius:6px;font-size:11px;background:#eef2ff;color:#3730a3}
 .cat-SALES{background:#eaf3ee;color:#204f38}
 .cat-PROTEINADOS{background:#fef3e0;color:#8a5a00}
@@ -84,9 +97,10 @@ main{padding:20px;flex:1;min-width:0}
 .cat-OTROS{background:#f1f0fe;color:#4c3fae}
 .section-title{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;margin:22px 0 8px}
 /* modal */
-#modalOverlay{position:fixed;inset:0;background:rgba(17,24,28,.5);display:none;align-items:flex-start;justify-content:center;z-index:100;padding:26px 14px;overflow:auto}
+#modalOverlay{position:fixed;inset:0;background:rgba(15,22,19,.55);backdrop-filter:blur(2px);display:none;align-items:flex-start;justify-content:center;z-index:100;padding:26px 14px;overflow:auto}
 #modalOverlay.active{display:flex}
-#modal{background:#fff;border-radius:14px;max-width:1080px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden}
+#modal{background:#fff;border-radius:var(--radius-lg);max-width:1080px;width:100%;box-shadow:var(--shadow-lg);overflow:hidden;animation:modalIn .18s var(--ease)}
+@keyframes modalIn{from{opacity:0;transform:translateY(6px) scale(.99)}to{opacity:1;transform:none}}
 #modalHead{padding:16px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;position:sticky;top:0;background:#fff;z-index:2}
 #modalHead input#pf_nombre{font-size:17px;font-weight:700;border:none;padding:4px 2px;width:340px;border-bottom:2px solid transparent}
 #modalHead input#pf_nombre:focus{border-bottom-color:var(--brand)}
@@ -100,17 +114,18 @@ main{padding:20px;flex:1;min-width:0}
 .inline-field label{font-size:12px;color:var(--muted)}
 .close-x{margin-left:auto;background:transparent;border:none;font-size:20px;line-height:1;color:var(--muted);padding:4px 8px}
 .qty-input{width:90px}
-.filter-chip{padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:#fff;font-size:12px;cursor:pointer}
+.filter-chip{padding:5px 13px;border-radius:999px;border:1px solid var(--line);background:#fff;font-size:12px;font-weight:600;cursor:pointer;transition:background .12s var(--ease),border-color .12s var(--ease),color .12s var(--ease)}
+.filter-chip:hover{border-color:var(--brand-mid)}
 .filter-chip.active{background:var(--brand);color:#fff;border-color:var(--brand)}
 .empty{padding:30px;text-align:center;color:var(--muted)}
 .footnote{font-size:11.5px;color:var(--muted);margin-top:14px;line-height:1.6}
 .idx-cat h3{margin-top:0}
 .idx-cat{margin-bottom:22px}
 .idx-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px}
-.idx-item{display:flex;justify-content:space-between;gap:8px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;font-size:12.5px}
-.idx-item:hover{border-color:var(--brand);background:var(--brand-light)}
+.idx-item{display:flex;justify-content:space-between;gap:8px;padding:8px 11px;border:1px solid var(--line);border-radius:var(--radius-sm);background:#fff;cursor:pointer;font-size:12.5px;transition:border-color .12s var(--ease),background .12s var(--ease),transform .12s var(--ease)}
+.idx-item:hover{border-color:var(--brand);background:var(--brand-light);transform:translateY(-1px)}
 .idx-item .p{font-weight:600;color:var(--brand-dark)}
-.toast{position:fixed;bottom:20px;right:20px;background:var(--brand-dark);color:#fff;padding:12px 18px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.3);z-index:200;font-size:13px;max-width:320px;opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--brand-dark);color:#fff;padding:12px 18px;border-radius:var(--radius-sm);box-shadow:var(--shadow-lg);z-index:200;font-size:13px;max-width:320px;opacity:0;transform:translateY(8px);transition:opacity .2s var(--ease),transform .2s var(--ease)}
 .toast.show{opacity:1;transform:translateY(0)}
 .sortable{cursor:pointer;user-select:none}
 .sortable:hover{color:var(--ink)}
@@ -118,13 +133,13 @@ main{padding:20px;flex:1;min-width:0}
 th.num,td.num{text-align:right}
 .unused-tag{font-size:10px;color:var(--muted);background:#f3f4f6;padding:1px 6px;border-radius:5px;margin-left:6px}
 .file-input-hidden{display:none}
-.overlay2{position:fixed;inset:0;background:rgba(17,24,28,.55);display:none;align-items:flex-start;justify-content:center;z-index:150;padding:30px 14px;overflow:auto}
+.overlay2{position:fixed;inset:0;background:rgba(15,22,19,.55);backdrop-filter:blur(2px);display:none;align-items:flex-start;justify-content:center;z-index:150;padding:30px 14px;overflow:auto}
 .overlay2.active{display:flex}
-.ocr-box{background:#fff;border-radius:14px;max-width:760px;width:100%;min-width:0;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden}
+.ocr-box{background:#fff;border-radius:var(--radius-lg);max-width:760px;width:100%;min-width:0;box-shadow:var(--shadow-lg);overflow:hidden;animation:modalIn .18s var(--ease)}
 .ocr-head{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
 .ocr-head h3{flex:1}
 .ocr-body{padding:18px 20px;max-height:70vh;overflow:auto}
-.dropzone{display:block;border:2px dashed var(--line);border-radius:12px;padding:34px 20px;text-align:center;color:var(--muted);cursor:pointer;font-size:14px}
+.dropzone{display:block;border:2px dashed #c7d2cb;border-radius:var(--radius-md);padding:34px 20px;text-align:center;color:var(--muted);cursor:pointer;font-size:14px;transition:border-color .15s var(--ease),background .15s var(--ease)}
 .dropzone:hover{border-color:var(--brand);background:var(--brand-light)}
 .ocr-progress{height:8px;border-radius:6px;background:#eef0f2;overflow:hidden;margin-top:10px}
 .ocr-progress-bar{height:100%;background:var(--brand);width:0%;transition:width .2s}
@@ -142,14 +157,14 @@ th.num,td.num{text-align:right}
 .swap-preview .arrow{color:var(--muted);font-size:11px}
 .swap-warn{color:var(--accent);font-size:11.5px;margin-top:6px}
 /* auth */
-#authOverlay{position:fixed;inset:0;background:linear-gradient(160deg,var(--brand-dark),var(--brand));display:flex;align-items:center;justify-content:center;z-index:500;padding:20px}
+#authOverlay{position:fixed;inset:0;background:radial-gradient(120% 120% at 15% 10%,var(--brand-mid),var(--brand-dark) 60%);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px}
 #authOverlay.hidden{display:none}
-.auth-box{background:#fff;border-radius:14px;max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.35);padding:26px 26px 22px}
+.auth-box{background:#fff;border-radius:var(--radius-lg);max-width:380px;width:100%;box-shadow:var(--shadow-lg);padding:28px 28px 24px}
 .auth-box h1{font-size:18px;display:flex;align-items:center;gap:8px}
-.auth-box .sub{font-size:12px;color:var(--muted);margin-bottom:16px}
-.auth-tabs{display:flex;gap:4px;margin-bottom:16px;background:#f1f2f4;border-radius:9px;padding:3px}
-.auth-tabs button{flex:1;border:none;background:transparent;padding:8px;border-radius:7px;font-weight:600;font-size:12.5px}
-.auth-tabs button.active{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.auth-box .sub{font-size:12px;color:var(--muted);margin-bottom:18px}
+.auth-tabs{display:flex;gap:4px;margin-bottom:18px;background:#f1f2f4;border-radius:10px;padding:3px}
+.auth-tabs button{flex:1;border:none;background:transparent;padding:8px;border-radius:8px;font-weight:600;font-size:12.5px;transition:background .12s var(--ease),box-shadow .12s var(--ease)}
+.auth-tabs button.active{background:#fff;box-shadow:var(--shadow-sm)}
 .auth-field{margin-bottom:12px}
 .auth-field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
 .auth-field input{width:100%}
@@ -218,17 +233,19 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
 .ocr-money-list{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
 .ocr-money-chip{border:1px solid var(--line);border-radius:16px;padding:5px 12px;background:#fff;cursor:pointer;font-size:12.5px}
 .ocr-money-chip:hover{background:var(--brand-light);border-color:var(--brand)}
-.home-card{border:1px solid var(--line);border-radius:10px;padding:16px;cursor:pointer;background:#fff;transition:box-shadow .15s,border-color .15s}
-.home-card:hover{box-shadow:0 2px 10px rgba(0,0,0,.08);border-color:var(--brand)}
+.home-card{border:1px solid var(--line);border-radius:var(--radius-md);padding:17px;cursor:pointer;background:#fff;box-shadow:var(--shadow-sm);transition:box-shadow .15s var(--ease),border-color .15s var(--ease),transform .15s var(--ease)}
+.home-card:hover{box-shadow:var(--shadow-lg);border-color:var(--brand-mid);transform:translateY(-2px)}
 .home-card .hc-icon{font-size:24px}
-.home-card .hc-title{font-weight:700;margin-top:6px;font-size:13.5px}
+.home-card .hc-title{font-weight:700;margin-top:7px;font-size:13.5px}
 .home-card .hc-sub{color:var(--muted);font-size:11.5px;margin-top:2px}
-.home-cards-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:14px 0 20px}
+.home-cards-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin:14px 0 20px}
 .doc-formula-box{border:1px dashed var(--muted);border-radius:8px;padding:8px 12px 10px;margin:8px 0 16px;background:#f7f7f8}
 .doc-formula-box .fi-section{color:var(--muted);margin-top:0}
 .doc-cantidad-box{border:2px solid var(--brand);border-radius:8px;padding:10px 14px;margin:8px 0 16px;background:var(--brand-light)}
 .doc-cantidad-box .fi-section{color:var(--brand-dark);margin-top:0}
 .pv-preciotabla{font-size:11.5px;color:var(--muted);margin-top:2px}
+.pfl-precio.modificado{border-color:#d97706;background:#fffbeb}
+.pf-reset-precio{font-size:11px;padding:2px 6px;margin-left:4px}
 .pv-lista-precios{max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin:0 0 14px}
 .pv-lista-precios table{width:100%}
 .doc-entrega-box{display:flex;gap:26px;margin:10px 0 4px;font-size:13px;flex-wrap:wrap}
@@ -240,7 +257,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
 .brand-logo{height:30px;width:auto;display:block}
 .fi-logo{height:24px;width:auto;vertical-align:middle;margin-right:8px}
 .stat-click{cursor:pointer}
-.stat-click:hover{box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.stat-click:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px);border-color:var(--brand-mid)}
 .pf-table{width:100%;border-collapse:collapse;margin-top:6px;table-layout:fixed}
 .pf-table th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.02em;color:var(--muted);padding:5px 3px;border-bottom:2px solid var(--brand);white-space:normal;line-height:1.25;word-break:break-word}
 .pf-table td{padding:6px 3px;border-bottom:1px solid var(--line);font-size:12px;white-space:normal;word-break:break-word}
@@ -548,7 +565,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
         <tbody id="proformasBody"></tbody>
       </table>
     </div>
-    <p class="footnote">La proforma toma el precio público directo del sistema (precio de venta con comisión), aplicás el % de descuento por producto y se suma el flete si corresponde. No genera producción ni descuenta stock de insumos — es solo una cotización para el cliente.</p>
+    <p class="footnote">La proforma toma el precio público del sistema (precio de venta con comisión) — podés modificarlo por producto al crearla o editarla (✏️) —, aplicás el % de descuento por producto y se suma el flete si corresponde. No genera producción ni descuenta stock de insumos — es solo una cotización para el cliente.</p>
   </section>
 
   <!-- NOTAS DE VENTA -->
@@ -1059,7 +1076,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
 <div id="proformaModalOverlay" class="overlay2">
   <div class="ocr-box" style="max-width:620px">
     <div class="ocr-head">
-      <h3>Nueva proforma</h3>
+      <h3 id="proformaModalTitle">Nueva proforma</h3>
       <button class="close-x" id="btnCerrarProforma">✕</button>
     </div>
     <div id="proformaBody" class="ocr-body"></div>
@@ -1076,6 +1093,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
       <div id="proformaDocCard" class="fi-card"></div>
       <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
         <button class="primary" id="btnDescargarProformaPdf">⬇ Descargar PDF</button>
+        <button id="btnEditarProformaDoc">✏️ Editar proforma</button>
       </div>
       <p class="footnote">Cotización de precio para el cliente. No genera producción ni descuenta stock — para eso, cargá un pedido de venta.</p>
     </div>
@@ -1083,7 +1101,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
 </div>
 
 <div id="notaVentaDocModalOverlay" class="overlay2">
-  <div class="ocr-box" style="max-width:600px">
+  <div class="ocr-box" style="max-width:680px">
     <div class="ocr-head">
       <h3>Nota de venta</h3>
       <button class="close-x" id="btnCerrarNotaVentaDoc">✕</button>
@@ -1218,6 +1236,7 @@ var pvSort = { k:'fecha_pedido', dir:-1 };
 var proformaState = { loaded:false, rows: [] };
 var pfSort = { k:'creado_en', dir:-1 };
 var pfLineas = [];
+var pfEditId = null;
 var notaVentaState = { loaded:false, rows: [] };
 var nvSort = { k:'fecha', dir:-1 };
 var cxcSort = { k:'cliente', dir:1 };
@@ -3210,7 +3229,7 @@ function submitPedidoVenta(){
       producto_hoja: l.producto_hoja,
       cantidad_toneladas: l.cantidad,
       precio_pactado: (l.precio===''||l.precio==null||isNaN(l.precio)) ? null : l.precio,
-      precio_lista: (function(){ var t=precioTablaFor(l.producto_hoja); return t==null?null:Math.round(t*100)/100; })(),
+      precio_lista: (function(){ var t = precioTablaFor(l.producto_hoja); return t==null ? null : Math.round(t*100)/100; })(),
       usar_stock_id: l.usar_stock_id || null
     });
   }
@@ -3435,7 +3454,7 @@ function renderProformasRows(){
       '<td class="num"><b>'+fmt(totalGeneral,2)+'</b></td>'+
       '<td>'+entregaLabel+'</td>'+
       '<td>'+(pf.fecha_entrega?fmtFecha(pf.fecha_entrega):'—')+'</td>'+
-      '<td><button class="ghost btn-doc-pf" title="Ver / descargar proforma">📄</button></td>'+
+      '<td style="white-space:nowrap"><button class="ghost btn-doc-pf" title="Ver / descargar proforma">📄</button> <button class="ghost btn-editar-pf" title="Editar proforma">✏️</button></td>'+
       eliminarCell+
     '</tr>';
   }).join('') || '<tr><td colspan="'+(esAdminPf?12:11)+'" class="empty">Sin proformas registradas</td></tr>';
@@ -3444,6 +3463,13 @@ function renderProformasRows(){
       var id = Number(btn.closest('tr').dataset.id);
       var pf = proformaState.rows.find(function(x){return x.id===id;});
       if(pf) openProformaDocModal(pf);
+    });
+  });
+  document.querySelectorAll('.btn-editar-pf').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var id = Number(btn.closest('tr').dataset.id);
+      var pf = proformaState.rows.find(function(x){return x.id===id;});
+      if(pf) openProformaModal(pf);
     });
   });
   document.querySelectorAll('.btn-eliminar-pf').forEach(function(btn){
@@ -3471,8 +3497,23 @@ document.querySelectorAll('#view-proformas th.sortable').forEach(function(th){
 });
 
 /* ---- formulario: nueva proforma ---- */
-function renderProformaForm(){
-  pfLineas = [{producto_hoja:'', cantidad:1, descuentoPct:0}];
+function pfPrecioSistema(l){
+  var p = l.producto_hoja ? state.productos.find(function(x){return x.hoja===l.producto_hoja;}) : null;
+  return p ? computeProducto(p).precioVentaConCom : null;
+}
+function pfPrecioPublico(l){
+  if(l.precioManual!=null && l.precioManual!=='' && !isNaN(l.precioManual)) return Number(l.precioManual);
+  return pfPrecioSistema(l);
+}
+function renderProformaForm(pf){
+  pfEditId = pf ? pf.id : null;
+  pfLineas = pf ? pfItemsOf(pf).map(function(it){
+    return { producto_hoja: it.producto_hoja, cantidad: Number(it.cantidad_toneladas)||0,
+             descuentoPct: Math.round((Number(it.descuento_pct)||0)*10000)/100,
+             precioManual: Number(it.precio_publico_ton) };
+  }) : [{producto_hoja:'', cantidad:1, descuentoPct:0, precioManual:null}];
+  if(!pfLineas.length) pfLineas = [{producto_hoja:'', cantidad:1, descuentoPct:0, precioManual:null}];
+  document.getElementById('proformaModalTitle').textContent = pf ? ('Editar proforma '+pf.numero_proforma) : 'Nueva proforma';
   document.getElementById('proformaBody').innerHTML =
     '<div class="inline-field"><label>Cliente</label><input type="text" id="pf_cliente" list="clientesDatalist" style="min-width:220px" placeholder="Nombre del cliente"></div>'+
     '<div class="inline-field"><label>Fecha de entrega</label><input type="date" id="pf_fechaEntrega"></div>'+
@@ -3485,9 +3526,9 @@ function renderProformaForm(){
     '<div id="pf_lineasWrap"></div>'+
     '<button type="button" id="btnAgregarPfLinea" class="ghost" style="margin-top:4px">+ Agregar producto</button>'+
     '<div id="pf_preview"></div>'+
-    '<p class="footnote">El precio público se toma en vivo del sistema (precio de venta con comisión, el mismo que usa el resto de la app). No genera producción ni descuenta stock de insumos — es solo una cotización.</p>'+
+    '<p class="footnote">El precio público se carga del sistema (precio de venta con comisión), pero podés modificarlo en cada producto. Los precios modificados se marcan en naranja; con ↺ volvés al precio del sistema. No genera producción ni descuenta stock de insumos — es solo una cotización.</p>'+
     '<div style="margin-top:16px;display:flex;gap:10px">'+
-      '<button class="primary" id="btnCrearProforma">Crear proforma</button>'+
+      '<button class="primary" id="btnCrearProforma">'+(pf?'Guardar cambios':'Crear proforma')+'</button>'+
       '<button id="btnCancelarProforma2">Cancelar</button>'+
     '</div>';
   document.getElementById('pf_modoEntrega').addEventListener('change', function(){
@@ -3498,44 +3539,85 @@ function renderProformaForm(){
   });
   document.getElementById('pf_flete').addEventListener('input', renderProformaPreview);
   document.getElementById('btnAgregarPfLinea').addEventListener('click', function(){
-    pfLineas.push({producto_hoja:'', cantidad:1, descuentoPct:0});
+    pfLineas.push({producto_hoja:'', cantidad:1, descuentoPct:0, precioManual:null});
     renderPfLineas();
   });
   document.getElementById('btnCancelarProforma2').addEventListener('click', closeProformaModal);
   document.getElementById('btnCrearProforma').addEventListener('click', submitProforma);
+  if(pf){
+    document.getElementById('pf_cliente').value = pf.cliente || '';
+    document.getElementById('pf_fechaEntrega').value = pf.fecha_entrega ? String(pf.fecha_entrega).slice(0,10) : '';
+    document.getElementById('pf_modoEntrega').value = pf.modo_entrega || 'recoge';
+    var envioPf = pf.modo_entrega === 'envio';
+    document.getElementById('pf_fleteWrap').style.display = envioPf ? '' : 'none';
+    document.getElementById('pf_flete').value = envioPf ? (Number(pf.flete_bs)||0) : 0;
+  }
   renderPfLineas();
   fetchClientes(populateClientesDatalist);
+}
+function pfLineaInfoHtml(l){
+  var precioSis = pfPrecioSistema(l);
+  var precioPublico = pfPrecioPublico(l);
+  if(precioPublico==null) return '';
+  var desc = Number(l.descuentoPct)||0;
+  var descMonto = precioPublico*desc/100;
+  var precioFinal = precioPublico*(1-desc/100);
+  var subtotal = l.cantidad>0 ? precioFinal*Number(l.cantidad) : null;
+  var modificado = precioSis!=null && Math.abs(precioPublico-precioSis)>0.005;
+  return (modificado ? 'Precio sistema: '+fmtBs(precioSis)+' · ' : '')+
+    (desc>0?'Descuento: '+fmtBs(descMonto)+'/Ton · Final: '+fmtBs(precioFinal)+'/Ton':'Final: '+fmtBs(precioFinal)+'/Ton')+
+    (subtotal!=null?' · Subtotal: '+fmtBs(subtotal):'');
+}
+function pfLineaModificada(l){
+  var s1 = pfPrecioSistema(l), s2 = pfPrecioPublico(l);
+  return s1!=null && s2!=null && Math.abs(s1-s2)>0.005;
 }
 function renderPfLineas(){
   var wrap = document.getElementById('pf_lineasWrap');
   wrap.innerHTML = pfLineas.map(function(l, idx){
-    var p = l.producto_hoja ? state.productos.find(function(x){return x.hoja===l.producto_hoja;}) : null;
-    var precioPublico = p ? computeProducto(p).precioVentaConCom : null;
-    var desc = Number(l.descuentoPct)||0;
-    var descMonto = precioPublico!=null ? precioPublico*desc/100 : null;
-    var precioFinal = precioPublico!=null ? precioPublico*(1-desc/100) : null;
-    var subtotal = (precioFinal!=null && l.cantidad>0) ? precioFinal*Number(l.cantidad) : null;
+    var precioPublico = pfPrecioPublico(l);
+    var mod = pfLineaModificada(l);
     return '<div class="pv-linea-row" data-idx="'+idx+'">'+
       '<div class="inline-field"><label>Producto</label><select class="pfl-producto" style="min-width:220px">'+buildProductoOptions(l.producto_hoja||null)+'</select></div>'+
       '<div class="inline-field"><label>Cantidad (Ton)</label><input type="number" step="0.01" min="0.01" class="pfl-cantidad pill-input" value="'+l.cantidad+'"></div>'+
+      '<div class="inline-field"><label>Precio público (Bs/Ton)</label><span style="display:inline-flex;align-items:center"><input type="number" step="0.01" min="0" class="pfl-precio pill-input'+(mod?' modificado':'')+'" style="max-width:130px" value="'+(precioPublico!=null?(Math.round(precioPublico*100)/100):'')+'" placeholder="—"'+(l.producto_hoja?'':' disabled')+'><button type="button" class="ghost pf-reset-precio" title="Volver al precio del sistema" style="'+(mod?'':'display:none')+'">↺</button></span></div>'+
       '<div class="inline-field"><label>Descuento (%)</label><input type="number" step="0.1" min="0" max="99" class="pfl-descuento pill-input" style="max-width:90px" value="'+(l.descuentoPct===''||l.descuentoPct==null?'':l.descuentoPct)+'" placeholder="0"></div>'+
-      (precioPublico!=null ? '<div class="pv-preciotabla">Precio público: '+fmtBs(precioPublico)+(desc>0?' · Descuento: '+fmtBs(descMonto)+'/Ton · Final: '+fmtBs(precioFinal)+'/Ton':'')+(subtotal!=null?' · Subtotal: '+fmtBs(subtotal):'')+'</div>' : '')+
+      '<div class="pv-preciotabla pfl-info">'+pfLineaInfoHtml(l)+'</div>'+
       (pfLineas.length>1 ? '<button type="button" class="ghost pf-linea-remove" title="Quitar producto">✕</button>' : '')+
     '</div>';
   }).join('');
   wrap.querySelectorAll('.pv-linea-row').forEach(function(row){
     var idx = Number(row.dataset.idx);
+    function refresh(){
+      var l = pfLineas[idx];
+      row.querySelector('.pfl-info').innerHTML = pfLineaInfoHtml(l);
+      var mod = pfLineaModificada(l);
+      row.querySelector('.pfl-precio').classList.toggle('modificado', mod);
+      row.querySelector('.pf-reset-precio').style.display = mod ? '' : 'none';
+      renderProformaPreview();
+    }
     row.querySelector('.pfl-producto').addEventListener('change', function(){
       pfLineas[idx].producto_hoja = this.value;
+      pfLineas[idx].precioManual = null;
       renderPfLineas();
     });
     row.querySelector('.pfl-cantidad').addEventListener('input', function(){
       pfLineas[idx].cantidad = parseFloat(this.value)||0;
-      renderPfLineas();
+      refresh();
+    });
+    row.querySelector('.pfl-precio').addEventListener('input', function(){
+      pfLineas[idx].precioManual = this.value==='' ? null : parseFloat(this.value);
+      refresh();
+    });
+    row.querySelector('.pf-reset-precio').addEventListener('click', function(){
+      pfLineas[idx].precioManual = null;
+      var ps = pfPrecioSistema(pfLineas[idx]);
+      row.querySelector('.pfl-precio').value = ps!=null ? Math.round(ps*100)/100 : '';
+      refresh();
     });
     row.querySelector('.pfl-descuento').addEventListener('input', function(){
       pfLineas[idx].descuentoPct = this.value===''?0:parseFloat(this.value);
-      renderPfLineas();
+      refresh();
     });
     var rm = row.querySelector('.pf-linea-remove');
     if(rm) rm.addEventListener('click', function(){ pfLineas.splice(idx,1); renderPfLineas(); });
@@ -3548,10 +3630,9 @@ function renderProformaPreview(){
   var totalProductos = 0;
   var hayAlgo = false;
   pfLineas.forEach(function(l){
-    var p = l.producto_hoja ? state.productos.find(function(x){return x.hoja===l.producto_hoja;}) : null;
-    if(!p || !l.cantidad) return;
+    var precioPublico = pfPrecioPublico(l);
+    if(precioPublico==null || !l.cantidad) return;
     hayAlgo = true;
-    var precioPublico = computeProducto(p).precioVentaConCom;
     var desc = Number(l.descuentoPct)||0;
     var precioFinal = precioPublico*(1-desc/100);
     totalProductos += precioFinal*Number(l.cantidad);
@@ -3576,7 +3657,9 @@ function submitProforma(){
     if(!l.cantidad || l.cantidad<=0){ toast('Poné una cantidad válida en todas las líneas'); return; }
     var p = state.productos.find(function(x){return x.hoja===l.producto_hoja;});
     if(!p){ toast('Producto no encontrado'); return; }
-    var precioPublico = computeProducto(p).precioVentaConCom;
+    var precioPublico = pfPrecioPublico(l);
+    if(precioPublico==null || isNaN(precioPublico) || precioPublico<0){ toast('Precio público inválido para '+p.nombre); return; }
+    precioPublico = Math.round(precioPublico*100)/100;
     var desc = (Number(l.descuentoPct)||0)/100;
     items.push({
       producto_hoja: l.producto_hoja,
@@ -3588,24 +3671,25 @@ function submitProforma(){
   if(!items.length){ toast('Agregá al menos un producto'); return; }
   var btn = document.getElementById('btnCrearProforma');
   btn.disabled = true;
-  sb.rpc('crear_proforma', {
-    p_cliente: cliente, p_fecha_entrega: fechaEntrega, p_modo_entrega: modoEntrega,
-    p_flete_bs: flete, p_items: items
-  }).then(function(res){
+  var editId = pfEditId;
+  var args = { p_cliente: cliente, p_fecha_entrega: fechaEntrega, p_modo_entrega: modoEntrega,
+    p_flete_bs: flete, p_items: items };
+  if(editId) args.p_id = editId;
+  sb.rpc(editId ? 'editar_proforma' : 'crear_proforma', args).then(function(res){
     btn.disabled = false;
-    if(res.error){ toast('No se pudo crear la proforma: '+errMsg(res.error)); return; }
+    if(res.error){ toast('No se pudo '+(editId?'guardar':'crear')+' la proforma: '+errMsg(res.error)); return; }
     var row = Array.isArray(res.data) ? res.data[0] : res.data;
     closeProformaModal();
-    toast('Proforma '+row.numero_proforma+' creada');
+    toast('Proforma '+row.numero_proforma+(editId?' actualizada':' creada'));
     renderProformas(true);
   });
 }
-function openProformaModal(){
+function openProformaModal(pf){
   document.getElementById('proformaModalOverlay').classList.add('active');
-  renderProformaForm();
+  renderProformaForm(pf && pf.id ? pf : null);
 }
 function closeProformaModal(){ document.getElementById('proformaModalOverlay').classList.remove('active'); }
-document.getElementById('btnNuevaProforma').addEventListener('click', openProformaModal);
+document.getElementById('btnNuevaProforma').addEventListener('click', function(){ openProformaModal(null); });
 document.getElementById('btnCerrarProforma').addEventListener('click', closeProformaModal);
 
 /* ---- documento imprimible de la proforma ---- */
@@ -3659,6 +3743,12 @@ function openProformaDocModal(pf){
   renderProformaDocCard(pf);
   document.getElementById('proformaDocModalOverlay').classList.add('active');
 }
+document.getElementById('btnEditarProformaDoc').addEventListener('click', function(){
+  if(!proformaDocState) return;
+  var pf = proformaDocState;
+  document.getElementById('proformaDocModalOverlay').classList.remove('active');
+  openProformaModal(pf);
+});
 document.getElementById('btnCerrarProformaDoc').addEventListener('click', function(){
   document.getElementById('proformaDocModalOverlay').classList.remove('active');
 });
@@ -3978,35 +4068,31 @@ function renderNotaVentaDocCard(nota){
   var pv = nota.pedidos_venta || {};
   var items = (pv.pedido_venta_items||[]).slice().sort(function(a,b){ return (a.orden||0)-(b.orden||0); });
   function metaItem(l,val){ return '<div class="doc-meta-item"><span class="l">'+l+'</span><span class="v">'+escapeHtml(String(val))+'</span></div>'; }
-  /* descuento por línea = precio de lista (guardado al crear el pedido) − precio pactado */
+  /* descuento por línea = precio de lista guardado al crear el pedido − precio pactado */
   function descLinea(it){
     if(it.precio_lista==null || it.precio_pactado==null) return 0;
     var d = Number(it.precio_lista) - Number(it.precio_pactado);
-    return d > 0.004 ? Math.round(d*100)/100 : 0;
+    return d > 0.009 ? Math.round(d*100)/100 : 0;
   }
   var hayDescuento = items.some(function(it){ return descLinea(it) > 0; });
-  var totalDescuento = 0, totalSinDescuento = 0;
+  var descuentoTotal = 0;
   var filasProductos = items.map(function(it){
-    var cant = Number(it.cantidad_toneladas)||0;
     var d = descLinea(it);
-    var precioFinal = it.precio_pactado!=null?fmtBs(it.precio_pactado):'—';
-    var total = it.total_pactado!=null?fmtBs(it.total_pactado):'—';
+    descuentoTotal += d * (Number(it.cantidad_toneladas)||0);
+    var total = it.total_pactado!=null ? fmtBs(it.total_pactado) : '—';
     if(!hayDescuento){
-      return '<tr><td>'+escapeHtml(it.producto_nombre)+'</td><td class="num">'+fmt(cant,2)+'</td><td class="num">'+precioFinal+'</td><td class="num">'+total+'</td></tr>';
+      return '<tr><td>'+escapeHtml(it.producto_nombre)+'</td><td class="num">'+fmt(it.cantidad_toneladas,2)+'</td><td class="num">'+(it.precio_pactado!=null?fmtBs(it.precio_pactado):'—')+'</td><td class="num">'+total+'</td></tr>';
     }
-    var lista = it.precio_lista!=null ? Number(it.precio_lista) : (it.precio_pactado!=null?Number(it.precio_pactado):null);
-    if(lista!=null) totalSinDescuento += lista*cant;
-    totalDescuento += d*cant;
-    var pct = (d>0 && lista) ? (d/lista*100) : 0;
-    return '<tr><td>'+escapeHtml(it.producto_nombre)+'</td><td class="num">'+fmt(cant,2)+'</td>'+
-      '<td class="num">'+(lista!=null?fmtBs(lista):'—')+'</td>'+
-      '<td class="num">'+(d>0?(fmtBs(d)+'<br><span style="font-size:10px;color:var(--muted)">('+fmt(pct,1)+'%)</span>'):'—')+'</td>'+
-      '<td class="num">'+precioFinal+'</td><td class="num">'+total+'</td></tr>';
+    var pct = (d>0 && Number(it.precio_lista)>0) ? ' <span style="font-size:11px;color:#b45309">(-'+fmt(d/Number(it.precio_lista)*100,1)+'%)</span>' : '';
+    return '<tr><td>'+escapeHtml(it.producto_nombre)+'</td><td class="num">'+fmt(it.cantidad_toneladas,2)+'</td>'+
+      '<td class="num">'+(it.precio_lista!=null?fmtBs(it.precio_lista):(it.precio_pactado!=null?fmtBs(it.precio_pactado):'—'))+'</td>'+
+      '<td class="num">'+(d>0?fmtBs(d)+pct:'—')+'</td>'+
+      '<td class="num">'+(it.precio_pactado!=null?fmtBs(it.precio_pactado):'—')+'</td>'+
+      '<td class="num">'+total+'</td></tr>';
   }).join('');
-  totalDescuento = Math.round(totalDescuento*100)/100;
-  totalSinDescuento = Math.round(totalSinDescuento*100)/100;
+  descuentoTotal = Math.round(descuentoTotal*100)/100;
   var theadProductos = hayDescuento
-    ? '<th>Producto</th><th class="num">Cantidad (Ton)</th><th class="num">Precio lista (Bs/Ton)</th><th class="num">Descuento (Bs/Ton)</th><th class="num">Precio final (Bs/Ton)</th><th class="num">Total (Bs)</th>'
+    ? '<th>Producto</th><th class="num">Cantidad<br>(Ton)</th><th class="num">Precio lista<br>(Bs/Ton)</th><th class="num">Descuento<br>(Bs/Ton)</th><th class="num">Precio final<br>(Bs/Ton)</th><th class="num">Total<br>(Bs)</th>'
     : '<th>Producto</th><th class="num">Cantidad (Ton)</th><th class="num">Precio (Bs/Ton)</th><th class="num">Total (Bs)</th>';
   var flete = Number(pv.flete_bs)||0;
   var totalProductos = Math.round((t.total-flete)*100)/100;
@@ -4030,10 +4116,10 @@ function renderNotaVentaDocCard(nota){
     '<div class="fi-section">Productos</div>'+
     '<table class="pf-table"><thead><tr>'+theadProductos+'</tr></thead><tbody>'+filasProductos+'</tbody></table>'+
     '<div class="doc-grand-total-box">'+
-      (hayDescuento ? ('<div class="doc-meta-item"><span class="l">Subtotal a precio de lista</span><span class="v">'+fmtBs(totalSinDescuento)+'</span></div>'+
-        '<div class="doc-meta-item"><span class="l">Descuento aplicado</span><span class="v" style="color:#b42318">− '+fmtBs(totalDescuento)+'</span></div>') : '')+
-      ((flete>0 || hayDescuento) ? ('<div class="doc-meta-item"><span class="l">Total productos'+(hayDescuento?' (con descuento)':'')+'</span><span class="v">'+fmtBs(totalProductos)+'</span></div>') : '')+
-      (flete>0 ? ('<div class="doc-meta-item"><span class="l">Flete</span><span class="v">'+fmtBs(flete)+'</span></div>') : '')+
+      (hayDescuento ? ('<div class="doc-meta-item"><span class="l">Subtotal a precio de lista</span><span class="v">'+fmtBs(Math.round((totalProductos+descuentoTotal)*100)/100)+'</span></div>'+
+        '<div class="doc-meta-item"><span class="l">Descuento aplicado</span><span class="v" style="color:#b45309">- '+fmtBs(descuentoTotal)+'</span></div>') : '')+
+      ((flete>0 || hayDescuento) ? ('<div class="doc-meta-item"><span class="l">Total productos</span><span class="v">'+fmtBs(totalProductos)+'</span></div>'+
+        (flete>0 ? '<div class="doc-meta-item"><span class="l">Flete</span><span class="v">'+fmtBs(flete)+'</span></div>' : '')) : '')+
       '<div class="doc-total-row">TOTAL: '+fmtBs(t.total)+'</div>'+
       '<div class="doc-meta-item"><span class="l">Pagado</span><span class="v">'+fmtBs(t.pagado)+'</span></div>'+
       '<div class="doc-meta-item"><span class="l">Saldo pendiente</span><span class="v"><b>'+fmtBs(t.saldo)+'</b></span></div>'+
