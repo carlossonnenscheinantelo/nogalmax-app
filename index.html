@@ -2852,7 +2852,7 @@ var CONDICION_PAGO_LABEL = {contado:'Contado', credito:'Crédito', otro:'Otro'};
 var pvLineas = []; // [{producto_hoja, cantidad, precio, asig:{stockId: toneladas}, descuentoPct}]
 function renderPedidosVenta(forceReload){
   if(forceReload){
-    sb.from('pedidos_venta').select('*, pedido_venta_items(*, producciones(id, numero_produccion, lote, estado, despachado, despachado_cantidad, cantidad_toneladas, formula_usada, insumos_requeridos, desde_stock_existente, es_stock_fabrica, origen_stock_id))').order('fecha_pedido',{ascending:false}).order('id',{ascending:false}).then(function(res){
+    sb.from('pedidos_venta').select('*, pedido_venta_items(*, producciones(id, numero_produccion, lote, estado, despachado, despachado_cantidad, cantidad_toneladas, completado_en, fecha_pedido, formula_usada, insumos_requeridos, desde_stock_existente, es_stock_fabrica, origen_stock_id))').order('fecha_pedido',{ascending:false}).order('id',{ascending:false}).then(function(res){
       if(res.error){ toast('No se pudieron cargar los pedidos de venta: '+errMsg(res.error)); return; }
       ventaState.rows = res.data || [];
       ventaState.loaded = true;
@@ -3408,7 +3408,8 @@ function renderPedidoVentaDocCard(v, copiaLabel){
     if(prod.desde_stock_existente){
       return '<div class="doc-producto-box doc-producto-stock">'+
         '<div class="doc-producto-titulo">'+(idx+1)+'. '+escapeHtml(it.producto_nombre)+' — '+fmt(it.cantidad_toneladas,2)+' Ton — Lote '+escapeHtml(it.lote||'—')+' ('+escapeHtml(it.numero_produccion||'—')+')</div>'+
-        '<div class="fi-section">✅ YA DISPONIBLE EN STOCK DE FÁBRICA — no requiere producción, solo despacho</div>'+
+        (function(){ var org = origenStockInfo(Object.assign({}, prod, {lote: it.lote || prod.lote})); return '<div class="fi-section">📦 PRODUCTO EN ALMACÉN — no se produce, solo despacho</div>'+
+          '<div class="fi-empty" style="font-weight:600;color:var(--brand-dark)">Sacar de la producción '+escapeHtml(org.numero)+' (Lote '+escapeHtml(org.lote)+') — producida el '+(org.fecha?fmtFecha(org.fecha):'—')+'</div>'; })()+
       '</div>';
     }
     var formulaMpEntries = [], formulaEnvEntries = [];
@@ -3462,14 +3463,16 @@ function renderPedidoVentaDocCard(v, copiaLabel){
       '<span class="doc-entrega-opt'+(v.modo_entrega==='envio'?' checked':'')+'">'+(v.modo_entrega==='envio'?'☑':'☐')+' Envío a cliente</span>'+
       (v.modo_entrega==='envio' && Number(v.flete_bs)>0 ? '<span class="doc-entrega-opt">🚚 Flete: '+fmtBs(v.flete_bs)+'</span>' : '')+
     '</div>'+
-    '<div class="fi-section">Productos del pedido (receta de cada uno)</div>'+
+    '<div class="fi-section">Productos del pedido</div>'+
     productosBoxes+
+    (totalNombres.length===0 && items.length && items.every(function(it){ return it.producciones && it.producciones.desde_stock_existente; })
+      ? '<div class="doc-grand-total-box"><div class="fi-section">📦 TODO EL PEDIDO SALE DEL ALMACÉN — no hay nada que producir</div></div>' :
     '<div class="doc-grand-total-box">'+
-      '<div class="fi-section">⚠ TOTAL GENERAL DE INSUMOS A UTILIZAR — TODOS LOS PRODUCTOS DEL PEDIDO</div>'+
+      '<div class="fi-section">⚠ TOTAL GENERAL DE INSUMOS A UTILIZAR — PRODUCTOS A FABRICAR</div>'+
       tableRows(totalMpList)+
       '<div class="doc-total-row">TOTAL MATERIAS PRIMAS: '+fmt(totalMpKg, totalMpKg%1===0?0:2)+' Kg</div>'+
       (totalEnvList.length ? ('<div class="fi-section">Envases y servicios (total)</div>'+tableRows(totalEnvList)+docTotalRow(totalEnvList, 'TOTAL ENVASES Y SERVICIOS')) : '')+
-    '</div>'+
+    '</div>')+
     '<div class="fi-foot">Generado desde NOGALMAX — Precios y Fórmulas'+(v.creado_por_nombre?(' · '+escapeHtml(v.creado_por_nombre)):'')+'</div>';
 }
 function openPedidoVentaDocModal(v){
@@ -4522,7 +4525,46 @@ function batidasDeProduccion(cantidadTon){
   sizes.push(restante);
   return sizes;
 }
+/* de qué producción en almacén sale una línea tomada de stock (número original y fecha en que se produjo) */
+function origenStockInfo(o){
+  var padre = (o.origen_stock_id && ordenesState && ordenesState.rows) ? ordenesState.rows.find(function(x){ return x.id===o.origen_stock_id; }) : null;
+  var numero = padre ? padre.numero_produccion : String(o.numero_produccion||'—').replace(/-P\d+$/,'');
+  var fecha = o.completado_en || (padre && padre.completado_en) || (padre ? padre.fecha_pedido : o.fecha_pedido);
+  return {numero:numero, lote:o.lote||(padre&&padre.lote)||'—', fecha:fecha};
+}
+function renderProduccionDocCardStock(o, copiaLabel){
+  var hoy = new Date().toLocaleDateString('es-BO',{day:'2-digit',month:'2-digit',year:'numeric'});
+  function metaItem(l,v){ return '<div class="doc-meta-item"><span class="l">'+l+'</span><span class="v">'+escapeHtml(String(v))+'</span></div>'; }
+  var org = origenStockInfo(o);
+  var kg = (Number(o.cantidad_toneladas)||0)*1000;
+  document.getElementById('prodDocCard').innerHTML =
+    '<div class="fi-head"><span class="fi-brand"><img src="'+LOGO_DATA_URI+'" class="fi-logo" alt="NOGALMAX"> Orden de Producción</span><span class="fi-date">'+hoy+'</span></div>'+
+    '<div class="copy-badge">COPIA: '+escapeHtml(copiaLabel)+'</div>'+
+    '<div class="fi-nombre">'+escapeHtml(o.producto_nombre)+'</div>'+
+    '<div class="doc-meta">'+
+      metaItem('N° Orden', o.numero_produccion)+
+      metaItem('Lote', org.lote)+
+      metaItem('Cantidad', fmt(kg,0)+' Kg ('+fmt(o.cantidad_toneladas,2)+' Ton)')+
+      metaItem('Cliente', o.cliente||'—')+
+      metaItem('N° Pedido', o.pedido_venta_numero||'—')+
+      metaItem('Fecha de entrega', o.fecha_entrega ? fmtFecha(o.fecha_entrega) : '—')+
+    '</div>'+
+    '<div class="doc-cantidad-box" style="text-align:center;padding:18px 14px">'+
+      '<div style="font-size:20px;font-weight:800;color:var(--brand-dark);letter-spacing:.02em">📦 PRODUCTO EN ALMACÉN</div>'+
+      '<div style="font-size:13px;margin-top:4px">No se produce — solo sacar del almacén</div>'+
+      '<table class="fi-table" style="margin:14px auto 0;max-width:420px;text-align:left">'+
+        '<tr><td>Sacar de la producción</td><td class="fi-qty"><b>'+escapeHtml(org.numero)+'</b></td></tr>'+
+        '<tr><td>Lote</td><td class="fi-qty"><b>'+escapeHtml(org.lote)+'</b></td></tr>'+
+        '<tr><td>Fecha de esa producción</td><td class="fi-qty"><b>'+(org.fecha?fmtFecha(org.fecha):'—')+'</b></td></tr>'+
+        '<tr><td>Cantidad a sacar</td><td class="fi-qty"><b>'+fmt(kg,0)+' Kg</b></td></tr>'+
+      '</table>'+
+    '</div>'+
+    (o.despachado ? '<div class="fi-section">Despacho</div><div class="fi-empty" style="color:var(--brand-dark);font-weight:600">Despachado el '+fmtFecha(o.despachado_en)+(o.despachado_por_nombre?(' · '+escapeHtml(o.despachado_por_nombre)):'')+'</div>'
+      : ((Number(o.despachado_cantidad)||0)>0 ? '<div class="fi-section">Despacho</div><div class="fi-empty" style="color:var(--accent);font-weight:600">Despachado parcialmente: '+fmt((Number(o.despachado_cantidad)||0)*1000,0)+' de '+fmt(kg,0)+' Kg</div>' : ''))+
+    '<div class="fi-foot">Generado desde NOGALMAX — Precios y Fórmulas'+(o.creado_por_nombre?(' · '+escapeHtml(o.creado_por_nombre)):'')+'</div>';
+}
 function renderProduccionDocCard(o, copiaLabel){
+  if(o.desde_stock_existente){ renderProduccionDocCardStock(o, copiaLabel); return; }
   var hoy = new Date().toLocaleDateString('es-BO',{day:'2-digit',month:'2-digit',year:'numeric'});
   var mpEntries=[], envEntries=[], totalMp=0;
   Object.keys(o.insumos_requeridos||{}).sort().forEach(function(nombre){
