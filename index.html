@@ -982,6 +982,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
           <div class="card" style="padding:14px">
             <div class="inline-field"><label>% Utilidad / margen</label><input type="number" step="0.01" min="0" max="0.95" id="pf_margen" class="pill-input"></div>
             <div class="inline-field"><label>% Comisión vendedor</label><input type="number" step="0.01" min="0" max="0.95" id="pf_comision" class="pill-input"></div>
+            <div class="inline-field"><label>Facturación</label><select id="pf_factura" class="pill-input"><option value="1">Con factura (costo ÷ 0.87)</option><option value="0">Sin factura (costo directo)</option></select></div>
           </div>
           <div class="section-title">Resultado (Bs / Tonelada)</div>
           <div class="summary-box" id="pf_summary"></div>
@@ -1302,7 +1303,7 @@ function rowToInsumo(r){
   return { id:r.id, nombre:r.nombre, unidad:r.unidad, precioIngresado:Number(r.precio_ingresado)||0, unidadPrecio:r.unidad_precio, tipo:r.tipo, stockActual:Number(r.stock_actual)||0 };
 }
 function rowToProducto(r){
-  return { id:r.id, hoja:r.hoja, nombre:r.nombre, categoria:r.categoria, formula: r.formula || {}, margen:Number(r.margen)||0, comision:Number(r.comision)||0 };
+  return { id:r.id, hoja:r.hoja, nombre:r.nombre, categoria:r.categoria, formula: r.formula || {}, margen:Number(r.margen)||0, comision:Number(r.comision)||0, con_factura: r.con_factura!==false };
 }
 
 /* ---------- calculation engine (mirrors the original Excel formulas — unchanged) ---------- */
@@ -1331,7 +1332,8 @@ function computeProducto(p){
   });
   var totalBs = mpCosto + envCosto;
   var costoMPTon = mpKg>0 ? (totalBs/mpKg*1000) : 0;
-  var costoFacturadoTon = costoMPTon/0.87;
+  // con factura: ÷0.87 (Ley 843). Sin factura (con_factura=false): el costo facturado es el mismo costo, igual que en la hoja del Excel
+  var costoFacturadoTon = p.con_factura===false ? costoMPTon : costoMPTon/0.87;
   var margen = Number(p.margen)||0;
   var comision = Number(p.comision)||0;
   var precioVentaSinCom = margen<1 ? costoFacturadoTon/(1-margen) : 0;
@@ -1792,7 +1794,7 @@ var modalState = null; // {hoja(null=new), draft:{...producto}}
 function blankProducto(){
   var formula = {};
   state.insumos.forEach(function(i){ formula[i.nombre]=0; });
-  return {id:null, hoja:null, nombre:'', categoria: (state.productos[0]?state.productos[0].categoria:'OTROS PRODUCTOS'), formula:formula, margen:0.15, comision:0.07};
+  return {id:null, hoja:null, nombre:'', categoria: (state.productos[0]?state.productos[0].categoria:'OTROS PRODUCTOS'), formula:formula, margen:0.15, comision:0.07, con_factura:true};
 }
 function openModal(hoja){
   populateCategoriaFilters();
@@ -1805,6 +1807,7 @@ function openModal(hoja){
   document.getElementById('pf_categoria').value = draft.categoria;
   document.getElementById('pf_margen').value = draft.margen;
   document.getElementById('pf_comision').value = draft.comision;
+  document.getElementById('pf_factura').value = draft.con_factura===false ? '0' : '1';
   document.getElementById('pf_search').value = '';
   document.getElementById('pf_onlyUsed').checked = !!hoja;
   document.getElementById('btnEliminarProducto').style.display = hoja ? '' : 'none';
@@ -1837,6 +1840,7 @@ function renderModalComputed(){
   var draft = modalState.draft;
   draft.margen = parseFloat(document.getElementById('pf_margen').value)||0;
   draft.comision = parseFloat(document.getElementById('pf_comision').value)||0;
+  draft.con_factura = document.getElementById('pf_factura').value !== '0';
   var c = computeProducto(draft);
   var searchQ = (document.getElementById('pf_search').value||'').toLowerCase();
   var onlyUsed = document.getElementById('pf_onlyUsed').checked;
@@ -1868,7 +1872,7 @@ function renderModalComputed(){
     row('Total general (Bs)', fmtBs(c.totalBs), true) +
     row('Peso total materias primas (Kg)', fmt(c.mpKg,1)) +
     row('Costo materia prima / Ton', fmtBs(c.costoMPTon)) +
-    row('Costo facturado / Ton (÷0.87)', fmtBs(c.costoFacturadoTon)) +
+    row(draft.con_factura===false ? 'Costo sin factura / Ton (sin ÷0.87)' : 'Costo facturado / Ton (÷0.87)', fmtBs(c.costoFacturadoTon)) +
     row('Precio de venta SIN comisión', fmtBs(c.precioVentaSinCom), true) +
     row('Precio de venta CON comisión', fmtBs(c.precioVentaConCom), true) +
     row('Comisión vendedor / Ton', fmtBs(c.comisionBsTon)) +
@@ -1886,6 +1890,9 @@ function renderModalComputed(){
 /* lighter recompute that doesn't rebuild the ingredient table rows (keeps focus) */
 function renderModalComputedLight(){
   var draft = modalState.draft;
+  draft.margen = parseFloat(document.getElementById('pf_margen').value)||0;
+  draft.comision = parseFloat(document.getElementById('pf_comision').value)||0;
+  draft.con_factura = document.getElementById('pf_factura').value !== '0';
   var c = computeProducto(draft);
   document.querySelectorAll('#pf_mpBody tr').forEach(function(tr){
     var name = tr.dataset.name;
@@ -1908,7 +1915,7 @@ function renderModalComputedLight(){
     row('Total general (Bs)', fmtBs(c.totalBs), true) +
     row('Peso total materias primas (Kg)', fmt(c.mpKg,1)) +
     row('Costo materia prima / Ton', fmtBs(c.costoMPTon)) +
-    row('Costo facturado / Ton (÷0.87)', fmtBs(c.costoFacturadoTon)) +
+    row(draft.con_factura===false ? 'Costo sin factura / Ton (sin ÷0.87)' : 'Costo facturado / Ton (÷0.87)', fmtBs(c.costoFacturadoTon)) +
     row('Precio de venta SIN comisión', fmtBs(c.precioVentaSinCom), true) +
     row('Precio de venta CON comisión', fmtBs(c.precioVentaConCom), true) +
     row('Comisión vendedor / Ton', fmtBs(c.comisionBsTon)) +
@@ -1919,6 +1926,7 @@ function row(l,v,total){ return '<div class="row'+(total?' total':'')+'"><span>'
 
 document.getElementById('pf_margen').addEventListener('input', renderModalComputedLight);
 document.getElementById('pf_comision').addEventListener('input', renderModalComputedLight);
+document.getElementById('pf_factura').addEventListener('change', renderModalComputedLight);
 document.getElementById('pf_search').addEventListener('input', renderModalComputed);
 document.getElementById('pf_onlyUsed').addEventListener('change', renderModalComputed);
 
@@ -1935,13 +1943,14 @@ document.getElementById('btnGuardarProducto').addEventListener('click', function
   draft.categoria = document.getElementById('pf_categoria').value || 'OTROS PRODUCTOS';
   draft.margen = parseFloat(document.getElementById('pf_margen').value)||0;
   draft.comision = parseFloat(document.getElementById('pf_comision').value)||0;
+  draft.con_factura = document.getElementById('pf_factura').value !== '0';
   if(!draft.nombre){ toast('Ponele un nombre al producto'); return; }
   var btn = document.getElementById('btnGuardarProducto');
   btn.disabled = true;
   if(modalState.hoja){
     var idx = state.productos.findIndex(function(p){return p.hoja===modalState.hoja;});
     draft.hoja = modalState.hoja;
-    sb.from('productos').update({nombre:draft.nombre, categoria:draft.categoria, margen:draft.margen, comision:draft.comision, formula:draft.formula}).eq('id', draft.id).then(function(res){
+    sb.from('productos').update({nombre:draft.nombre, categoria:draft.categoria, margen:draft.margen, comision:draft.comision, con_factura:draft.con_factura!==false, formula:draft.formula}).eq('id', draft.id).then(function(res){
       btn.disabled = false;
       if(res.error){ toast('No se pudo guardar: '+errMsg(res.error)); return; }
       state.productos[idx] = draft;
@@ -1952,7 +1961,7 @@ document.getElementById('btnGuardarProducto').addEventListener('click', function
     });
   } else {
     draft.hoja = slugHoja(draft.nombre);
-    sb.from('productos').insert({hoja:draft.hoja, nombre:draft.nombre, categoria:draft.categoria, margen:draft.margen, comision:draft.comision, formula:draft.formula}).select().single().then(function(res){
+    sb.from('productos').insert({hoja:draft.hoja, nombre:draft.nombre, categoria:draft.categoria, margen:draft.margen, comision:draft.comision, con_factura:draft.con_factura!==false, formula:draft.formula}).select().single().then(function(res){
       btn.disabled = false;
       if(res.error){ toast('No se pudo crear la fórmula: '+errMsg(res.error)); return; }
       draft.id = res.data.id;
@@ -4379,7 +4388,7 @@ function renderRentabilidad(forceReload){
 // snapshot tomado al crear/editar esa producción) valorizadas a los precios de insumos ACTUALES —
 // no hay precio histórico guardado por transacción, así que esta es la mejor aproximación disponible.
 // Sigue el mismo criterio de costo facturado (÷0.87) que usa computeProducto() en el resto de la app.
-function costoRealFacturadoTon(insumosReq){
+function costoRealFacturadoTon(insumosReq, sinFactura){
   var mpCosto=0, mpKg=0, envCosto=0;
   Object.keys(insumosReq||{}).forEach(function(nombre){
     var qty = Number(insumosReq[nombre])||0;
@@ -4392,7 +4401,7 @@ function costoRealFacturadoTon(insumosReq){
   });
   var totalBs = mpCosto+envCosto;
   var costoMPTon = mpKg>0 ? (totalBs/mpKg*1000) : 0;
-  return costoMPTon/0.87;
+  return sinFactura ? costoMPTon : costoMPTon/0.87;
 }
 function calcRentabilidadReal(){
   var stats = {};
@@ -4411,7 +4420,7 @@ function calcRentabilidadReal(){
       if(tienePrecio && tieneCosto){
         s.cantidadTon += cantidad;
         s.ingreso += Number(it.total_pactado)||0;
-        s.costo += costoRealFacturadoTon(prod.insumos_requeridos)*cantidad;
+        s.costo += costoRealFacturadoTon(prod.insumos_requeridos, (state.productos.find(function(p){return p.hoja===it.producto_hoja;})||{}).con_factura===false)*cantidad;
       } else {
         s.cantidadSinDatos += cantidad;
       }
