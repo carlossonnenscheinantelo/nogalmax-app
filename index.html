@@ -965,6 +965,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
             <button id="btnOcrFormula" title="Leer cantidades desde una foto">📷</button>
             <button id="btnSwapInsumoModal" title="Cambiar un insumo por otro en esta fórmula">🔁</button>
           </div>
+          <div id="pf_formulasBar" style="margin:8px 0 4px"></div>
           <div class="section-title">Materias primas (Kg por tonelada)</div>
           <div class="table-wrap" style="max-height:320px">
             <table>
@@ -1333,7 +1334,7 @@ function rowToInsumo(r){
   return { id:r.id, nombre:r.nombre, unidad:r.unidad, precioIngresado:Number(r.precio_ingresado)||0, unidadPrecio:r.unidad_precio, tipo:r.tipo, stockActual:Number(r.stock_actual)||0 };
 }
 function rowToProducto(r){
-  return { id:r.id, hoja:r.hoja, nombre:r.nombre, categoria:r.categoria, formula: r.formula || {}, margen:Number(r.margen)||0, comision:Number(r.comision)||0, con_factura: r.con_factura!==false };
+  return { id:r.id, hoja:r.hoja, nombre:r.nombre, categoria:r.categoria, formula: r.formula || {}, margen:Number(r.margen)||0, comision:Number(r.comision)||0, con_factura: r.con_factura!==false, formula_nombre: r.formula_nombre||'', variantes: Array.isArray(r.variantes) ? r.variantes : [] };
 }
 
 /* ---------- calculation engine (mirrors the original Excel formulas — unchanged) ---------- */
@@ -1342,6 +1343,27 @@ function precioUnitario(insumo){
   var p = Number(insumo.precioIngresado)||0;
   return insumo.unidadPrecio === 'Ton' ? p/1000 : p;
 }
+/* ---- fórmulas alternativas del mismo producto (ej: Fosfato 21 / Fosfato 18,5) ---- */
+function formulasDeProducto(p){
+  var list = [{nombre: p.formula_nombre||'', formula: p.formula||{}, principal:true}];
+  (p.variantes||[]).forEach(function(v){ list.push({nombre: v.nombre||'', formula: v.formula||{}}); });
+  return list;
+}
+function tieneVariantes(p){ return !!(p && p.variantes && p.variantes.length); }
+function formulaDeProducto(p, variante){
+  if(!p) return {};
+  var v = String(variante||'').trim().toLowerCase();
+  if(!v || v===String(p.formula_nombre||'').trim().toLowerCase()) return p.formula||{};
+  var f = (p.variantes||[]).find(function(x){ return String(x.nombre||'').trim().toLowerCase()===v; });
+  return f ? (f.formula||{}) : (p.formula||{});
+}
+function opcionesFormula(p, sel){
+  return formulasDeProducto(p).map(function(f,i){
+    var val = i===0 ? '' : f.nombre;
+    return '<option value="'+escapeHtml(val)+'"'+((sel||'')===val?' selected':'')+'>'+escapeHtml(f.nombre || 'Fórmula principal')+(i===0?' (principal)':'')+'</option>';
+  }).join('');
+}
+function varianteTag(v){ return v ? ' <span class="tag" style="background:#eef2ff;color:#3730a3">'+escapeHtml(v)+'</span>' : ''; }
 function computeProducto(p){
   var mpCosto=0, mpKg=0, envCosto=0;
   var mpRows=[], envRows=[];
@@ -1888,6 +1910,43 @@ function blankProducto(){
   state.insumos.forEach(function(i){ formula[i.nombre]=0; });
   return {id:null, hoja:null, nombre:'', categoria: (state.productos[0]?state.productos[0].categoria:'OTROS PRODUCTOS'), formula:formula, margen:0.15, comision:0.07, con_factura:true};
 }
+function renderFormulasBar(){
+  var bar = document.getElementById('pf_formulasBar'); if(!bar || !modalState) return;
+  var fs = modalState.formulas, idx = modalState.fIdx;
+  bar.innerHTML = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+
+    '<span class="muted" style="font-size:12px;font-weight:700">Fórmulas:</span>'+
+    fs.map(function(f,i){ return '<button type="button" class="'+(i===idx?'primary':'ghost')+' pf-fbtn" data-i="'+i+'" style="padding:5px 10px;font-size:12px">'+escapeHtml(f.nombre || (i===0?'Principal':'Alternativa '+i))+(i===0?' ★':'')+'</button>'; }).join('')+
+    '<button type="button" class="ghost" id="pf_fAdd" style="padding:5px 10px;font-size:12px">+ Fórmula alternativa</button>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:6px">'+
+      '<div class="inline-field"><label>Nombre de esta fórmula'+(idx===0?' (principal)':'')+'</label><input type="text" id="pf_fNombre" value="'+escapeHtml(fs[idx].nombre||'')+'" placeholder="Ej: Fosfato 21" style="min-width:180px"></div>'+
+      (idx>0 ? '<button type="button" class="ghost danger" id="pf_fDel" style="padding:5px 10px;font-size:12px">🗑 Quitar esta fórmula</button>' : '')+
+    '</div>'+
+    (fs.length>1 ? '<p class="footnote" style="margin:4px 0 0">El precio de venta del producto se calcula con la fórmula principal (★). El resultado de la derecha es el de la fórmula que estás viendo. Al cargar una orden o pedido se elige con qué fórmula se produce y eso define qué insumos se descuentan.</p>' : '');
+  bar.querySelectorAll('.pf-fbtn').forEach(function(b){ b.addEventListener('click', function(){ cambiarFormulaModal(Number(b.dataset.i)); }); });
+  document.getElementById('pf_fNombre').addEventListener('input', function(){ modalState.formulas[modalState.fIdx].nombre = this.value; });
+  document.getElementById('pf_fNombre').addEventListener('change', renderFormulasBar);
+  document.getElementById('pf_fAdd').addEventListener('click', function(){
+    var nombre = (prompt('Nombre de la fórmula alternativa (ej: Fosfato 18,5). Se crea como copia de la fórmula que estás viendo, después cambiás los insumos.')||'').trim();
+    if(!nombre) return;
+    if(modalState.formulas.some(function(f){ return (f.nombre||'').trim().toLowerCase()===nombre.toLowerCase(); })){ toast('Ya hay una fórmula con ese nombre'); return; }
+    modalState.formulas[modalState.fIdx].formula = modalState.draft.formula;
+    modalState.formulas.push({nombre:nombre, formula: JSON.parse(JSON.stringify(modalState.draft.formula))});
+    cambiarFormulaModal(modalState.formulas.length-1);
+  });
+  var del = document.getElementById('pf_fDel');
+  if(del) del.addEventListener('click', function(){
+    if(!confirm('¿Quitar la fórmula «'+(fs[idx].nombre||'')+'» de este producto? (las órdenes ya creadas con ella no cambian)')) return;
+    modalState.formulas.splice(idx,1); modalState.fIdx = 0; modalState.draft.formula = modalState.formulas[0].formula;
+    renderFormulasBar(); renderModalComputed();
+  });
+}
+function cambiarFormulaModal(i){
+  modalState.formulas[modalState.fIdx].formula = modalState.draft.formula;
+  modalState.fIdx = i;
+  modalState.draft.formula = modalState.formulas[i].formula;
+  renderFormulasBar(); renderModalComputed();
+}
 function openModal(hoja){
   populateCategoriaFilters();
   var original = hoja ? state.productos.find(function(p){return p.hoja===hoja;}) : null;
@@ -1895,6 +1954,11 @@ function openModal(hoja){
   // ensure draft has an entry for every current insumo
   state.insumos.forEach(function(i){ if(!(i.nombre in draft.formula)) draft.formula[i.nombre]=0; });
   modalState = {hoja:hoja, draft:draft};
+  draft.formula_nombre = draft.formula_nombre||''; draft.variantes = draft.variantes||[];
+  modalState.formulas = formulasDeProducto(draft).map(function(f){ var ff = JSON.parse(JSON.stringify(f.formula||{})); state.insumos.forEach(function(i){ if(!(i.nombre in ff)) ff[i.nombre]=0; }); return {nombre:f.nombre, formula:ff}; });
+  modalState.fIdx = 0;
+  draft.formula = modalState.formulas[0].formula;
+  renderFormulasBar();
   document.getElementById('pf_nombre').value = draft.nombre;
   document.getElementById('pf_categoria').value = draft.categoria;
   document.getElementById('pf_margen').value = draft.margen;
@@ -2031,6 +2095,19 @@ function slugHoja(nombre){
 }
 document.getElementById('btnGuardarProducto').addEventListener('click', function(){
   var draft = modalState.draft;
+  if(modalState.formulas){
+    modalState.formulas[modalState.fIdx].formula = draft.formula;
+    var nombresF = modalState.formulas.map(function(f){ return (f.nombre||'').trim(); });
+    if(modalState.formulas.length>1){
+      if(nombresF.some(function(n){ return !n; })){ toast('Poné nombre a todas las fórmulas (ej: Fosfato 21 y Fosfato 18,5)'); return; }
+      var lower = nombresF.map(function(n){ return n.toLowerCase(); });
+      if(lower.some(function(n,i){ return lower.indexOf(n)!==i; })){ toast('Las fórmulas no pueden tener el mismo nombre'); return; }
+    }
+    draft.formula = modalState.formulas[0].formula;
+    draft.formula_nombre = nombresF[0];
+    draft.variantes = modalState.formulas.slice(1).map(function(f){ return {nombre:(f.nombre||'').trim(), formula:f.formula}; });
+    modalState.fIdx = 0;
+  }
   draft.nombre = document.getElementById('pf_nombre').value.trim();
   draft.categoria = document.getElementById('pf_categoria').value || 'OTROS PRODUCTOS';
   draft.margen = parseFloat(document.getElementById('pf_margen').value)||0;
@@ -2042,7 +2119,7 @@ document.getElementById('btnGuardarProducto').addEventListener('click', function
   if(modalState.hoja){
     var idx = state.productos.findIndex(function(p){return p.hoja===modalState.hoja;});
     draft.hoja = modalState.hoja;
-    sb.from('productos').update({nombre:draft.nombre, categoria:draft.categoria, margen:draft.margen, comision:draft.comision, con_factura:draft.con_factura!==false, formula:draft.formula}).eq('id', draft.id).then(function(res){
+    sb.from('productos').update({nombre:draft.nombre, categoria:draft.categoria, margen:draft.margen, comision:draft.comision, con_factura:draft.con_factura!==false, formula:draft.formula, formula_nombre:draft.formula_nombre||null, variantes:draft.variantes||[]}).eq('id', draft.id).then(function(res){
       btn.disabled = false;
       if(res.error){ toast('No se pudo guardar: '+errMsg(res.error)); return; }
       state.productos[idx] = draft;
@@ -2053,7 +2130,7 @@ document.getElementById('btnGuardarProducto').addEventListener('click', function
     });
   } else {
     draft.hoja = slugHoja(draft.nombre);
-    sb.from('productos').insert({hoja:draft.hoja, nombre:draft.nombre, categoria:draft.categoria, margen:draft.margen, comision:draft.comision, con_factura:draft.con_factura!==false, formula:draft.formula}).select().single().then(function(res){
+    sb.from('productos').insert({hoja:draft.hoja, nombre:draft.nombre, categoria:draft.categoria, margen:draft.margen, comision:draft.comision, con_factura:draft.con_factura!==false, formula:draft.formula, formula_nombre:draft.formula_nombre||null, variantes:draft.variantes||[]}).select().single().then(function(res){
       btn.disabled = false;
       if(res.error){ toast('No se pudo crear la fórmula: '+errMsg(res.error)); return; }
       draft.id = res.data.id;
@@ -2733,7 +2810,7 @@ function renderOrdenesRows(){
       '<td>'+fmtFecha(o.fecha_pedido)+'</td>'+
       '<td><b>'+escapeHtml(o.numero_produccion)+'</b></td>'+
       '<td>'+escapeHtml(o.lote)+'</td>'+
-      '<td>'+escapeHtml(o.producto_nombre)+'</td>'+
+      '<td>'+escapeHtml(o.producto_nombre)+varianteTag(o.variante)+'</td>'+
       '<td class="num">'+fmt(o.cantidad_toneladas,2)+'</td>'+
       '<td>'+clienteLabel+'</td>'+
       '<td>'+(o.fecha_entrega?fmtFecha(o.fecha_entrega):'—')+'</td>'+
@@ -2849,7 +2926,7 @@ function renderStockFabricaRows(){
     return '<tr data-id="'+o.id+'"'+(rowClass?' class="'+rowClass+'"':'')+'>'+
       '<td><b>'+escapeHtml(o.numero_produccion)+'</b></td>'+
       '<td>'+escapeHtml(o.lote)+'</td>'+
-      '<td>'+escapeHtml(o.producto_nombre)+'</td>'+
+      '<td>'+escapeHtml(o.producto_nombre)+varianteTag(o.variante)+'</td>'+
       '<td class="num">'+fmt(o.cantidad_toneladas,2)+'</td>'+
       '<td>'+destino+'</td>'+
       '<td>'+estadoCell+'</td>'+
@@ -2902,7 +2979,7 @@ function renderEntregadosRows(){
       '<td>'+fmtFecha(o.despachado_en)+'</td>'+
       '<td><b>'+escapeHtml(o.numero_produccion)+'</b></td>'+
       '<td>'+escapeHtml(o.pedido_venta_numero||'—')+'</td>'+
-      '<td>'+escapeHtml(o.producto_nombre)+'</td>'+
+      '<td>'+escapeHtml(o.producto_nombre)+varianteTag(o.variante)+'</td>'+
       '<td class="num">'+fmt(o.cantidad_toneladas,2)+'</td>'+
       '<td>'+clienteLabel+'</td>'+
       '<td>'+escapeHtml(o.despachado_por_nombre||'—')+'</td>'+
@@ -2993,7 +3070,7 @@ function renderPedidosVentaRows(){
     var totalPactado = items.reduce(function(s,it){ return s+(it.precio_pactado!=null?(Number(it.total_pactado)||0):0); }, 0);
     var hayPrecio = items.some(function(it){ return it.precio_pactado!=null; });
     var productosCell = '<div class="pv-multi">'+items.map(function(it){
-      return '<div>'+fmt(it.cantidad_toneladas,2)+' Ton — '+escapeHtml(it.producto_nombre)+'</div>';
+      return '<div>'+fmt(it.cantidad_toneladas,2)+' Ton — '+escapeHtml(it.producto_nombre)+varianteTag(it.variante)+'</div>';
     }).join('')+'</div>';
     var precioCell = items.map(function(it){ return '<div>'+(it.precio_pactado!=null?fmt(it.precio_pactado,2):'—')+'</div>'; }).join('');
     var lotesCell = '<div class="pv-multi">'+items.map(function(it){ return '<div>'+escapeHtml(it.lote||'—')+'</div>'; }).join('')+'</div>';
@@ -3305,7 +3382,7 @@ function renderPvStockBox(l, idx){
       var t = (l.asig && l.asig[o.id]) ? l.asig[o.id] : 0;
       return '<tr data-stockid="'+o.id+'">'+
         '<td><input type="checkbox" class="pvs-chk"'+(t>0?' checked':'')+'></td>'+
-        '<td>'+escapeHtml(o.lote)+'</td><td>'+escapeHtml(o.numero_produccion)+'</td>'+
+        '<td>'+escapeHtml(o.lote)+varianteTag(o.variante)+'</td><td>'+escapeHtml(o.numero_produccion)+'</td>'+
         '<td class="num">'+fmt(d*1000,0)+'</td>'+
         '<td class="num"><input type="number" class="pvs-kg pill-input" min="0" step="1" max="'+Math.round(d*1000)+'" value="'+(t>0?Math.round(t*1000):'')+'" placeholder="0"></td>'+
       '</tr>';
@@ -3322,6 +3399,7 @@ function renderPvLineas(){
     var tabla = l.producto_hoja ? precioTablaFor(l.producto_hoja) : null;
     return '<div class="pv-linea-row" data-idx="'+idx+'">'+
       '<div class="inline-field"><label>Producto</label><select class="pvl-producto" style="min-width:220px">'+buildProductoOptions(l.producto_hoja||null)+'</select></div>'+
+      (function(){ var pp = state.productos.find(function(x){return x.hoja===l.producto_hoja;}); return tieneVariantes(pp) ? '<div class="inline-field"><label>Fórmula</label><select class="pvl-formula">'+opcionesFormula(pp, l.variante||'')+'</select></div>' : ''; })()+
       '<div class="inline-field"><label>Cantidad (Kg)</label><input type="number" step="1" min="1" class="pvl-cantidad pill-input" value="'+Math.round(l.cantidad*1000)+'"></div>'+
       '<div class="inline-field"><label>Descuento (%)</label><input type="number" step="0.1" min="0" max="100" class="pvl-descuento pill-input" style="max-width:90px" value="'+(l.descuentoPct===''||l.descuentoPct==null?'':l.descuentoPct)+'" placeholder="0"></div>'+
       '<div class="inline-field"><label>Precio final (Bs/Ton)</label><input type="number" step="0.01" min="0" class="pvl-precio pill-input" value="'+(l.precio===''?'':l.precio)+'">'+
@@ -3340,10 +3418,13 @@ function renderPvLineas(){
     }
     row.querySelector('.pvl-producto').addEventListener('change', function(){
       pvLineas[idx].producto_hoja = this.value;
+      pvLineas[idx].variante = '';
       pvLineas[idx].asig = {};
       aplicarDescuentoLinea(idx);
       renderPvLineas();
     });
+    var fSel = row.querySelector('.pvl-formula');
+    if(fSel) fSel.addEventListener('change', function(){ pvLineas[idx].variante = this.value; renderPedidoVentaPreview(); });
     var cantInput = row.querySelector('.pvl-cantidad');
     cantInput.addEventListener('input', function(){ pvLineas[idx].cantidad = (parseFloat(this.value)||0)/1000; refrescarResumen(); });
     row.querySelector('.pvl-precio').addEventListener('input', function(){ var v=this.value; pvLineas[idx].precio = v===''?'':parseFloat(v); updatePvTotalBox(); });
@@ -3403,8 +3484,9 @@ function renderPedidoVentaPreview(){
     var cantidad = pvAProducirLinea(l);
     if(!p || cantidad<=0) return;
     huboAlgo = true;
-    Object.keys(p.formula).forEach(function(n){
-      var dosis = Number(p.formula[n])||0;
+    var fx = formulaDeProducto(p, l.variante||'');
+    Object.keys(fx).forEach(function(n){
+      var dosis = Number(fx[n])||0;
       if(dosis<=0) return;
       var req = dosis*cantidad;
       combinado[n] = (combinado[n]||0) + req;
@@ -3454,6 +3536,7 @@ function submitPedidoVenta(){
       cantidad_toneladas: l.cantidad,
       precio_pactado: (l.precio===''||l.precio==null||isNaN(l.precio)) ? null : l.precio,
       precio_lista: (function(){ var t = precioTablaFor(l.producto_hoja); return t==null ? null : Math.round(t*100)/100; })(),
+      variante: l.variante || null,
       stock_asignaciones: Object.keys(l.asig||{}).filter(function(k){ return Number(l.asig[k])>0; }).map(function(k){ return {produccion_id:Number(k), cantidad_toneladas:Number(l.asig[k])}; })
     });
   }
@@ -3523,7 +3606,7 @@ function renderPedidoVentaDocCard(v, copiaLabel){
     var prod = it.producciones || {};
     if(prod.desde_stock_existente){
       return '<div class="doc-producto-box doc-producto-stock">'+
-        '<div class="doc-producto-titulo">'+(idx+1)+'. '+escapeHtml(it.producto_nombre)+' — '+fmt(it.cantidad_toneladas,2)+' Ton — Lote '+escapeHtml(it.lote||'—')+' ('+escapeHtml(it.numero_produccion||'—')+')</div>'+
+        '<div class="doc-producto-titulo">'+(idx+1)+'. '+escapeHtml(it.producto_nombre)+(it.variante?' ('+escapeHtml(it.variante)+')':'')+' — '+fmt(it.cantidad_toneladas,2)+' Ton — Lote '+escapeHtml(it.lote||'—')+' ('+escapeHtml(it.numero_produccion||'—')+')</div>'+
         (function(){ var org = origenStockInfo(Object.assign({}, prod, {lote: it.lote || prod.lote})); return '<div class="fi-section">📦 PRODUCTO EN ALMACÉN — no se produce, solo despacho</div>'+
           '<div class="fi-empty" style="font-weight:600;color:var(--brand-dark)">Sacar de la producción '+escapeHtml(org.numero)+' (Lote '+escapeHtml(org.lote)+') — producida el '+(org.fecha?fmtFecha(org.fecha):'—')+'</div>'; })()+
       '</div>';
@@ -3538,7 +3621,7 @@ function renderPedidoVentaDocCard(v, copiaLabel){
       if(ins && ins.tipo==='envase') formulaEnvEntries.push(entry); else formulaMpEntries.push(entry);
     });
     return '<div class="doc-producto-box">'+
-      '<div class="doc-producto-titulo">'+(idx+1)+'. '+escapeHtml(it.producto_nombre)+' — '+fmt(it.cantidad_toneladas,2)+' Ton — Lote '+escapeHtml(it.lote||'—')+' ('+escapeHtml(it.numero_produccion||'—')+')</div>'+
+      '<div class="doc-producto-titulo">'+(idx+1)+'. '+escapeHtml(it.producto_nombre)+(it.variante?' ('+escapeHtml(it.variante)+')':'')+' — '+fmt(it.cantidad_toneladas,2)+' Ton — Lote '+escapeHtml(it.lote||'—')+' ('+escapeHtml(it.numero_produccion||'—')+')</div>'+
       '<div class="fi-section">Fórmula (dosis por Tonelada)</div>'+
       (formulaMpEntries.length || formulaEnvEntries.length ?
         tableRows(formulaMpEntries) +
@@ -3666,7 +3749,7 @@ function renderProformasRows(){
     var flete = Number(pf.flete_bs)||0;
     var totalGeneral = totalProductos + flete;
     var productosCell = '<div class="pv-multi">'+items.map(function(it){
-      return '<div>'+fmt(it.cantidad_toneladas,2)+' Ton — '+escapeHtml(it.producto_nombre)+'</div>';
+      return '<div>'+fmt(it.cantidad_toneladas,2)+' Ton — '+escapeHtml(it.producto_nombre)+varianteTag(it.variante)+'</div>';
     }).join('')+'</div>';
     var entregaLabel = pf.modo_entrega==='recoge' ? '📦 Recoge cliente' : '🚚 Envío a cliente';
     var eliminarCell = !esAdminPf ? '' : '<td><button class="ghost danger btn-eliminar-pf" title="Eliminar esta proforma">🗑️</button></td>';
@@ -4407,6 +4490,7 @@ function renderProdNuevaForm(){
   var soloStock = currentProfile && currentProfile.rol==='produccion';
   document.getElementById('prodNuevaBody').innerHTML =
     '<div class="inline-field"><label>Producto</label><select id="pn_producto" style="min-width:260px">'+buildProductoOptions(null)+'</select></div>'+
+    '<div class="inline-field" id="pn_formulaWrap" style="display:none"><label>Fórmula</label><select id="pn_formula"></select></div>'+
     '<div class="inline-field"><label>Cantidad a producir (Toneladas)</label><input type="number" step="0.01" min="0.01" id="pn_cantidad" class="pill-input" value="1"></div>'+
     '<div class="inline-field"><label>¿Es para stock de fábrica (sin cliente)?</label><input type="checkbox" id="pn_esStock"'+(soloStock?' checked disabled':'')+'></div>'+
     (soloStock ? '<p class="footnote">Tu rol de Producción solo puede crear órdenes para stock de fábrica. Los pedidos con cliente los carga Comercial.</p>' : '')+
@@ -4417,7 +4501,15 @@ function renderProdNuevaForm(){
       '<button class="primary" id="btnCrearProduccion">Crear producción</button>'+
       '<button id="btnCancelarProdNueva2">Cancelar</button>'+
     '</div>';
-  document.getElementById('pn_producto').addEventListener('change', renderProdNuevaPreview);
+  function refrescarFormulaPn(){
+    var p = state.productos.find(function(x){ return x.hoja===document.getElementById('pn_producto').value; });
+    var w = document.getElementById('pn_formulaWrap');
+    if(tieneVariantes(p)){ w.style.display=''; document.getElementById('pn_formula').innerHTML = opcionesFormula(p, ''); }
+    else { w.style.display='none'; document.getElementById('pn_formula').innerHTML = ''; }
+    renderProdNuevaPreview();
+  }
+  document.getElementById('pn_producto').addEventListener('change', refrescarFormulaPn);
+  document.getElementById('pn_formula').addEventListener('change', renderProdNuevaPreview);
   document.getElementById('pn_cantidad').addEventListener('input', renderProdNuevaPreview);
   document.getElementById('pn_esStock').addEventListener('change', function(){
     var on = this.checked;
@@ -4434,15 +4526,16 @@ function renderProdNuevaPreview(){
   var p = state.productos.find(function(x){return x.hoja===hoja;});
   var wrap = document.getElementById('pn_preview');
   if(!p || cantidad<=0){ wrap.innerHTML=''; return; }
+  var fx = formulaDeProducto(p, (document.getElementById('pn_formula')||{}).value||'');
   function lineaDe(n){
-    var req = Number(p.formula[n])*cantidad;
+    var req = Number(fx[n])*cantidad;
     var ins = insumoIndex[n];
     var stock = ins ? Number(ins.stockActual)||0 : 0;
     var falta = stock < req;
     var unidad = ins && ins.unidad ? ins.unidad : '';
     return '<div class="line"><span>'+escapeHtml(n)+'</span><span'+(falta?' class="k-warn"':'')+'>'+fmt(req, req%1===0?0:2)+' '+escapeHtml(unidad)+(falta?' ⚠ stock: '+fmt(stock,1):'')+'</span></div>';
   }
-  var nombresOrdenados = Object.keys(p.formula).filter(function(n){ return (Number(p.formula[n])||0)>0; }).sort();
+  var nombresOrdenados = Object.keys(fx).filter(function(n){ return (Number(fx[n])||0)>0; }).sort();
   var mpKeys = nombresOrdenados.filter(function(n){ var ins=insumoIndex[n]; return !(ins && ins.tipo==='envase'); });
   var envKeys = nombresOrdenados.filter(function(n){ var ins=insumoIndex[n]; return ins && ins.tipo==='envase'; });
   var linea = mpKeys.map(lineaDe).join('') +
@@ -4467,9 +4560,10 @@ function submitNuevaProduccion(){
   if(!esStock && !cliente){ toast('Poné el cliente, o marcá "para stock de fábrica"'); return; }
   var btn = document.getElementById('btnCrearProduccion');
   btn.disabled = true;
-  sb.rpc('crear_produccion', {
+  sb.rpc('crear_produccion_v2', {
     p_producto_hoja: hoja, p_cantidad_toneladas: cantidad,
-    p_cliente: esStock ? null : cliente, p_es_stock_fabrica: esStock, p_fecha_entrega: fechaEntrega
+    p_cliente: esStock ? null : cliente, p_es_stock_fabrica: esStock, p_fecha_entrega: fechaEntrega,
+    p_variante: ((document.getElementById('pn_formula')||{}).value||'') || null
   }).then(function(res){
     btn.disabled = false;
     if(res.error){ toast('No se pudo crear la producción: '+errMsg(res.error)); return; }
@@ -4656,7 +4750,7 @@ function renderProduccionDocCardStock(o, copiaLabel){
   document.getElementById('prodDocCard').innerHTML =
     '<div class="fi-head"><span class="fi-brand"><img src="'+LOGO_DATA_URI+'" class="fi-logo" alt="NOGALMAX"> Orden de Producción</span><span class="fi-date">'+hoy+'</span></div>'+
     '<div class="copy-badge">COPIA: '+escapeHtml(copiaLabel)+'</div>'+
-    '<div class="fi-nombre">'+escapeHtml(o.producto_nombre)+'</div>'+
+    '<div class="fi-nombre">'+escapeHtml(o.producto_nombre)+(o.variante?' <span style="font-size:13px;color:#3730a3">— Fórmula '+escapeHtml(o.variante)+'</span>':'')+'</div>'+
     '<div class="doc-meta">'+
       metaItem('N° Orden', o.numero_produccion)+
       metaItem('Lote', org.lote)+
@@ -4761,7 +4855,7 @@ function renderProduccionDocCard(o, copiaLabel){
   document.getElementById('prodDocCard').innerHTML =
     '<div class="fi-head"><span class="fi-brand"><img src="'+LOGO_DATA_URI+'" class="fi-logo" alt="NOGALMAX"> Orden de Producción</span><span class="fi-date">'+hoy+'</span></div>'+
     '<div class="copy-badge">COPIA: '+escapeHtml(copiaLabel)+'</div>'+
-    '<div class="fi-nombre">'+escapeHtml(o.producto_nombre)+'</div>'+
+    '<div class="fi-nombre">'+escapeHtml(o.producto_nombre)+(o.variante?' <span style="font-size:13px;color:#3730a3">— Fórmula '+escapeHtml(o.variante)+'</span>':'')+'</div>'+
     '<div class="bolsa-badge bolsa-'+colorBolsa+'">🎒 COLOR DE BOLSA: '+colorBolsa.toUpperCase()+'</div>'+
     '<div class="doc-meta">'+
       metaItem('N° Producción', o.numero_produccion)+
