@@ -351,6 +351,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
       <div class="home-card" data-tab="compras"><div class="hc-icon">🛒</div><div class="hc-title">Compras</div><div class="hc-sub">Compras de insumos y comprobantes</div></div>
     </div>
     <div class="grid-cards" id="statCards"></div>
+    <div id="homeCobros"></div>
     <div class="card" style="margin-top:16px">
       <h2>Cómo funciona esta app</h2>
       <p>Todo está conectado igual que en tu Excel: cambiá el precio de un insumo en <b>«Precio de Insumos»</b> y el costo y precio de venta de los productos se recalcula al instante. Para crear una fórmula nueva usá <b>«+ Nueva Fórmula»</b> — elegís insumos de tu lista y la app calcula costo, precio de venta sin comisión y con comisión automáticamente, con la misma lógica de tu planilla (margen, comisión, costo facturado ÷0.87).</p>
@@ -805,6 +806,8 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
   <section id="view-clientescardex" class="view">
     <div class="toolbar">
       <input type="search" id="clcxSearch" placeholder="Buscar cliente…">
+      <div class="spacer"></div>
+      <button class="primary" id="btnExtractoCliente">📑 Extracto de cuenta</button>
     </div>
     <div class="table-wrap">
       <table>
@@ -1181,6 +1184,32 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
   </div>
 </div>
 
+<div id="extractoModalOverlay" class="overlay2">
+  <div class="ocr-box" style="max-width:980px">
+    <div class="ocr-head">
+      <h3>📑 Extracto de cuenta por cliente</h3>
+      <button class="close-x" id="btnCerrarExtracto">✕</button>
+    </div>
+    <div class="ocr-body">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
+        <div class="inline-field"><label>Cliente</label><input type="text" id="ext_cliente" list="extractoClientesList" style="min-width:220px" placeholder="Nombre del cliente"></div>
+        <div class="inline-field"><label>Desde</label><input type="date" id="ext_desde"></div>
+        <div class="inline-field"><label>Hasta</label><input type="date" id="ext_hasta"></div>
+        <button class="ghost" id="btnExtractoMes">Este mes</button>
+        <button class="ghost" id="btnExtractoTodo">Todo</button>
+        <button class="primary" id="btnExtractoGenerar">Ver extracto</button>
+      </div>
+      <datalist id="extractoClientesList"></datalist>
+      <div id="extractoCard" class="fi-card"></div>
+      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+        <button class="primary" id="btnExtractoPdf">⬇ Descargar PDF</button>
+        <button id="btnExtractoExcel">📊 Descargar Excel</button>
+      </div>
+      <p class="footnote">Todas las compras (notas de venta con su detalle de productos, Kg, precio y flete) y todos los pagos del cliente, con saldo acumulado. Dejá «Desde» vacío para ver todo el historial.</p>
+    </div>
+  </div>
+</div>
+
 <div id="cardexModalOverlay" class="overlay2">
   <div class="ocr-box" style="max-width:640px">
     <div class="ocr-head">
@@ -1276,6 +1305,7 @@ var notaVentaState = { loaded:false, rows: [] };
 var nvSort = { k:'fecha', dir:-1 };
 var cxcSort = { k:'cliente', dir:1 };
 var pvCuotas = []; // [{fecha, monto}]
+var pvCuotasMontoManual = false; // true cuando el usuario escribió un monto a mano (con 2 o 3 cuotas)
 var pagoModalState = null; // nota_venta row actual del modal de pago
 var pagoFile = null;
 var notaVentaDocState = null;
@@ -1441,6 +1471,68 @@ function renderResumen(){
       statCard(pendEntrega,'Pedidos pendientes de entrega', true)
     ].join('');
     wireStatClicks();
+  });
+  renderHomeCobros();
+}
+/* ---- inicio: cobros vencidos (incumplimiento) y próximos a vencer ---- */
+function cobroInfo(nv){
+  var t = notaTotales(nv);
+  var hoy = new Date().toISOString().slice(0,10);
+  var acum = 0, vencidoAcum = 0, primeraVencida = null;
+  t.cuotas.forEach(function(c){
+    acum += Number(c.monto_bs)||0;
+    if(c.fecha_vencimiento && c.fecha_vencimiento < hoy){ vencidoAcum = acum; if(!c._pagada && !primeraVencida) primeraVencida = c.fecha_vencimiento; }
+  });
+  var montoVencido = Math.max(0, Math.round((vencidoAcum - t.pagado)*100)/100);
+  var dias = primeraVencida ? Math.round((new Date(hoy+'T00:00:00') - new Date(primeraVencida+'T00:00:00'))/86400000) : 0;
+  return {t:t, montoVencido:montoVencido, dias:dias, primeraVencida:primeraVencida};
+}
+function renderHomeCobros(){
+  var wrap = document.getElementById('homeCobros');
+  if(!wrap) return;
+  if(currentProfile && currentProfile.rol==='produccion'){ wrap.innerHTML=''; return; }
+  fetchNotasVenta(function(){
+    var hoy = new Date().toISOString().slice(0,10);
+    var en7 = addDiasISO(hoy, 7);
+    var vencidas = [], proximas = [];
+    notaVentaState.rows.forEach(function(nv){
+      var ci = cobroInfo(nv);
+      if(ci.t.saldo<=0.005) return;
+      if(ci.montoVencido>0.005) vencidas.push({nv:nv, ci:ci});
+      else if(ci.t.proximaFecha && ci.t.proximaFecha>=hoy && ci.t.proximaFecha<=en7) proximas.push({nv:nv, ci:ci});
+    });
+    vencidas.sort(function(a,b){ return b.ci.dias - a.ci.dias; });
+    proximas.sort(function(a,b){ return a.ci.t.proximaFecha<b.ci.t.proximaFecha?-1:1; });
+    var totalVencido = vencidas.reduce(function(s,x){ return s+x.ci.montoVencido; },0);
+    var clientes = {}; vencidas.forEach(function(x){ clientes[(x.nv.cliente||'').toLowerCase()] = 1; });
+    function fila(x, esVencida){
+      var nv = x.nv, ci = x.ci;
+      return '<tr data-id="'+nv.id+'">'+
+        '<td><b>'+escapeHtml(nv.cliente||'—')+'</b></td>'+
+        '<td>'+escapeHtml(nv.numero_nota)+'<br><span class="muted" style="font-size:11px">'+escapeHtml(nv.numero_pedido||'')+'</span></td>'+
+        (esVencida
+          ? '<td>'+fmtFecha(ci.primeraVencida)+'</td><td><span class="pill-estado pill-vencida">'+ci.dias+' día'+(ci.dias===1?'':'s')+' de atraso</span></td><td class="num"><b style="color:#b91c1c">'+fmtBs(ci.montoVencido)+'</b></td>'
+          : '<td>'+fmtFecha(ci.t.proximaFecha)+'</td><td><span class="pill-estado pill-pendiente">Vence pronto</span></td><td class="num">—</td>')+
+        '<td class="num">'+fmtBs(ci.t.saldo)+'</td>'+
+        '<td style="white-space:nowrap"><button class="ghost hc-doc" title="Ver nota de venta">📄</button>'+(typeof openPagoModal==='function'?' <button class="ghost hc-pago" title="Registrar pago">💳</button>':'')+'</td>'+
+      '</tr>';
+    }
+    var thead = '<thead><tr><th>Cliente</th><th>Nota / Pedido</th><th>Venció / Vence</th><th>Estado</th><th class="num">Monto vencido</th><th class="num">Saldo total</th><th></th></tr></thead>';
+    var html = '<div class="card" style="margin-top:16px;border-left:4px solid '+(vencidas.length?'#b91c1c':'var(--brand-mid)')+'">'+
+      '<h2 style="margin-top:0">'+(vencidas.length ? '⚠ Pagos vencidos — '+Object.keys(clientes).length+' cliente'+(Object.keys(clientes).length===1?'':'s')+' · '+fmtBs(totalVencido) : '✅ Sin pagos vencidos')+'</h2>'+
+      (vencidas.length ? '<div class="table-wrap"><table>'+thead+'<tbody>'+vencidas.map(function(x){ return fila(x,true); }).join('')+'</tbody></table></div>' : '<p class="muted">Todos los clientes están al día.</p>')+
+      (proximas.length ? '<div class="section-title" style="margin-top:14px">Vencen en los próximos 7 días</div><div class="table-wrap"><table>'+thead+'<tbody>'+proximas.map(function(x){ return fila(x,false); }).join('')+'</tbody></table></div>' : '')+
+      '<div style="margin-top:8px"><button class="ghost" id="hcVerCxc">📊 Ver Cuentas por Cobrar</button></div>'+
+    '</div>';
+    wrap.innerHTML = html;
+    wrap.querySelectorAll('tr[data-id]').forEach(function(tr){
+      var nv = notaVentaState.rows.find(function(x){ return x.id===Number(tr.dataset.id); });
+      if(!nv) return;
+      var d = tr.querySelector('.hc-doc'); if(d) d.addEventListener('click', function(){ openNotaVentaDocModal(nv); });
+      var p = tr.querySelector('.hc-pago'); if(p) p.addEventListener('click', function(){ openPagoModal(nv); });
+    });
+    var b = document.getElementById('hcVerCxc');
+    if(b) b.addEventListener('click', function(){ var n = document.querySelector('.nav-item[data-tab="cuentasxcobrar"]'); if(n) n.click(); });
   });
 }
 function wireStatClicks(){
@@ -2965,7 +3057,7 @@ function renderPedidosVentaRows(){
         fetchNotasVenta(function(){
           if(activeTab()==='notasventa') renderNotasVentaRows();
           if(activeTab()==='pagos') renderPagosRows();
-          if(activeTab()==='cuentasxcobrar') renderCuentasXCobrarRows();
+          if(activeTab()==='cuentasxcobrar') renderCuentasXCobrarRows(); if(activeTab()==='resumen') renderHomeCobros();
         });
       });
     });
@@ -3020,6 +3112,7 @@ function renderPedidoVentaForm(){
       '<button id="btnCancelarPedidoVenta2">Cancelar</button>'+
     '</div>';
   pvCuotas = [{fecha: document.getElementById('pv_fechaEntrega').value || '', monto: 0}];
+  pvCuotasMontoManual = false;
   document.getElementById('pv_condicion').addEventListener('change', actualizarPlanPagoVisibilidad);
   document.getElementById('pv_modoEntrega').addEventListener('change', function(){
     var envio = this.value === 'envio';
@@ -3112,6 +3205,19 @@ function updatePvTotalBox(){
   if(box) box.textContent = 'Total del pedido: '+fmtBs(total)+sufijoFlete;
   var boxContado = document.getElementById('pv_totalBoxContado');
   if(boxContado) boxContado.textContent = 'Total del pedido (al contado, se paga al recoger): '+fmtBs(total)+sufijoFlete;
+  sincronizarMontosCuotas(total);
+}
+/* 1 solo pago: el monto es siempre el total del pedido. 2-3 pagos: se reparten en partes iguales mientras no se haya escrito un monto a mano */
+function sincronizarMontosCuotas(total){
+  if(!pvCuotas || !pvCuotas.length) return;
+  if(pvCuotas.length===1){
+    pvCuotas[0].monto = total;
+  } else if(!pvCuotasMontoManual){
+    var n = pvCuotas.length, base = Math.floor((total/n)*100)/100, acum = 0;
+    pvCuotas.forEach(function(c, i){ c.monto = (i===n-1) ? Math.round((total-acum)*100)/100 : base; acum += c.monto; });
+  } else { return; }
+  var inputs = document.querySelectorAll('#pv_cuotasWrap .pvc-monto');
+  inputs.forEach(function(inp, i){ if(pvCuotas[i] && document.activeElement!==inp) inp.value = pvCuotas[i].monto; });
 }
 function addDiasISO(fechaISO, dias){
   var d = fechaISO ? new Date(fechaISO+'T00:00:00') : new Date();
@@ -3132,6 +3238,7 @@ function repartirPvCuotas(n){
     partes.push({ fecha: addDiasISO(fechaBase, i*30), monto: monto });
   }
   pvCuotas = partes;
+  pvCuotasMontoManual = false;
   var sel = document.getElementById('pv_numCuotas');
   if(sel) sel.value = String(n);
   renderPvCuotas();
@@ -3143,13 +3250,13 @@ function renderPvCuotas(){
   wrap.innerHTML = pvCuotas.map(function(c, idx){
     return '<div class="pv-cuota-row" data-idx="'+idx+'">'+
       '<div class="inline-field"><label>Cuota '+(idx+1)+' — Fecha de pago</label><input type="date" class="pvc-fecha" value="'+(c.fecha||'')+'"></div>'+
-      '<div class="inline-field"><label>Monto (Bs)</label><input type="number" step="0.01" min="0" class="pvc-monto pill-input" value="'+(c.monto!=null?c.monto:'')+'"></div>'+
+      '<div class="inline-field"><label>Monto (Bs)'+(pvCuotas.length===1?' — total del pedido':'')+'</label><input type="number" step="0.01" min="0" class="pvc-monto pill-input" value="'+(c.monto!=null?c.monto:'')+'"'+(pvCuotas.length===1?' readonly title="Con 1 solo pago el monto es el total del pedido"':'')+'></div>'+
     '</div>';
   }).join('');
   wrap.querySelectorAll('.pv-cuota-row').forEach(function(row){
     var idx = Number(row.dataset.idx);
     row.querySelector('.pvc-fecha').addEventListener('change', function(){ pvCuotas[idx].fecha = this.value; });
-    row.querySelector('.pvc-monto').addEventListener('input', function(){ pvCuotas[idx].monto = parseFloat(this.value)||0; });
+    row.querySelector('.pvc-monto').addEventListener('input', function(){ if(pvCuotas.length===1) return; pvCuotas[idx].monto = parseFloat(this.value)||0; pvCuotasMontoManual = true; });
   });
 }
 function dispStock(o){ return Math.max(0, Math.round(((Number(o.cantidad_toneladas)||0) - (Number(o.despachado_cantidad)||0))*10000)/10000); }
@@ -3392,7 +3499,7 @@ function submitPedidoVenta(){
     fetchNotasVenta(function(){
       if(activeTab()==='notasventa') renderNotasVentaRows();
       if(activeTab()==='pagos') renderPagosRows();
-      if(activeTab()==='cuentasxcobrar') renderCuentasXCobrarRows();
+      if(activeTab()==='cuentasxcobrar') renderCuentasXCobrarRows(); if(activeTab()==='resumen') renderHomeCobros();
       var nota = notaVentaState.rows.find(function(nv){ return nv.pedido_venta_id===row.id; });
       if(nota) openNotaVentaDocModal(nota);
     });
@@ -3935,7 +4042,7 @@ function avisarNotaSiEntregado(pedidoId){
   if(!pedidoId) return;
   fetchNotasVenta(function(){
     if(activeTab()==='notasventa') renderNotasVentaRows();
-    if(activeTab()==='cuentasxcobrar') renderCuentasXCobrarRows();
+    if(activeTab()==='cuentasxcobrar') renderCuentasXCobrarRows(); if(activeTab()==='resumen') renderHomeCobros();
     var nota = notaVentaState.rows.find(function(nv){ return nv.pedido_venta_id===pedidoId; });
     if(!nota || nota.estado_entrega!=='entregada' || !nota.entregado_en) return;
     if(Date.now() - new Date(nota.entregado_en).getTime() > 3*60*1000) return;
@@ -4158,7 +4265,7 @@ function renderPagoForm(){
           pagoModalState = notaVentaState.rows.find(function(x){return x.id===pagoModalState.id;}) || pagoModalState;
           renderPagoForm();
           if(activeTab()==='pagos') renderPagosRows();
-          if(activeTab()==='cuentasxcobrar') renderCuentasXCobrarRows();
+          if(activeTab()==='cuentasxcobrar') renderCuentasXCobrarRows(); if(activeTab()==='resumen') renderHomeCobros();
           if(activeTab()==='notasventa') renderNotasVentaRows();
         });
       });
@@ -4191,7 +4298,7 @@ function submitPago(){
         pagoModalState = notaVentaState.rows.find(function(x){return x.id===nota.id;}) || nota;
         renderPagoForm();
         if(activeTab()==='pagos') renderPagosRows();
-        if(activeTab()==='cuentasxcobrar') renderCuentasXCobrarRows();
+        if(activeTab()==='cuentasxcobrar') renderCuentasXCobrarRows(); if(activeTab()==='resumen') renderHomeCobros();
         if(activeTab()==='notasventa') renderNotasVentaRows();
       });
     });
@@ -5585,9 +5692,12 @@ function renderClientesCardexRows(){
       '<td class="num">'+fmt(r.total,2)+'</td>'+
       '<td class="num">'+fmt(r.pagado,2)+'</td>'+
       '<td class="num"><b>'+fmt(r.saldo,2)+'</b></td>'+
-      '<td><button class="ghost btn-ver-cardex-cliente" style="padding:6px 12px;font-size:12px">📋 Ver cardex</button></td>'+
+      '<td style="white-space:nowrap"><button class="ghost btn-ver-cardex-cliente" style="padding:6px 12px;font-size:12px">📋 Ver cardex</button> <button class="ghost btn-extracto-cliente" style="padding:6px 12px;font-size:12px">📑 Extracto</button></td>'+
     '</tr>';
   }).join('') || '<tr><td colspan="6" class="empty">Todavía no hay clientes registrados</td></tr>';
+  document.querySelectorAll('.btn-extracto-cliente').forEach(function(btn){
+    btn.addEventListener('click', function(){ openExtractoModal(btn.closest('tr').dataset.nombre); });
+  });
   document.querySelectorAll('.btn-ver-cardex-cliente').forEach(function(btn){
     btn.addEventListener('click', function(){ openClienteCardexModal(btn.closest('tr').dataset.nombre); });
   });
@@ -5683,6 +5793,186 @@ function openProveedorCardexModal(nombre){
 document.getElementById('btnCerrarCardex').addEventListener('click', function(){
   document.getElementById('cardexModalOverlay').classList.remove('active');
 });
+
+/* ================= EXTRACTO DE CUENTA POR CLIENTE ================= */
+var extractoState = null;
+function openExtractoModal(nombre){
+  document.getElementById('extractoModalOverlay').classList.add('active');
+  document.getElementById('extractoCard').innerHTML = '<p class="muted">Cargando…</p>';
+  var pending = 2;
+  function listo(){
+    pending--; if(pending>0) return;
+    document.getElementById('extractoClientesList').innerHTML = buildClientesCardexList().sort(function(a,b){ return a.localeCompare(b); }).map(function(n){ return '<option value="'+escapeHtml(n)+'">'; }).join('');
+    if(nombre) document.getElementById('ext_cliente').value = nombre;
+    if(!document.getElementById('ext_hasta').value) document.getElementById('ext_hasta').value = new Date().toISOString().slice(0,10);
+    generarExtracto();
+  }
+  fetchClientes(listo);
+  fetchNotasVenta(listo);
+}
+function calcularExtracto(nombre, desde, hasta){
+  var key = nombre.trim().toLowerCase();
+  var notas = notaVentaState.rows.filter(function(nv){ return (nv.cliente||'').trim().toLowerCase()===key; });
+  var movs = [];
+  notas.forEach(function(nv){
+    var pv = nv.pedidos_venta || {};
+    var items = (pv.pedido_venta_items||[]).slice().sort(function(a,b){ return (a.orden||0)-(b.orden||0); });
+    var detalle = items.map(function(it){
+      var kg = (Number(it.cantidad_toneladas)||0)*1000;
+      return {producto: it.producto_nombre, kg: kg, precio: it.precio_pactado!=null?Number(it.precio_pactado):null, total: it.total_pactado!=null?Number(it.total_pactado):null};
+    });
+    var flete = Number(pv.flete_bs)||0;
+    movs.push({fecha: nv.fecha, orden:0, tipo:'Compra', nota: nv.numero_nota, pedido: nv.numero_pedido||pv.numero_pedido||'', detalle: detalle, flete: flete,
+      condicion: pv.condicion_pago ? (CONDICION_PAGO_LABEL[pv.condicion_pago]||pv.condicion_pago)+(pv.condicion_pago_nota?' · '+pv.condicion_pago_nota:'') : '',
+      cargo: Number(nv.total_bs)||0, abono: 0});
+    (nv.pagos_venta||[]).forEach(function(p){
+      movs.push({fecha: p.fecha_pago, orden:1, tipo:'Pago', nota: nv.numero_nota, pedido: nv.numero_pedido||'', detalle: null,
+        registrado: p.registrado_por_nombre||'', comprobante: !!p.comprobante_path, cargo: 0, abono: Number(p.monto_bs)||0});
+    });
+  });
+  movs.sort(function(a,b){ return (a.fecha<b.fecha)?-1:(a.fecha>b.fecha?1:(a.orden-b.orden)); });
+  var saldoAnterior = 0, compras = 0, pagos = 0, kg = 0, nCompras = 0, nPagos = 0;
+  var porProducto = {};
+  var periodo = [];
+  movs.forEach(function(m){
+    if(desde && m.fecha < desde){ saldoAnterior += m.cargo - m.abono; return; }
+    if(hasta && m.fecha > hasta) return;
+    periodo.push(m);
+    compras += m.cargo; pagos += m.abono;
+    if(m.tipo==='Compra'){ nCompras++; m.detalle.forEach(function(d){ kg += d.kg; var k=d.producto; if(!porProducto[k]) porProducto[k]={kg:0,monto:0}; porProducto[k].kg += d.kg; porProducto[k].monto += d.total||0; }); }
+    else nPagos++;
+  });
+  var saldo = saldoAnterior;
+  periodo.forEach(function(m){ saldo += m.cargo - m.abono; m.saldo = Math.round(saldo*100)/100; });
+  var hoy = new Date().toISOString().slice(0,10);
+  var cuotas = [], vencidoTotal = 0;
+  notas.forEach(function(nv){
+    var t = notaTotales(nv);
+    if(t.saldo<=0.005) return;
+    var ci = cobroInfo(nv);
+    vencidoTotal += ci.montoVencido;
+    t.cuotas.forEach(function(c){
+      var estado = c._pagada ? 'Pagada' : (c.fecha_vencimiento && c.fecha_vencimiento < hoy ? 'Vencida' : 'Pendiente');
+      cuotas.push({nota: nv.numero_nota, n: c.numero_cuota, venc: c.fecha_vencimiento, monto: Number(c.monto_bs)||0, estado: estado,
+        dias: estado==='Vencida' ? Math.round((new Date(hoy+'T00:00:00') - new Date(c.fecha_vencimiento+'T00:00:00'))/86400000) : 0});
+    });
+  });
+  var deudaActual = notas.reduce(function(s,nv){ return s + notaTotales(nv).saldo; }, 0);
+  return {nombre:nombre, desde:desde, hasta:hasta, movs:periodo, saldoAnterior:Math.round(saldoAnterior*100)/100, compras:compras, pagos:pagos,
+    saldoFinal: Math.round((saldoAnterior+compras-pagos)*100)/100, kg:kg, nCompras:nCompras, nPagos:nPagos, porProducto:porProducto,
+    cuotas:cuotas, vencidoTotal:Math.round(vencidoTotal*100)/100, deudaActual:Math.round(deudaActual*100)/100, nNotas:notas.length};
+}
+function generarExtracto(){
+  var nombre = (document.getElementById('ext_cliente').value||'').trim();
+  var desde = document.getElementById('ext_desde').value || '';
+  var hasta = document.getElementById('ext_hasta').value || '';
+  var card = document.getElementById('extractoCard');
+  if(!nombre){ card.innerHTML = '<p class="muted">Elegí un cliente para ver su extracto.</p>'; extractoState=null; return; }
+  var e = calcularExtracto(nombre, desde, hasta);
+  extractoState = e;
+  if(!e.nNotas){ card.innerHTML = '<p class="muted">No hay compras registradas para «'+escapeHtml(nombre)+'».</p>'; return; }
+  var hoyTxt = new Date().toLocaleDateString('es-BO',{day:'2-digit',month:'2-digit',year:'numeric'});
+  var th = 'style="text-align:left;font-size:10.5px;text-transform:uppercase;color:#6b7680;border-bottom:2px solid #2f6f4f;padding:6px 5px"';
+  var thr = 'style="text-align:right;font-size:10.5px;text-transform:uppercase;color:#6b7680;border-bottom:2px solid #2f6f4f;padding:6px 5px"';
+  var td = 'style="padding:6px 5px;border-bottom:1px solid #e6e9e7;font-size:12px;vertical-align:top"';
+  var tdr = 'style="padding:6px 5px;border-bottom:1px solid #e6e9e7;font-size:12px;vertical-align:top;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums"';
+  function kpi(l,v,color){ return '<div style="background:#eaf3ee;border-radius:8px;padding:8px 10px"><div style="font-size:10.5px;color:#6b7680">'+l+'</div><div style="font-size:15px;font-weight:800;color:'+(color||'#1e4a34')+'">'+v+'</div></div>'; }
+  var filas = '';
+  if(desde) filas += '<tr><td '+td+'>'+fmtFecha(desde)+'</td><td '+td+' colspan="3"><i>Saldo anterior al '+fmtFecha(desde)+'</i></td><td '+tdr+'></td><td '+tdr+'></td><td '+tdr+'><b>'+fmtBs(e.saldoAnterior)+'</b></td></tr>';
+  e.movs.forEach(function(m){
+    var det;
+    if(m.tipo==='Compra'){
+      det = m.detalle.map(function(d){ return escapeHtml(d.producto)+' — '+fmt(d.kg,0)+' Kg'+(d.precio!=null?' × '+fmtBs(d.precio)+'/Ton = '+fmtBs(d.total||0):''); }).join('<br>')+
+        (m.flete>0 ? '<br>Flete: '+fmtBs(m.flete) : '')+
+        (m.condicion ? '<br><span style="color:#6b7680;font-size:11px">Condición: '+escapeHtml(m.condicion)+'</span>' : '');
+    } else {
+      det = 'Pago recibido'+(m.registrado?' · registrado por '+escapeHtml(m.registrado):'')+(m.comprobante?' · con comprobante':'');
+    }
+    filas += '<tr><td '+td+'>'+fmtFecha(m.fecha)+'</td>'+
+      '<td '+td+'><b style="color:'+(m.tipo==='Compra'?'#1e4a34':'#1d4ed8')+'">'+m.tipo+'</b></td>'+
+      '<td '+td+'>'+escapeHtml(m.nota)+(m.pedido?'<br><span style="color:#6b7680;font-size:11px">'+escapeHtml(m.pedido)+'</span>':'')+'</td>'+
+      '<td '+td+'>'+det+'</td>'+
+      '<td '+tdr+'>'+(m.cargo?fmtBs(m.cargo):'')+'</td>'+
+      '<td '+tdr+'>'+(m.abono?fmtBs(m.abono):'')+'</td>'+
+      '<td '+tdr+'><b>'+fmtBs(m.saldo)+'</b></td></tr>';
+  });
+  if(!e.movs.length) filas += '<tr><td '+td+' colspan="7"><span style="color:#6b7680">Sin movimientos en este período.</span></td></tr>';
+  filas += '<tr><td colspan="4" style="padding:7px 5px;font-weight:800;text-align:right;border-top:2px solid #2f6f4f;font-size:12px">TOTALES DEL PERÍODO</td><td '+tdr+'><b>'+fmtBs(e.compras)+'</b></td><td '+tdr+'><b>'+fmtBs(e.pagos)+'</b></td><td '+tdr+'><b>'+fmtBs(e.saldoFinal)+'</b></td></tr>';
+  var prodRows = Object.keys(e.porProducto).sort().map(function(k){ var p=e.porProducto[k]; return '<tr><td '+td+'>'+escapeHtml(k)+'</td><td '+tdr+'>'+fmt(p.kg,0)+' Kg</td><td '+tdr+'>'+fmtBs(p.monto)+'</td></tr>'; }).join('');
+  var cuotaRows = e.cuotas.map(function(c){
+    var color = c.estado==='Vencida'?'#b91c1c':(c.estado==='Pagada'?'#1e6b3f':'#475569');
+    return '<tr><td '+td+'>'+escapeHtml(c.nota)+'</td><td '+td+'>Cuota '+c.n+'</td><td '+td+'>'+fmtFecha(c.venc)+'</td><td '+tdr+'>'+fmtBs(c.monto)+'</td><td '+td+'><b style="color:'+color+'">'+c.estado+(c.dias?' ('+c.dias+' días)':'')+'</b></td></tr>';
+  }).join('');
+  card.innerHTML =
+    '<div class="fi-head"><span class="fi-brand"><img src="'+LOGO_DATA_URI+'" class="fi-logo" alt="NOGALMAX"> Extracto de cuenta</span><span class="fi-date">Emitido: '+hoyTxt+'</span></div>'+
+    '<div class="fi-nombre">'+escapeHtml(e.nombre)+'</div>'+
+    '<div style="font-size:12px;color:#6b7680;margin-bottom:10px">Período: '+(desde?fmtFecha(desde):'desde el inicio')+' al '+(hasta?fmtFecha(hasta):'hoy')+'</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:12px">'+
+      (desde?kpi('Saldo anterior', fmtBs(e.saldoAnterior)):'')+
+      kpi('Compras ('+e.nCompras+')', fmtBs(e.compras))+
+      kpi('Pagos ('+e.nPagos+')', fmtBs(e.pagos), '#1d4ed8')+
+      kpi('Saldo al '+(hasta?fmtFecha(hasta):'día'), fmtBs(e.saldoFinal))+
+      kpi('Kg comprados', fmt(e.kg,0)+' Kg')+
+      kpi('Vencido hoy', fmtBs(e.vencidoTotal), e.vencidoTotal>0?'#b91c1c':'#1e6b3f')+
+    '</div>'+
+    '<div class="fi-section">Movimientos (compras y pagos)</div>'+
+    '<table style="width:100%;border-collapse:collapse"><thead><tr><th '+th+'>Fecha</th><th '+th+'>Tipo</th><th '+th+'>Nota / Pedido</th><th '+th+'>Detalle</th><th '+thr+'>Cargo</th><th '+thr+'>Abono</th><th '+thr+'>Saldo</th></tr></thead><tbody>'+filas+'</tbody></table>'+
+    (prodRows ? '<div class="fi-section">Resumen por producto (período)</div><table style="width:100%;border-collapse:collapse"><thead><tr><th '+th+'>Producto</th><th '+thr+'>Cantidad</th><th '+thr+'>Monto</th></tr></thead><tbody>'+prodRows+'</tbody></table>' : '')+
+    (cuotaRows ? '<div class="fi-section">Cuotas de notas con saldo pendiente (situación a hoy) — deuda actual '+fmtBs(e.deudaActual)+'</div><table style="width:100%;border-collapse:collapse"><thead><tr><th '+th+'>Nota</th><th '+th+'>Cuota</th><th '+th+'>Vencimiento</th><th '+thr+'>Monto</th><th '+th+'>Estado</th></tr></thead><tbody>'+cuotaRows+'</tbody></table>' : '<div class="fi-section">Situación a hoy</div><div class="fi-empty" style="color:#1e6b3f;font-weight:700">✅ Sin deudas pendientes</div>')+
+    '<div class="fi-foot">Generado desde NOGALMAX — Extracto de cuenta del cliente. Cargo = compras (nota de venta, incluye flete); Abono = pagos recibidos.</div>';
+}
+function descargarExtractoPdf(){
+  if(!extractoState) { toast('Primero generá el extracto'); return; }
+  if(typeof html2canvas === 'undefined'){ toast('No se pudo cargar el generador de documentos (revisá tu conexión a internet).'); return; }
+  var jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
+  if(!jsPDFCtor){ toast('No se pudo cargar el generador de PDF (revisá tu conexión a internet).'); return; }
+  var btn = document.getElementById('btnExtractoPdf'); btn.disabled = true;
+  html2canvas(document.getElementById('extractoCard'), {backgroundColor:'#ffffff', scale:2}).then(function(canvas){
+    var img = canvas.toDataURL('image/jpeg', 0.85);
+    var doc = makeCompactPdfFromCanvas(jsPDFCtor, img, canvas);
+    doc.save('extracto_'+slugFilename(extractoState.nombre)+'_'+(extractoState.hasta||new Date().toISOString().slice(0,10))+'.pdf');
+    btn.disabled = false; toast('PDF descargado');
+  }).catch(function(err){ btn.disabled=false; toast('No se pudo generar el PDF: '+(err&&err.message?err.message:String(err))); });
+}
+function descargarExtractoExcel(){
+  var e = extractoState;
+  if(!e){ toast('Primero generá el extracto'); return; }
+  var r2 = function(n){ return Math.round((Number(n)||0)*100)/100; };
+  var aoa = [['EXTRACTO DE CUENTA — NOGALMAX'], ['Cliente', e.nombre], ['Período', (e.desde||'inicio')+' al '+(e.hasta||'hoy')], ['Emitido', new Date().toISOString().slice(0,10)], [],
+    ['Saldo anterior', r2(e.saldoAnterior)], ['Compras del período', r2(e.compras)], ['Pagos del período', r2(e.pagos)], ['Saldo final', r2(e.saldoFinal)], ['Kg comprados', Math.round(e.kg)], ['Vencido hoy', r2(e.vencidoTotal)], ['Deuda actual', r2(e.deudaActual)], [],
+    ['Fecha','Tipo','Nota','Pedido','Producto / Detalle','Kg','Precio Bs/Ton','Cargo (Bs)','Abono (Bs)','Saldo (Bs)']];
+  e.movs.forEach(function(m){
+    if(m.tipo==='Compra'){
+      aoa.push([m.fecha, 'Compra', m.nota, m.pedido, 'Total nota'+(m.condicion?' ('+m.condicion+')':''), '', '', r2(m.cargo), '', r2(m.saldo)]);
+      m.detalle.forEach(function(d){ aoa.push(['', '', '', '', '   '+d.producto, Math.round(d.kg), d.precio!=null?r2(d.precio):'', d.total!=null?r2(d.total):'', '', '']); });
+      if(m.flete>0) aoa.push(['', '', '', '', '   Flete', '', '', r2(m.flete), '', '']);
+    } else {
+      aoa.push([m.fecha, 'Pago', m.nota, m.pedido, 'Pago recibido'+(m.registrado?' · '+m.registrado:''), '', '', '', r2(m.abono), r2(m.saldo)]);
+    }
+  });
+  aoa.push([], ['CUOTAS PENDIENTES (a hoy)'], ['Nota','Cuota','Vencimiento','Monto (Bs)','Estado','Días de atraso']);
+  e.cuotas.forEach(function(c){ aoa.push([c.nota, c.n, c.venc, r2(c.monto), c.estado, c.dias||'']); });
+  var nombreArchivo = 'extracto_'+slugFilename(e.nombre)+'_'+(e.hasta||new Date().toISOString().slice(0,10));
+  if(typeof XLSX !== 'undefined'){
+    var wb = XLSX.utils.book_new();
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{wch:12},{wch:9},{wch:13},{wch:13},{wch:42},{wch:9},{wch:13},{wch:13},{wch:13},{wch:13}];
+    XLSX.utils.book_append_sheet(wb, ws, 'Extracto');
+    XLSX.writeFile(wb, nombreArchivo+'.xlsx');
+  } else {
+    var csv = aoa.map(function(r){ return r.map(function(v){ v = v==null?'':String(v); return /[;"\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }).join(';'); }).join('\n');
+    downloadBlob(nombreArchivo+'.csv', new Blob(["﻿"+csv], {type:'text/csv;charset=utf-8'}));
+  }
+  toast('Excel descargado');
+}
+document.getElementById('btnCerrarExtracto').addEventListener('click', function(){ document.getElementById('extractoModalOverlay').classList.remove('active'); });
+document.getElementById('btnExtractoGenerar').addEventListener('click', generarExtracto);
+['ext_cliente','ext_desde','ext_hasta'].forEach(function(id){ document.getElementById(id).addEventListener('change', generarExtracto); });
+document.getElementById('btnExtractoPdf').addEventListener('click', descargarExtractoPdf);
+document.getElementById('btnExtractoExcel').addEventListener('click', descargarExtractoExcel);
+document.getElementById('btnExtractoCliente').addEventListener('click', function(){ openExtractoModal(''); });
+document.getElementById('btnExtractoMes').addEventListener('click', function(){ var h=new Date(); var y=h.getFullYear(), mo=('0'+(h.getMonth()+1)).slice(-2); document.getElementById('ext_desde').value = y+'-'+mo+'-01'; document.getElementById('ext_hasta').value = h.toISOString().slice(0,10); generarExtracto(); });
+document.getElementById('btnExtractoTodo').addEventListener('click', function(){ document.getElementById('ext_desde').value = ''; document.getElementById('ext_hasta').value = new Date().toISOString().slice(0,10); generarExtracto(); });
 
 /* ================= PAGOS DE COMPRAS / CUENTAS POR PAGAR ================= */
 function renderPagosCompra(forceReload){
