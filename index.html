@@ -651,6 +651,33 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
     <p class="footnote">Elegí la nota de venta del cliente que está pagando, subí la foto del comprobante (el sistema intenta leer el monto solo) y registrá el pago — el saldo se actualiza al toque.</p>
   </section>
 
+  <!-- RECIBOS DE PAGO -->
+  <section id="view-recibos" class="view">
+    <div class="toolbar">
+      <input type="search" id="rcSearch" placeholder="Buscar por cliente, N° recibo o N° nota…">
+      <label class="inline-field" style="align-items:center;flex-direction:row;gap:6px">Desde <input type="date" id="rcDesde"></label>
+      <label class="inline-field" style="align-items:center;flex-direction:row;gap:6px">Hasta <input type="date" id="rcHasta"></label>
+      <div class="spacer"></div>
+      <span id="rcResumen" class="muted" style="font-size:13px"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>N° Recibo</th>
+          <th>Fecha de pago</th>
+          <th>Cliente</th>
+          <th>N° Nota</th>
+          <th>N° Pedido</th>
+          <th class="num">Monto (Bs)</th>
+          <th>Registrado por</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="recibosBody"></tbody>
+      </table>
+    </div>
+    <p class="footnote">Todos los recibos generados por los pagos registrados en «💳 Pagos». Cada recibo queda guardado con su número correlativo: lo podés ver, volver a descargar en PDF o abrir el comprobante que se subió con el pago.</p>
+  </section>
+
   <!-- CUENTAS POR COBRAR -->
   <section id="view-cuentasxcobrar" class="view">
     <div class="toolbar">
@@ -920,6 +947,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
     <div class="nav-group-items">
       <button data-tab="notasventa" class="nav-item">📑 Notas de Venta</button>
       <button data-tab="pagos" class="nav-item">💳 Pagos</button>
+      <button data-tab="recibos" class="nav-item">🧾 Recibos</button>
       <button data-tab="cuentasxcobrar" class="nav-item">📊 Cuentas por Cobrar</button>
     </div>
   </div>
@@ -1486,6 +1514,7 @@ document.querySelectorAll('.nav-item').forEach(function(btn){
     if(btn.dataset.tab==='proformas') renderProformas(!proformaState.loaded);
     if(btn.dataset.tab==='notasventa') renderNotasVenta(!notaVentaState.loaded);
     if(btn.dataset.tab==='pagos') renderPagos(!notaVentaState.loaded);
+    if(btn.dataset.tab==='recibos') renderRecibos(true);
     if(btn.dataset.tab==='cuentasxcobrar') renderCuentasXCobrar(!notaVentaState.loaded);
     if(btn.dataset.tab==='stockfabrica') renderOrdenes(!ordenesState.loaded);
     if(btn.dataset.tab==='entregados') renderOrdenes(!ordenesState.loaded);
@@ -4441,6 +4470,7 @@ function renderPagoForm(){
           pagoModalState = notaVentaState.rows.find(function(x){return x.id===pagoModalState.id;}) || pagoModalState;
           renderPagoForm();
           if(activeTab()==='pagos') renderPagosRows();
+          if(activeTab()==='recibos') renderRecibosRows();
           if(activeTab()==='cuentasxcobrar') renderCuentasXCobrarRows(); if(activeTab()==='resumen') renderHomeCobros();
           if(activeTab()==='notasventa') renderNotasVentaRows();
         });
@@ -4586,6 +4616,70 @@ document.getElementById('btnDescargarReciboPdf').addEventListener('click', funct
     toast('Recibo descargado');
   }).catch(function(err){ btn.disabled=false; toast('No se pudo generar el PDF: '+(err&&err.message?err.message:String(err))); });
 });
+
+/* ---- Recibos: listado de todos los recibos de pago generados ---- */
+function renderRecibos(forceReload){
+  if(forceReload){ fetchNotasVenta(renderRecibosRows); return; }
+  renderRecibosRows();
+}
+function recibosLista(){
+  var out = [];
+  notaVentaState.rows.forEach(function(nv){
+    (nv.pagos_venta||[]).forEach(function(p){ out.push({nota:nv, pago:p}); });
+  });
+  out.sort(function(a,b){
+    var ka = (a.pago.fecha_pago||'')+'|'+String(a.pago.id).padStart(10,'0'), kb = (b.pago.fecha_pago||'')+'|'+String(b.pago.id).padStart(10,'0');
+    return ka<kb?1:(ka>kb?-1:0);
+  });
+  return out;
+}
+function renderRecibosRows(){
+  var q = (document.getElementById('rcSearch').value||'').toLowerCase();
+  var desde = document.getElementById('rcDesde').value || '';
+  var hasta = document.getElementById('rcHasta').value || '';
+  var rows = recibosLista().filter(function(r){
+    var f = r.pago.fecha_pago || '';
+    if(desde && f < desde) return false;
+    if(hasta && f > hasta) return false;
+    if(q){
+      var hay = ((r.pago.numero_recibo||'')+' '+(r.nota.cliente||'')+' '+(r.nota.numero_nota||'')+' '+(r.nota.numero_pedido||'')).toLowerCase();
+      if(hay.indexOf(q)===-1) return false;
+    }
+    return true;
+  });
+  var total = rows.reduce(function(s,r){ return s+(Number(r.pago.monto_bs)||0); }, 0);
+  document.getElementById('rcResumen').innerHTML = rows.length+' recibo'+(rows.length===1?'':'s')+' · <b>Bs '+fmt(total,2)+'</b>';
+  document.getElementById('recibosBody').innerHTML = rows.map(function(r, i){
+    var p = r.pago, nv = r.nota;
+    return '<tr data-i="'+i+'">'+
+      '<td><b>'+escapeHtml(p.numero_recibo||'—')+'</b></td>'+
+      '<td>'+fmtFecha(p.fecha_pago)+'</td>'+
+      '<td>'+escapeHtml(nv.cliente||'—')+'</td>'+
+      '<td>'+escapeHtml(nv.numero_nota||'—')+'</td>'+
+      '<td>'+escapeHtml(nv.numero_pedido||'—')+'</td>'+
+      '<td class="num"><b>'+fmt(p.monto_bs,2)+'</b></td>'+
+      '<td>'+escapeHtml(p.registrado_por_nombre||'—')+'</td>'+
+      '<td style="white-space:nowrap">'+
+        '<button class="ghost btn-rc-ver" title="Ver recibo">🧾 Ver</button> '+
+        '<button class="ghost btn-rc-pdf" title="Descargar recibo en PDF">⬇ PDF</button>'+
+        (p.comprobante_path ? ' <button class="ghost btn-rc-comp" title="Ver comprobante del pago">👁 Comprobante</button>' : '')+
+      '</td>'+
+    '</tr>';
+  }).join('') || '<tr><td colspan="8" class="empty">Sin recibos para mostrar</td></tr>';
+  document.querySelectorAll('#recibosBody tr[data-i]').forEach(function(tr){
+    var r = rows[Number(tr.dataset.i)];
+    tr.querySelector('.btn-rc-ver').addEventListener('click', function(){ openReciboModal(r.nota, r.pago); });
+    tr.querySelector('.btn-rc-pdf').addEventListener('click', function(){
+      openReciboModal(r.nota, r.pago);
+      setTimeout(function(){ document.getElementById('btnDescargarReciboPdf').click(); }, 300);
+    });
+    var c = tr.querySelector('.btn-rc-comp');
+    if(c) c.addEventListener('click', function(){ verComprobantePago(r.pago.comprobante_path); });
+  });
+}
+document.getElementById('rcSearch').addEventListener('input', renderRecibosRows);
+document.getElementById('rcDesde').addEventListener('change', renderRecibosRows);
+document.getElementById('rcHasta').addEventListener('change', renderRecibosRows);
 
 /* ---- documento imprimible: nota de venta ---- */
 function renderNotaVentaDocCard(nota){
