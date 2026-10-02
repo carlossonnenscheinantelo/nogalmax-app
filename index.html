@@ -3568,18 +3568,27 @@ function submitPedidoVenta(){
   }
   var btn = document.getElementById('btnCrearPedidoVenta');
   btn.disabled = true;
-  sb.rpc('crear_pedido_venta', {
-    p_cliente: cliente, p_condicion_pago: condicion, p_condicion_pago_nota: condicionNota || null,
-    p_fecha_entrega: fechaEntrega, p_items: items, p_modo_entrega: modoEntrega, p_cuotas: cuotasPayload,
-    p_flete_bs: flete
-  }).then(function(res){
+  /* mismo cliente + mismo día de entrega = una sola nota de venta: se ofrece sumar al pedido que ya existe */
+  sb.rpc('pedido_mismo_dia', {p_cliente: cliente, p_fecha: fechaEntrega}).then(function(chk){
+    var ex = (!chk.error && chk.data && chk.data.length) ? chk.data[0] : null;
+    if(ex && window.confirm(cliente+' ya tiene el pedido '+ex.numero_pedido+' (nota '+ex.numero_nota+', Bs '+fmt(ex.total_bs,2)+') para el '+fmtFecha(ex.fecha)+'.\n\nSi recoge todo el mismo día, va en UNA sola nota de venta.\n¿Agregar estos productos a ese pedido y a la misma nota?\n\nAceptar = agregar a '+ex.numero_nota+'\nCancelar = crear un pedido y una nota aparte')){
+      sb.rpc('agregar_items_pedido_venta', {p_pedido_id: ex.pedido_id, p_items: items, p_flete_bs: flete}).then(function(res){ despuesPedido(res, ex); });
+    } else {
+      sb.rpc('crear_pedido_venta', {
+        p_cliente: cliente, p_condicion_pago: condicion, p_condicion_pago_nota: condicionNota || null,
+        p_fecha_entrega: fechaEntrega, p_items: items, p_modo_entrega: modoEntrega, p_cuotas: cuotasPayload,
+        p_flete_bs: flete
+      }).then(function(res){ despuesPedido(res, null); });
+    }
+  });
+  function despuesPedido(res, ex){
     btn.disabled = false;
-    if(res.error){ toast('No se pudo crear el pedido de venta: '+errMsg(res.error)); return; }
+    if(res.error){ toast((ex?'No se pudieron agregar los productos: ':'No se pudo crear el pedido de venta: ')+errMsg(res.error)); return; }
     var row = Array.isArray(res.data) ? res.data[0] : res.data;
     closePedidoVentaModal();
     var kgStock = pvLineas.reduce(function(t,l){ return t+pvAsignadoLinea(l); }, 0);
     var kgProd = pvLineas.reduce(function(t,l){ return t+pvAProducirLinea(l); }, 0);
-    var msg = 'Pedido de venta '+row.numero_pedido+' creado';
+    var msg = ex ? ('Productos agregados al pedido '+row.numero_pedido+' — misma nota '+ex.numero_nota) : ('Pedido de venta '+row.numero_pedido+' creado');
     if(kgStock>0) msg += ' — '+fmt(kgStock*1000,0)+' Kg tomados de stock (ya a nombre de '+cliente+')';
     if(kgProd>0) msg += (kgStock>0?' y ':' — ')+fmt(kgProd*1000,0)+' Kg mandados a producir';
     toast(msg);
@@ -3592,7 +3601,7 @@ function submitPedidoVenta(){
       var nota = notaVentaState.rows.find(function(nv){ return nv.pedido_venta_id===row.id; });
       if(nota) openNotaVentaDocModal(nota);
     });
-  });
+  }
 }
 
 /* ---- documento imprimible: fórmula por producto + total general ---- */
