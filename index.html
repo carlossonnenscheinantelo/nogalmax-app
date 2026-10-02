@@ -292,6 +292,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
 .pf-table.pf-6 th,.pf-table.pf-6 td{font-size:11px;padding-left:4px;padding-right:4px}
 .pf-table.pf-6 th:first-child,.pf-table.pf-6 td:first-child{width:24%}
 .pf-table.pf-6 th:nth-child(2),.pf-table.pf-6 td:nth-child(2){width:10%}
+.pf-table.pf-recibo th:first-child,.pf-table.pf-recibo td:first-child{width:30%}
 .bolsa-badge{display:inline-block;font-weight:700;font-size:13px;padding:6px 14px;border-radius:8px;margin:2px 0 12px;letter-spacing:.02em}
 .bolsa-naranja{background:#ff8c1a;color:#fff}
 .bolsa-verde{background:#2ea043;color:#fff}
@@ -1166,6 +1167,22 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
       <button class="close-x" id="btnCerrarPago">✕</button>
     </div>
     <div id="pagoBody" class="ocr-body"></div>
+  </div>
+</div>
+
+<div id="reciboModalOverlay" class="overlay2">
+  <div class="ocr-box" style="max-width:680px">
+    <div class="ocr-head">
+      <h3>Recibo de pago</h3>
+      <button class="close-x" id="btnCerrarRecibo">✕</button>
+    </div>
+    <div class="ocr-body">
+      <div id="reciboDocCard" class="fi-card"></div>
+      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+        <button class="primary" id="btnDescargarReciboPdf">⬇ Descargar PDF</button>
+      </div>
+      <p class="footnote">Recibo del pago a nombre del cliente, con el detalle de productos y lotes de la nota de venta y el saldo que queda.</p>
+    </div>
   </div>
 </div>
 
@@ -4373,7 +4390,8 @@ function renderPagoForm(){
   var t = notaTotales(nota);
   var esAdminPg = currentProfile && currentProfile.rol==='admin';
   var historial = t.pagos.slice().sort(function(a,b){ return (a.fecha_pago<b.fecha_pago)?1:-1; }).map(function(p){
-    return '<div class="line" data-pagoid="'+p.id+'"><span>'+fmtFecha(p.fecha_pago)+' — Bs '+fmt(p.monto_bs,2)+(p.registrado_por_nombre?(' · '+escapeHtml(p.registrado_por_nombre)):'')+'</span><span>'+
+    return '<div class="line" data-pagoid="'+p.id+'"><span>'+(p.numero_recibo?'<b>'+escapeHtml(p.numero_recibo)+'</b> · ':'')+fmtFecha(p.fecha_pago)+' — Bs '+fmt(p.monto_bs,2)+(p.registrado_por_nombre?(' · '+escapeHtml(p.registrado_por_nombre)):'')+'</span><span>'+
+      '<button type="button" class="ghost btn-recibo-pago" data-id="'+p.id+'" style="padding:2px 8px;font-size:11px">🧾 Recibo</button> '+
       (p.comprobante_path ? '<button type="button" class="ghost btn-ver-comprobante-pago" data-path="'+escapeHtml(p.comprobante_path)+'" style="padding:2px 8px;font-size:11px">👁 Ver</button>' : '')+
       (esAdminPg ? ' <button type="button" class="ghost danger btn-eliminar-pago" data-id="'+p.id+'" style="padding:2px 8px;font-size:11px">🗑️</button>' : '')+
     '</span></div>';
@@ -4404,6 +4422,12 @@ function renderPagoForm(){
       : '<p class="footnote" style="margin-top:12px">Esta nota de venta ya está totalmente pagada.</p>');
   document.querySelectorAll('.btn-ver-comprobante-pago').forEach(function(btn){
     btn.addEventListener('click', function(){ verComprobantePago(btn.dataset.path); });
+  });
+  document.querySelectorAll('.btn-recibo-pago').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var p = (pagoModalState.pagos_venta||[]).find(function(x){ return x.id===Number(btn.dataset.id); });
+      if(p) openReciboModal(pagoModalState, p);
+    });
   });
   document.querySelectorAll('.btn-eliminar-pago').forEach(function(btn){
     btn.addEventListener('click', function(){
@@ -4445,10 +4469,14 @@ function submitPago(){
     sb.rpc('registrar_pago_venta', { p_nota_venta_id: nota.id, p_monto_bs: monto, p_fecha_pago: fecha, p_comprobante_path: path }).then(function(res){
       btn.disabled = false;
       if(res.error){ toast('No se pudo registrar el pago: '+errMsg(res.error)); return; }
-      toast('Pago registrado');
+      var pagoRow = Array.isArray(res.data) ? res.data[0] : res.data;
+      toast('Pago registrado'+(pagoRow&&pagoRow.numero_recibo?' — recibo '+pagoRow.numero_recibo:''));
       fetchNotasVenta(function(){
         pagoModalState = notaVentaState.rows.find(function(x){return x.id===nota.id;}) || nota;
         renderPagoForm();
+        /* el recibo se genera solo con cada pago */
+        var pg = pagoRow && (pagoModalState.pagos_venta||[]).find(function(x){ return x.id===pagoRow.id; });
+        if(pg) openReciboModal(pagoModalState, pg);
         if(activeTab()==='pagos') renderPagosRows();
         if(activeTab()==='cuentasxcobrar') renderCuentasXCobrarRows(); if(activeTab()==='resumen') renderHomeCobros();
         if(activeTab()==='notasventa') renderNotasVentaRows();
@@ -4463,6 +4491,101 @@ function submitPago(){
     conArchivo(path);
   });
 }
+
+/* ---- recibo de pago (se genera solo al registrar cada pago) ---- */
+var reciboDocState = null; // {nota, pago}
+function numeroALetras(num){
+  var U=['','UNO','DOS','TRES','CUATRO','CINCO','SEIS','SIETE','OCHO','NUEVE','DIEZ','ONCE','DOCE','TRECE','CATORCE','QUINCE','DIECISÉIS','DIECISIETE','DIECIOCHO','DIECINUEVE','VEINTE','VEINTIUNO','VEINTIDÓS','VEINTITRÉS','VEINTICUATRO','VEINTICINCO','VEINTISÉIS','VEINTISIETE','VEINTIOCHO','VEINTINUEVE'];
+  var D=['','','','TREINTA','CUARENTA','CINCUENTA','SESENTA','SETENTA','OCHENTA','NOVENTA'];
+  var C=['','CIENTO','DOSCIENTOS','TRESCIENTOS','CUATROCIENTOS','QUINIENTOS','SEISCIENTOS','SETECIENTOS','OCHOCIENTOS','NOVECIENTOS'];
+  function dec(n){ if(n<30) return U[n]; var d=Math.floor(n/10), u=n%10; return D[d]+(u?' Y '+U[u]:''); }
+  function cen(n){ if(n===100) return 'CIEN'; var c=Math.floor(n/100), r=n%100; return (C[c]+(c&&r?' ':'')+(r?dec(r):'')).trim(); }
+  function apocope(s){ return s.replace(/VEINTIUNO$/,'VEINTIÚN').replace(/UNO$/,'UN'); }
+  function mil(n){ var m=Math.floor(n/1000), r=n%1000, s=''; if(m===1) s='MIL'; else if(m>1) s=apocope(cen(m))+' MIL'; return (s+(s&&r?' ':'')+(r?cen(r):'')).trim(); }
+  function mill(n){ var m=Math.floor(n/1000000), r=n%1000000, s=''; if(m===1) s='UN MILLÓN'; else if(m>1) s=apocope(mil(m))+' MILLONES'; return (s+(s&&r?' ':'')+(r?mil(r):'')).trim(); }
+  num = Math.round((Number(num)||0)*100)/100;
+  var entero = Math.floor(num), cent = Math.round((num-entero)*100);
+  if(cent===100){ entero++; cent=0; }
+  var txt = entero===0 ? 'CERO' : apocope(mill(entero));
+  return txt+' '+String(cent).padStart(2,'0')+'/100 BOLIVIANOS';
+}
+function renderReciboDocCard(nota, pago){
+  var t = notaTotales(nota);
+  var pv = nota.pedidos_venta || {};
+  var items = (pv.pedido_venta_items||[]).slice().sort(function(a,b){ return (a.orden||0)-(b.orden||0); });
+  function clave(p){ return (p.fecha_pago||'')+'|'+String(p.id).padStart(10,'0'); }
+  var pagos = t.pagos.slice().sort(function(a,b){ return clave(a)<clave(b)?-1:1; });
+  var antes = 0;
+  for(var i=0;i<pagos.length;i++){ if(pagos[i].id===pago.id) break; antes += Number(pagos[i].monto_bs)||0; }
+  antes = Math.round(antes*100)/100;
+  var monto = Number(pago.monto_bs)||0;
+  var saldoDespues = Math.max(0, Math.round((t.total - antes - monto)*100)/100);
+  var cancela = saldoDespues <= 0.005;
+  var flete = Number(pv.flete_bs)||0;
+  function metaItem(l,val){ return '<div class="doc-meta-item"><span class="l">'+l+'</span><span class="v">'+escapeHtml(String(val))+'</span></div>'; }
+  var filas = items.map(function(it){
+    return '<tr><td>'+escapeHtml(it.producto_nombre)+(it.variante?' <span class="muted" style="font-size:10px">('+escapeHtml(it.variante)+')</span>':'')+'</td>'+
+      '<td>'+escapeHtml(it.lote||'—')+'<br><span class="muted" style="font-size:10px">'+escapeHtml(it.numero_produccion||'')+'</span></td>'+
+      '<td class="num">'+fmt(it.cantidad_toneladas,3)+'</td>'+
+      '<td class="num">'+(it.precio_pactado!=null?fmt(it.precio_pactado,2):'—')+'</td>'+
+      '<td class="num">'+(it.total_pactado!=null?fmt(it.total_pactado,2):'—')+'</td></tr>';
+  }).join('') + (flete>0 ? '<tr><td>Flete</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num">'+fmt(flete,2)+'</td></tr>' : '');
+  document.getElementById('reciboDocCard').innerHTML =
+    '<div class="fi-head"><span class="fi-brand"><img src="'+LOGO_DATA_URI+'" class="fi-logo" alt="NOGALMAX"> Recibo de pago</span><span class="fi-date" style="font-size:14px;font-weight:700;color:var(--brand-dark)">'+escapeHtml(pago.numero_recibo||'')+'</span></div>'+
+    '<div class="doc-grand-total-box" style="margin-top:0">'+
+      '<div class="doc-meta-item"><span class="l">Recibí de</span><span class="v" style="font-size:15px">'+escapeHtml(nota.cliente||'—')+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">La suma de</span><span class="v" style="font-size:17px">'+fmtBs(monto)+'</span></div>'+
+      '<div style="font-size:11.5px;padding:4px 0 2px;color:var(--muted)">Son: <b style="color:#1c2128">'+numeroALetras(monto)+'</b></div>'+
+      '<div class="doc-meta-item"><span class="l">Por concepto de</span><span class="v">'+(cancela?'Cancelación':'Pago a cuenta')+' de la nota de venta '+escapeHtml(nota.numero_nota)+'</span></div>'+
+    '</div>'+
+    '<div class="doc-meta">'+
+      metaItem('Fecha de pago', fmtFecha(pago.fecha_pago))+
+      metaItem('N° Nota de venta', nota.numero_nota)+
+      metaItem('N° Pedido', nota.numero_pedido||'—')+
+      metaItem('Condición', pv.condicion_pago ? (CONDICION_PAGO_LABEL[pv.condicion_pago]||pv.condicion_pago)+(pv.condicion_pago_nota?(' · '+pv.condicion_pago_nota):'') : '—')+
+      metaItem('Registrado por', pago.registrado_por_nombre||'—')+
+      metaItem('Comprobante', pago.comprobante_path ? 'Adjunto en el sistema' : 'Sin comprobante')+
+    '</div>'+
+    '<div class="fi-section">Detalle de la venta</div>'+
+    '<table class="pf-table pf-recibo"><thead><tr><th>Producto</th><th>Lote</th><th class="num">Cant.<br>(Ton)</th><th class="num">Precio<br>(Bs/Ton)</th><th class="num">Total<br>(Bs)</th></tr></thead><tbody>'+filas+'</tbody></table>'+
+    '<div class="doc-grand-total-box">'+
+      '<div class="doc-meta-item"><span class="l">Total nota de venta</span><span class="v">'+fmtBs(t.total)+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">Pagado anteriormente</span><span class="v">'+fmtBs(antes)+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">Este pago ('+escapeHtml(pago.numero_recibo||'')+')</span><span class="v" style="color:var(--brand-dark)">'+fmtBs(monto)+'</span></div>'+
+      '<div class="doc-total-row">SALDO PENDIENTE: '+fmtBs(saldoDespues)+(cancela?' — NOTA CANCELADA':'')+'</div>'+
+    '</div>'+
+    '<div style="display:flex;justify-content:space-around;gap:30px;margin-top:46px;font-size:11px;color:var(--muted);text-align:center">'+
+      '<div style="flex:1;border-top:1px solid #1c2128;padding-top:4px">Recibí conforme<br><b style="color:#1c2128">NOGALMAX</b></div>'+
+      '<div style="flex:1;border-top:1px solid #1c2128;padding-top:4px">Entregué conforme<br><b style="color:#1c2128">'+escapeHtml(nota.cliente||'')+'</b></div>'+
+    '</div>'+
+    '<div class="fi-foot">Generado desde NOGALMAX — Precios y Fórmulas</div>';
+}
+function openReciboModal(nota, pago){
+  if(!nota || !pago) return;
+  reciboDocState = {nota:nota, pago:pago};
+  renderReciboDocCard(nota, pago);
+  document.getElementById('reciboModalOverlay').classList.add('active');
+}
+document.getElementById('btnCerrarRecibo').addEventListener('click', function(){
+  document.getElementById('reciboModalOverlay').classList.remove('active');
+});
+document.getElementById('btnDescargarReciboPdf').addEventListener('click', function(){
+  if(!reciboDocState) return;
+  if(typeof html2canvas === 'undefined'){ toast('No se pudo cargar el generador de documentos (revisá tu conexión a internet).'); return; }
+  var jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
+  if(!jsPDFCtor){ toast('No se pudo cargar el generador de PDF (revisá tu conexión a internet).'); return; }
+  var btn = document.getElementById('btnDescargarReciboPdf');
+  btn.disabled = true;
+  var st = reciboDocState;
+  html2canvas(document.getElementById('reciboDocCard'), {backgroundColor:'#ffffff', scale:2}).then(function(canvas){
+    var img = canvas.toDataURL('image/jpeg', 0.85);
+    var doc = new jsPDFCtor({unit:'mm', format:'a4', compress:true});
+    addImageFitted(doc, img, canvas);
+    doc.save('recibo_'+(st.pago.numero_recibo||'pago')+'_'+slugFilename(st.nota.cliente||'cliente')+'.pdf');
+    btn.disabled = false;
+    toast('Recibo descargado');
+  }).catch(function(err){ btn.disabled=false; toast('No se pudo generar el PDF: '+(err&&err.message?err.message:String(err))); });
+});
 
 /* ---- documento imprimible: nota de venta ---- */
 function renderNotaVentaDocCard(nota){
