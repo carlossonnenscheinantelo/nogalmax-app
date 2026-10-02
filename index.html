@@ -4571,7 +4571,8 @@ function renderReciboDocCard(nota, pago){
       '<td class="num">'+(it.total_pactado!=null?fmt(it.total_pactado,2):'—')+'</td></tr>';
   }).join('') + (flete>0 ? '<tr><td>Flete</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num">'+fmt(flete,2)+'</td></tr>' : '');
   document.getElementById('reciboDocCard').innerHTML =
-    '<div class="fi-head"><span class="fi-brand"><img src="'+LOGO_DATA_URI+'" class="fi-logo" alt="NOGALMAX"> Recibo de pago</span><span class="fi-date" style="font-size:18px;font-weight:700;color:var(--brand-dark)">'+escapeHtml(pago.numero_recibo||'')+'</span></div>'+
+    '<div class="fi-head"><span class="fi-brand"><img src="'+LOGO_DATA_URI+'" class="fi-logo" alt="NOGALMAX"></span><span class="fi-date" style="font-size:18px;font-weight:700;color:var(--brand-dark)">N° '+escapeHtml(pago.numero_recibo||'')+'</span></div>'+
+    '<div style="text-align:center;font-size:32px;font-weight:800;letter-spacing:.06em;color:var(--brand-dark);margin:6px 0 16px">RECIBO DE PAGO</div>'+
     '<div class="doc-grand-total-box" style="margin-top:0">'+
       '<div class="doc-meta-item"><span class="l">Recibí de</span><span class="v" style="font-size:19px">'+escapeHtml(nota.cliente||'—')+'</span></div>'+
       '<div class="doc-meta-item"><span class="l">La suma de</span><span class="v" style="font-size:23px">'+fmtBs(monto)+'</span></div>'+
