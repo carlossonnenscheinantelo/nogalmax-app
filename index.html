@@ -2810,7 +2810,7 @@ function renderOrdenesRows(){
       '<td>'+fmtFecha(o.fecha_pedido)+'</td>'+
       '<td><b>'+escapeHtml(o.numero_produccion)+'</b></td>'+
       '<td>'+escapeHtml(o.lote)+'</td>'+
-      '<td>'+escapeHtml(o.producto_nombre)+varianteTag(o.variante)+'</td>'+
+      '<td>'+escapeHtml(o.producto_nombre)+varianteTag(o.variante)+(o.bloqueado?' <span class="tag" style="background:#fde3e3;color:#b91c1c">🚫 '+escapeHtml(o.nota||'Bloqueado')+'</span>':'')+'</td>'+
       '<td class="num">'+fmt(o.cantidad_toneladas,2)+'</td>'+
       '<td>'+clienteLabel+'</td>'+
       '<td>'+(o.fecha_entrega?fmtFecha(o.fecha_entrega):'—')+'</td>'+
@@ -2895,7 +2895,7 @@ function renderStockFabricaRows(){
   // Solo entra acá lo YA producido (estado='completada') y todavía no despachado —
   // un pedido pendiente de fabricación NO debe aparecer en Stock en Fábrica bajo ningún concepto.
   var sinDespachar = ordenesState.rows.filter(function(o){ return o.estado==='completada' && !o.despachado; });
-  var disponibles = sinDespachar.filter(function(o){ return o.es_stock_fabrica; });
+  var disponibles = sinDespachar.filter(function(o){ return o.es_stock_fabrica && !o.bloqueado; });
   var porProducto = {};
   disponibles.forEach(function(o){
     if(!porProducto[o.producto_nombre]) porProducto[o.producto_nombre] = {cantidad:0, lotes:0};
@@ -2913,7 +2913,7 @@ function renderStockFabricaRows(){
     return hay.indexOf(q)!==-1;
   }).sort(function(a,b){ return (a.fecha_pedido<b.fecha_pedido)?1:-1; });
   bodyDet.innerHTML = filtrado.map(function(o){
-    var destino = o.es_stock_fabrica ? '<span class="tag">Disponible para stock</span>' : (escapeHtml(o.cliente||'—')+(o.desde_stock_existente?' <span class="tag">📦 desde stock</span>':''));
+    var destino = o.bloqueado ? '<span class="tag" style="background:#fde3e3;color:#b91c1c">🚫 Bloqueado'+(o.nota?' — '+escapeHtml(o.nota):'')+'</span>' : o.es_stock_fabrica ? '<span class="tag">Disponible para stock</span>' : (escapeHtml(o.cliente||'—')+(o.desde_stock_existente?' <span class="tag">📦 desde stock</span>':''));
     var estadoCell = '<span class="tag">Completada</span>';
     var despCantSf = Number(o.despachado_cantidad)||0;
     var saldoDespSf = Math.max(0, (Number(o.cantidad_toneladas)||0) - despCantSf);
@@ -2926,7 +2926,7 @@ function renderStockFabricaRows(){
     return '<tr data-id="'+o.id+'"'+(rowClass?' class="'+rowClass+'"':'')+'>'+
       '<td><b>'+escapeHtml(o.numero_produccion)+'</b></td>'+
       '<td>'+escapeHtml(o.lote)+'</td>'+
-      '<td>'+escapeHtml(o.producto_nombre)+varianteTag(o.variante)+'</td>'+
+      '<td>'+escapeHtml(o.producto_nombre)+varianteTag(o.variante)+(o.bloqueado?' <span class="tag" style="background:#fde3e3;color:#b91c1c">🚫 '+escapeHtml(o.nota||'Bloqueado')+'</span>':'')+'</td>'+
       '<td class="num">'+fmt(o.cantidad_toneladas,2)+'</td>'+
       '<td>'+destino+'</td>'+
       '<td>'+estadoCell+'</td>'+
@@ -2979,7 +2979,7 @@ function renderEntregadosRows(){
       '<td>'+fmtFecha(o.despachado_en)+'</td>'+
       '<td><b>'+escapeHtml(o.numero_produccion)+'</b></td>'+
       '<td>'+escapeHtml(o.pedido_venta_numero||'—')+'</td>'+
-      '<td>'+escapeHtml(o.producto_nombre)+varianteTag(o.variante)+'</td>'+
+      '<td>'+escapeHtml(o.producto_nombre)+varianteTag(o.variante)+(o.bloqueado?' <span class="tag" style="background:#fde3e3;color:#b91c1c">🚫 '+escapeHtml(o.nota||'Bloqueado')+'</span>':'')+'</td>'+
       '<td class="num">'+fmt(o.cantidad_toneladas,2)+'</td>'+
       '<td>'+clienteLabel+'</td>'+
       '<td>'+escapeHtml(o.despachado_por_nombre||'—')+'</td>'+
@@ -3339,7 +3339,7 @@ function renderPvCuotas(){
 function dispStock(o){ return Math.max(0, Math.round(((Number(o.cantidad_toneladas)||0) - (Number(o.despachado_cantidad)||0))*10000)/10000); }
 function stockDisponiblePorHoja(hoja){
   if(!ordenesState.loaded || !hoja) return [];
-  return ordenesState.rows.filter(function(o){ return o.producto_hoja===hoja && o.es_stock_fabrica && o.estado==='completada' && !o.despachado && dispStock(o)>0.0005; })
+  return ordenesState.rows.filter(function(o){ return o.producto_hoja===hoja && o.es_stock_fabrica && !o.bloqueado && o.estado==='completada' && !o.despachado && dispStock(o)>0.0005; })
     .sort(function(a,b){ if(a.fecha_pedido!==b.fecha_pedido) return (a.fecha_pedido<b.fecha_pedido)?-1:1; return a.id-b.id; });
 }
 function pvAsignadoLinea(l){ var t=0; Object.keys(l.asig||{}).forEach(function(k){ t += Number(l.asig[k])||0; }); return Math.round(t*10000)/10000; }
