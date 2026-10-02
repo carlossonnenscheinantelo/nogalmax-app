@@ -729,9 +729,11 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
   <section id="view-compras" class="view">
     <div class="toolbar">
       <input type="search" id="comprasSearch" placeholder="Buscar por insumo, proveedor o notas…">
+      <label class="inline-field" style="align-items:center;flex-direction:row;gap:6px"><input type="checkbox" id="comprasVerAnuladas"> Mostrar anuladas</label>
       <div class="spacer"></div>
       <button class="primary" id="btnNuevaCompra">+ Nueva compra</button>
     </div>
+    <div id="comprasResumen" class="footnote" style="margin:4px 0 8px"></div>
     <div class="table-wrap">
       <table>
         <thead><tr>
@@ -739,17 +741,21 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
           <th class="sortable" data-k="insumo_nombre">Insumo</th>
           <th class="sortable" data-k="proveedor">Proveedor</th>
           <th class="num">Cantidad</th>
-          <th class="num">Precio unit.</th>
-          <th class="num">Total</th>
+          <th class="num sortable" data-k="monto_total">Total Bs</th>
+          <th class="num">P. unit.</th>
+          <th>Doc.</th>
+          <th class="num">Costo valorizado</th>
+          <th class="num">Precio insumo</th>
           <th class="num">Flete</th>
           <th>Condición</th>
-          <th>Comprobantes</th>
+          <th>Fotos</th>
           <th>Notas</th>
+          <th></th>
         </tr></thead>
         <tbody id="comprasBody"></tbody>
       </table>
     </div>
-    <p class="footnote">Registrá acá cada compra de insumo junto con su comprobante (factura o recibo) — el sistema ayuda a detectar los montos de la imagen. El flete, cuando corresponde, se registra con su propio comprobante separado. Cada compra suma al stock del insumo y, si marcás la casilla, también actualiza su precio (igual que en «📦 Stock de Insumos»).</p>
+    <p class="footnote">Cada compra <b>suma automáticamente al stock</b> del insumo y lo <b>valoriza</b>: con factura se toma el costo sin IVA (×0,87, crédito fiscal 13%) y, si marcás la casilla, se suma el flete. El precio del insumo se recalcula por <b>costo promedio ponderado</b> (stock anterior × precio anterior + costo de la compra) ÷ stock nuevo — o, si elegís, con el precio de esta compra. El nuevo precio impacta solo en todas las fórmulas y listas. Solo un administrador puede anular una compra (revierte stock y precio).</p>
   </section>
 
   <!-- PAGOS DE COMPRAS -->
@@ -1156,7 +1162,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
 </div>
 
 <div id="compraModalOverlay" class="overlay2">
-  <div class="ocr-box" style="max-width:600px">
+  <div class="ocr-box" style="max-width:680px">
     <div class="ocr-head">
       <h3>Nueva compra de insumo</h3>
       <button class="close-x" id="btnCerrarCompra">✕</button>
@@ -1311,7 +1317,7 @@ var pagoModalState = null; // nota_venta row actual del modal de pago
 var pagoFile = null;
 var notaVentaDocState = null;
 var stockIngState = { rows: [], offset: 0, pageSize: 60, loading:false, loaded:false };
-var comprasState = { loaded:false, rows: [] };
+var comprasState = { loaded:false, rows: [], anuladas: [] };
 var comprasSort = { k:'fecha', dir:-1 };
 var compraFile = null;
 var compraFleteFile = null;
@@ -2668,8 +2674,8 @@ function renderStockIngresosRows(){
   document.getElementById('stockIngresosList').innerHTML = stockIngState.rows.map(function(r){
     return '<div class="hist-row">'+
       '<div class="when">'+fmtFecha(r.fecha)+'</div>'+
-      '<div><span class="who">'+escapeHtml(r.insumo_nombre)+'</span><br><span class="muted">'+escapeHtml(r.usuario_nombre||'')+'</span></div>'+
-      '<div class="hist-diff"><div>+'+fmt(r.cantidad, r.cantidad%1===0?0:2)+'</div>'+
+      '<div><span class="who">'+escapeHtml(r.insumo_nombre)+'</span>'+(r.anulado?' <span class="k-warn" style="font-size:11px">ANULADO</span>':'')+'<br><span class="muted">'+escapeHtml(r.usuario_nombre||'')+'</span></div>'+
+      '<div class="hist-diff"'+(r.anulado?' style="text-decoration:line-through;opacity:.5"':'')+'><div>+'+fmt(r.cantidad, r.cantidad%1===0?0:2)+'</div>'+
         (r.precio_unitario!=null ? '<div class="muted" style="font-size:11px">Precio: '+fmt(r.precio_unitario,3)+(r.actualizo_precio?' (actualizado en el insumo)':'')+'</div>' : '')+
       '</div><div></div></div>';
   }).join('') || '<div class="empty">Sin ingresos registrados todavía</div>';
@@ -5511,7 +5517,9 @@ function renderCompras(forceReload){
 function fetchCompras(cb){
   sb.from('compras_insumos').select('*, pagos_compra(*)').order('fecha',{ascending:false}).order('id',{ascending:false}).then(function(res){
     if(res.error){ toast('No se pudieron cargar las compras: '+errMsg(res.error)); return; }
-    comprasState.rows = res.data || [];
+    var all = res.data || [];
+    comprasState.rows = all.filter(function(c){ return !c.anulada; });
+    comprasState.anuladas = all.filter(function(c){ return !!c.anulada; });
     comprasState.loaded = true;
     if(cb) cb();
   });
@@ -5532,7 +5540,9 @@ function compraTotales(compra){
 }
 function renderComprasRows(){
   var q = (document.getElementById('comprasSearch').value||'').toLowerCase();
-  var rows = comprasState.rows.filter(function(c){
+  var verAnul = document.getElementById('comprasVerAnuladas').checked;
+  var base = comprasState.rows.concat(verAnul ? (comprasState.anuladas||[]) : []);
+  var rows = base.filter(function(c){
     if(!q) return true;
     var hay = (c.insumo_nombre+' '+(c.proveedor||'')+' '+(c.notas||'')).toLowerCase();
     return hay.indexOf(q)!==-1;
@@ -5540,37 +5550,72 @@ function renderComprasRows(){
   rows.sort(function(a,b){
     var k=comprasSort.k, d=comprasSort.dir, av=a[k], bv=b[k];
     if(av==null) av=''; if(bv==null) bv='';
+    if(k==='monto_total'){ av=Number(av)||0; bv=Number(bv)||0; }
     if(typeof av==='string') return av.localeCompare(bv)*d;
     return (av-bv)*d;
   });
+  var esAdminC = currentProfile && currentProfile.rol==='admin';
+  var hoy = new Date(); var mesKey = hoy.toISOString().slice(0,7);
+  var totMes = 0, nMes = 0;
+  comprasState.rows.forEach(function(c){ if((c.fecha||'').slice(0,7)===mesKey){ totMes += Number(c.monto_total)||0; nMes++; } });
+  document.getElementById('comprasResumen').innerHTML = 'Este mes: <b>'+nMes+'</b> compra'+(nMes===1?'':'s')+' por <b>Bs '+fmt(totMes,2)+'</b>';
   document.getElementById('comprasBody').innerHTML = rows.map(function(c){
     var comprobantes = '';
-    if(c.comprobante_compra_path) comprobantes += '<button class="ghost btn-ver-comprobante" data-path="'+escapeHtml(c.comprobante_compra_path)+'" data-titulo="Comprobante de compra">🧾 Compra</button> ';
-    if(c.comprobante_flete_path) comprobantes += '<button class="ghost btn-ver-comprobante" data-path="'+escapeHtml(c.comprobante_flete_path)+'" data-titulo="Comprobante de flete">🚚 Flete</button> ';
-    if(c.comprobante_pago_path) comprobantes += '<button class="ghost btn-ver-comprobante-pago-c" data-path="'+escapeHtml(c.comprobante_pago_path)+'" data-titulo="Comprobante de pago">💳 Pago</button>';
+    if(c.comprobante_compra_path) comprobantes += '<button class="ghost btn-ver-comprobante" data-path="'+escapeHtml(c.comprobante_compra_path)+'" data-titulo="'+(c.tipo_documento==='recibo'?'Recibo':'Factura / recibo')+'">📄 '+(c.tipo_documento==='recibo'?'Recibo':'Factura')+'</button> ';
+    if(c.comprobante_pago_path) comprobantes += '<button class="ghost btn-ver-comprobante-pago-c" data-path="'+escapeHtml(c.comprobante_pago_path)+'" data-titulo="Comprobante de pago">💳 Pago</button> ';
+    if(c.comprobante_flete_path) comprobantes += '<button class="ghost btn-ver-comprobante" data-path="'+escapeHtml(c.comprobante_flete_path)+'" data-titulo="Comprobante de flete">🚚 Flete</button>';
     if(!comprobantes) comprobantes = '<span class="muted">—</span>';
     var condTxt = c.condicion_pago==='credito' ? ('Crédito'+(c.dias_credito?(' a '+c.dias_credito+' días'):'')+(c.fecha_vencimiento_pago?('<br><span class="muted" style="font-size:11px">vence '+fmtFecha(c.fecha_vencimiento_pago)+'</span>'):'')) : 'Contado';
-    return '<tr data-id="'+c.id+'">'+
+    var docTxt = c.tipo_documento==='factura' ? 'Factura' : (c.tipo_documento==='recibo' ? 'Recibo' : '<span class="muted">—</span>');
+    var metodoTxt = c.metodo_valor==='promedio' ? 'promedio' : (c.metodo_valor==='ultimo' ? 'últ. compra' : (c.metodo_valor==='ninguno'?'sin cambio':''));
+    var precioTxt = (c.precio_nuevo!=null) ? (fmt(c.precio_nuevo,3)+(c.precio_anterior!=null && Number(c.precio_anterior)!==Number(c.precio_nuevo)?'<br><span class="muted" style="font-size:11px">antes '+fmt(c.precio_anterior,3)+(metodoTxt?' · '+metodoTxt:'')+'</span>':'')) : '<span class="muted">—</span>';
+    var accion = '';
+    if(c.anulada) accion = '<span class="k-warn" style="font-size:11px">ANULADA'+(c.anulada_por_nombre?'<br>por '+escapeHtml(c.anulada_por_nombre):'')+'</span>';
+    else if(esAdminC) accion = '<button class="ghost btn-anular-compra" data-id="'+c.id+'" title="Anular compra (revierte stock y precio)">✕ Anular</button>';
+    return '<tr data-id="'+c.id+'"'+(c.anulada?' style="opacity:.5;text-decoration:line-through"':'')+'>'+
       '<td>'+fmtFecha(c.fecha)+'</td>'+
       '<td>'+escapeHtml(c.insumo_nombre)+'</td>'+
       '<td>'+escapeHtml(c.proveedor||'—')+'</td>'+
       '<td class="num">'+fmt(c.cantidad,2)+'</td>'+
-      '<td class="num">'+fmt(c.precio_unitario,2)+'</td>'+
-      '<td class="num">'+fmt(c.monto_total,2)+'</td>'+
-      '<td class="num">'+(c.monto_flete?fmt(c.monto_flete,2):'—')+'</td>'+
+      '<td class="num"><b>'+fmt(c.monto_total,2)+'</b></td>'+
+      '<td class="num">'+fmt(c.precio_unitario,3)+'</td>'+
+      '<td>'+docTxt+'</td>'+
+      '<td class="num">'+(c.costo_unitario!=null?fmt(c.costo_unitario,3):'<span class="muted">—</span>')+'</td>'+
+      '<td class="num">'+precioTxt+'</td>'+
+      '<td class="num">'+(c.monto_flete?fmt(c.monto_flete,2)+(c.flete_en_costo?'<br><span class="muted" style="font-size:11px">en costo</span>':''):'—')+'</td>'+
       '<td>'+condTxt+'</td>'+
       '<td>'+comprobantes+'</td>'+
-      '<td>'+escapeHtml(c.notas||'—')+'</td>'+
+      '<td>'+escapeHtml(c.notas||'—')+(c.motivo_anulacion?'<br><span class="muted" style="font-size:11px">Motivo: '+escapeHtml(c.motivo_anulacion)+'</span>':'')+'</td>'+
+      '<td>'+accion+'</td>'+
     '</tr>';
-  }).join('') || '<tr><td colspan="10" class="empty">Sin compras registradas</td></tr>';
+  }).join('') || '<tr><td colspan="14" class="empty">Sin compras registradas</td></tr>';
   document.querySelectorAll('.btn-ver-comprobante').forEach(function(btn){
     btn.addEventListener('click', function(){ verComprobante(btn.dataset.path, btn.dataset.titulo); });
   });
   document.querySelectorAll('.btn-ver-comprobante-pago-c').forEach(function(btn){
     btn.addEventListener('click', function(){ verComprobantePagoCompra(btn.dataset.path, btn.dataset.titulo); });
   });
+  document.querySelectorAll('.btn-anular-compra').forEach(function(btn){
+    btn.addEventListener('click', function(){ anularCompra(Number(btn.dataset.id)); });
+  });
+}
+function anularCompra(id){
+  var c = comprasState.rows.find(function(x){ return x.id===id; });
+  if(!c) return;
+  var motivo = window.prompt('¿Anular la compra de '+fmt(c.cantidad,2)+' de '+c.insumo_nombre+' por Bs '+fmt(c.monto_total,2)+'?\nSe descontará del stock y, si nadie cambió el precio después, se vuelve al precio anterior.\n\nMotivo (opcional):', '');
+  if(motivo===null) return;
+  sb.rpc('anular_compra_insumo', {p_compra_id: id, p_motivo: motivo||null}).then(function(res){
+    if(res.error){ toast('No se pudo anular: '+errMsg(res.error)); return; }
+    toast('Compra anulada — stock y precio revertidos');
+    fetchCompras(function(){
+      if(activeTab()==='compras') renderComprasRows();
+      if(activeTab()==='pagoscompra') renderPagosCompraRows();
+      if(activeTab()==='cxpagar') renderCXPagarRows();
+    });
+  });
 }
 document.getElementById('comprasSearch').addEventListener('input', renderComprasRows);
+document.getElementById('comprasVerAnuladas').addEventListener('change', renderComprasRows);
 document.querySelectorAll('#view-compras th.sortable').forEach(function(th){
   th.addEventListener('click', function(){
     var k = th.dataset.k;
@@ -5620,39 +5665,87 @@ function wireCompraOcr(inputId, chipWrapId, targetFieldId, btnId){
     });
   });
 }
+function compraInsumoOptions(filtro, selectedId){
+  var f = (filtro||'').toLowerCase();
+  var list = state.insumos.slice().sort(function(a,b){return a.nombre.localeCompare(b.nombre);}).filter(function(i){ return !f || i.nombre.toLowerCase().indexOf(f)!==-1 || i.id===selectedId; });
+  return '<option value="">— elegí un insumo del stock —</option>' + list.map(function(i){
+    var u = i.tipo==='envase' ? 'u' : 'kg';
+    return '<option value="'+i.id+'"'+(selectedId===i.id?' selected':'')+'>'+escapeHtml(i.nombre)+' — stock '+fmt(i.stockActual,0)+' '+u+' · Bs '+fmt(i.precioIngresado,2)+'/'+u+'</option>';
+  }).join('');
+}
+function compraCalc(){
+  var ins = state.insumos.find(function(i){ return i.id===Number(document.getElementById('cp_insumo').value); });
+  var cant = parseFloat(document.getElementById('cp_cantidad').value);
+  var total = parseFloat(document.getElementById('cp_total').value);
+  var doc = document.getElementById('cp_documento').value;
+  var flete = parseFloat(document.getElementById('cp_flete').value) || 0;
+  var fleteEnCosto = document.getElementById('cp_fleteEnCosto').checked;
+  var metodo = document.getElementById('cp_metodo').value;
+  var u = ins && ins.tipo==='envase' ? 'u' : 'kg';
+  document.getElementById('cp_unidadLbl').textContent = ins ? '('+(ins.tipo==='envase'?'unidades':'kg')+')' : '';
+  var info = document.getElementById('cp_insumoInfo');
+  info.innerHTML = ins ? ('Stock actual: <b>'+fmt(ins.stockActual,2)+' '+u+'</b> · Precio actual: <b>Bs '+fmt(ins.precioIngresado,3)+'/'+u+'</b> · Valor del stock: <b>Bs '+fmt(Math.max(ins.stockActual,0)*ins.precioIngresado,2)+'</b>') : '';
+  var pu = (cant>0 && total>=0) ? total/cant : null;
+  document.getElementById('cp_unitario').textContent = pu!=null ? ('Bs '+fmt(pu,3)+' / '+u) : '—';
+  var prev = document.getElementById('cp_valorPreview');
+  if(!ins || !(cant>0) || isNaN(total)){ prev.innerHTML = '<span class="muted">Completá insumo, cantidad y precio total para ver cómo queda valorizado.</span>'; return; }
+  var costoTotal = (doc==='factura' ? total*0.87 : total) + (fleteEnCosto ? flete : 0);
+  var costoU = costoTotal/cant;
+  var stockPrev = ins.stockActual, precioPrev = ins.precioIngresado, base = Math.max(stockPrev,0);
+  var precioNuevo;
+  if(metodo==='ninguno') precioNuevo = precioPrev;
+  else if(metodo==='ultimo' || precioPrev<=0 || base===0) precioNuevo = costoU;
+  else precioNuevo = (base*precioPrev + costoTotal)/(base+cant);
+  var stockNuevo = stockPrev + cant;
+  prev.innerHTML =
+    '<div>Costo de esta compra'+(doc==='factura'?' (sin IVA)':'')+(fleteEnCosto&&flete?' + flete':'')+': <b>Bs '+fmt(costoTotal,2)+'</b> → <b>Bs '+fmt(costoU,3)+'/'+u+'</b></div>'+
+    '<div>Stock: '+fmt(stockPrev,2)+' + '+fmt(cant,2)+' = <b>'+fmt(stockNuevo,2)+' '+u+'</b></div>'+
+    '<div>Precio del insumo: '+fmt(precioPrev,3)+' → <b style="color:var(--accent,#0a7)">'+fmt(precioNuevo,3)+' Bs/'+u+'</b>'+(metodo==='ninguno'?' (sin cambio)':'')+'</div>'+
+    '<div>Valor del stock después: <b>Bs '+fmt(Math.max(stockNuevo,0)*precioNuevo,2)+'</b></div>'+
+    (stockPrev<0 ? '<div class="k-warn" style="font-size:12px">El stock actual está en negativo: para el promedio se toma como 0.</div>' : '');
+}
+function compraFotoField(id, label, ocr){
+  return '<div class="inline-field"><label>'+label+'</label><input type="file" id="'+id+'" accept="image/*"></div>'+
+    '<div id="'+id+'_prev"></div>'+
+    (ocr ? '<button type="button" class="ghost" id="'+id+'_ocr" style="margin-top:6px">🔍 Detectar montos en la imagen</button><div id="'+id+'_chips"></div>' : '');
+}
 function renderCompraForm(){
   compraFile = null; compraFleteFile = null; compraPagoFile = null;
   document.getElementById('compraBody').innerHTML =
-    '<div class="inline-field"><label>Insumo</label><select id="cp_insumo" style="min-width:240px">'+buildInsumoOptionsPlain(null)+'</select></div>'+
-    '<div class="inline-field"><label>Proveedor</label><input type="text" id="cp_proveedor" list="proveedoresDatalist" style="min-width:200px" placeholder="Nombre del proveedor"></div>'+
+    '<div class="section-title">1. Insumo</div>'+
+    '<div class="inline-field"><label>Buscar</label><input type="search" id="cp_insumoFiltro" placeholder="Escribí para filtrar…" style="min-width:200px"></div>'+
+    '<div class="inline-field"><label>Insumo</label><select id="cp_insumo" style="min-width:260px;max-width:100%">'+compraInsumoOptions('',null)+'</select></div>'+
+    '<div id="cp_insumoInfo" class="footnote" style="margin:4px 0"></div>'+
+    '<div class="section-title" style="margin-top:14px">2. Compra</div>'+
     '<div class="inline-field"><label>Fecha</label><input type="date" id="cp_fecha" value="'+new Date().toISOString().slice(0,10)+'"></div>'+
-    '<div class="inline-field"><label>Cantidad</label><input type="number" step="0.01" min="0.01" id="cp_cantidad" class="pill-input"></div>'+
-    '<div class="inline-field"><label>Precio unitario</label><input type="number" step="0.01" min="0" id="cp_precio" class="pill-input"></div>'+
-    '<div class="inline-field"><label>¿Actualizar precio del insumo?</label><input type="checkbox" id="cp_actualizarPrecio"></div>'+
-    '<div class="inline-field"><label>Monto de flete (opcional — comprobante separado)</label><input type="number" step="0.01" min="0" id="cp_flete" class="pill-input" placeholder="0"></div>'+
-    '<div class="section-title" style="margin-top:14px">Comprobante de compra (factura / recibo)</div>'+
-    '<div class="inline-field"><input type="file" id="cp_fileCompra" accept="image/*"></div>'+
-    '<div id="cp_previewCompra"></div>'+
-    '<button type="button" class="ghost" id="cp_btnDetectCompra" style="margin-top:6px">🔍 Detectar montos en la imagen</button>'+
-    '<div id="cp_chipsCompra"></div>'+
-    '<div class="section-title" style="margin-top:14px">Comprobante de flete (opcional, separado)</div>'+
-    '<div class="inline-field"><input type="file" id="cp_fileFlete" accept="image/*"></div>'+
-    '<div id="cp_previewFlete"></div>'+
-    '<button type="button" class="ghost" id="cp_btnDetectFlete" style="margin-top:6px">🔍 Detectar montos en la imagen</button>'+
-    '<div id="cp_chipsFlete"></div>'+
-    '<div class="section-title" style="margin-top:14px">Condición de pago</div>'+
+    '<div class="inline-field"><label>Proveedor</label><input type="text" id="cp_proveedor" list="proveedoresDatalist" style="min-width:200px" placeholder="Nombre del proveedor"></div>'+
+    '<div class="inline-field"><label>Cantidad <span id="cp_unidadLbl" class="muted"></span></label><input type="number" step="0.01" min="0.01" id="cp_cantidad" class="pill-input"></div>'+
+    '<div class="inline-field"><label>Precio TOTAL pagado (Bs)</label><input type="number" step="0.01" min="0" id="cp_total" class="pill-input"></div>'+
+    '<div class="inline-field"><label>Precio unitario</label><span id="cp_unitario" style="font-weight:600">—</span></div>'+
+    '<div class="inline-field"><label>Documento</label><select id="cp_documento"><option value="factura">Factura (costo sin IVA: ×0,87)</option><option value="recibo">Recibo (sin factura)</option></select></div>'+
+    '<div class="inline-field"><label>Flete (opcional, Bs)</label><input type="number" step="0.01" min="0" id="cp_flete" class="pill-input" placeholder="0"></div>'+
+    '<div class="inline-field"><label>¿Sumar el flete al costo del insumo?</label><input type="checkbox" id="cp_fleteEnCosto" checked></div>'+
+    '<div class="section-title" style="margin-top:14px">3. Valorización</div>'+
+    '<div class="inline-field"><label>Nuevo precio del insumo</label><select id="cp_metodo">'+
+      '<option value="promedio">Costo promedio ponderado (recomendado)</option>'+
+      '<option value="ultimo">Precio de esta compra</option>'+
+      '<option value="ninguno">No cambiar el precio</option>'+
+    '</select></div>'+
+    '<div id="cp_valorPreview" class="footnote" style="background:var(--panel2,#f5f7f6);padding:8px 10px;border-radius:8px;margin-top:6px"></div>'+
+    '<div class="section-title" style="margin-top:14px">4. Fotos</div>'+
+    compraFotoField('cp_fileCompra','📄 Foto de la factura o recibo', true)+
+    '<div class="section-title" style="margin-top:14px">5. Pago</div>'+
     '<div class="inline-field"><label>¿Cómo se paga?</label><select id="cp_condicion">'+
-      '<option value="contado">Contado</option>'+
+      '<option value="contado">Contado (ya pagado)</option>'+
       '<option value="credito">Crédito</option>'+
     '</select></div>'+
     '<div class="inline-field" id="cp_diasCreditoWrap"><label>¿A cuántos días?</label><input type="number" step="1" min="1" id="cp_diasCredito" class="pill-input" placeholder="Ej: 30"></div>'+
     '<div id="cp_pagoContadoWrap">'+
-      '<div class="section-title" style="margin-top:14px">Comprobante de pago (distinto del comprobante de compra)</div>'+
-      '<div class="inline-field"><input type="file" id="cp_filePago" accept="image/*"></div>'+
-      '<div id="cp_previewPago"></div>'+
-      '<div class="inline-field" style="margin-top:10px"><label>Cuenta de origen (de dónde salió el dinero)</label><input type="text" id="cp_cuentaOrigen" style="min-width:220px" placeholder="Ej: Banco XX cta. 123 — Juan Pérez"></div>'+
+      compraFotoField('cp_filePago','💳 Foto del comprobante de pago (transferencia / depósito)', false)+
+      '<div class="inline-field" style="margin-top:10px"><label>Cuenta de origen (de dónde salió el dinero)</label><input type="text" id="cp_cuentaOrigen" style="min-width:220px" placeholder="Ej: Banco XX cta. 123"></div>'+
     '</div>'+
-    '<p class="footnote" id="cp_pagoCreditoNota" style="display:none">Como es al crédito, el comprobante de pago y la cuenta de origen se registran después, cuando se pague, desde «💳 Pagos de Compras».</p>'+
+    '<p class="footnote" id="cp_pagoCreditoNota" style="display:none">Como es al crédito, el comprobante de pago se sube después, cuando se pague, desde «💳 Pagos de Compras».</p>'+
+    '<details style="margin-top:10px"><summary class="muted" style="cursor:pointer">🚚 Comprobante de flete (opcional)</summary>'+compraFotoField('cp_fileFlete','Foto del comprobante de flete', true)+'</details>'+
     '<div class="inline-field" style="margin-top:14px"><label>Notas (opcional)</label><input type="text" id="cp_notas" style="min-width:220px"></div>'+
     '<div style="margin-top:16px;display:flex;gap:10px">'+
       '<button class="primary" id="btnGuardarCompra">Registrar compra</button>'+
@@ -5660,24 +5753,32 @@ function renderCompraForm(){
     '</div>';
   document.getElementById('btnCancelarCompra2').addEventListener('click', closeCompraModal);
   document.getElementById('btnGuardarCompra').addEventListener('click', submitCompra);
-  document.getElementById('cp_fileCompra').addEventListener('change', function(e){
-    compraFile = (e.target.files && e.target.files[0]) ? e.target.files[0] : null;
-    document.getElementById('cp_previewCompra').innerHTML = compraFile ? '<img src="'+URL.createObjectURL(compraFile)+'" style="max-width:220px;border-radius:8px;margin-top:6px">' : '';
-    document.getElementById('cp_chipsCompra').innerHTML = '';
+  document.getElementById('cp_insumoFiltro').addEventListener('input', function(e){
+    var sel = document.getElementById('cp_insumo'); var cur = Number(sel.value)||null;
+    sel.innerHTML = compraInsumoOptions(e.target.value, cur);
+    if(!cur){ var opts = sel.querySelectorAll('option[value]:not([value=""])'); if(opts.length===1){ sel.value = opts[0].value; } }
+    compraCalc();
   });
-  document.getElementById('cp_fileFlete').addEventListener('change', function(e){
-    compraFleteFile = (e.target.files && e.target.files[0]) ? e.target.files[0] : null;
-    document.getElementById('cp_previewFlete').innerHTML = compraFleteFile ? '<img src="'+URL.createObjectURL(compraFleteFile)+'" style="max-width:220px;border-radius:8px;margin-top:6px">' : '';
-    document.getElementById('cp_chipsFlete').innerHTML = '';
+  ['cp_insumo','cp_cantidad','cp_total','cp_documento','cp_flete','cp_fleteEnCosto','cp_metodo'].forEach(function(id){
+    var el = document.getElementById(id);
+    el.addEventListener('input', compraCalc); el.addEventListener('change', compraCalc);
   });
-  document.getElementById('cp_filePago').addEventListener('change', function(e){
-    compraPagoFile = (e.target.files && e.target.files[0]) ? e.target.files[0] : null;
-    document.getElementById('cp_previewPago').innerHTML = compraPagoFile ? '<img src="'+URL.createObjectURL(compraPagoFile)+'" style="max-width:220px;border-radius:8px;margin-top:6px">' : '';
-  });
-  wireCompraOcr('cp_fileCompra','cp_chipsCompra','cp_precio','cp_btnDetectCompra');
-  wireCompraOcr('cp_fileFlete','cp_chipsFlete','cp_flete','cp_btnDetectFlete');
+  function wireFoto(id, setter){
+    document.getElementById(id).addEventListener('change', function(e){
+      var f = (e.target.files && e.target.files[0]) ? e.target.files[0] : null;
+      setter(f);
+      document.getElementById(id+'_prev').innerHTML = f ? '<img src="'+URL.createObjectURL(f)+'" style="max-width:220px;border-radius:8px;margin-top:6px">' : '';
+      var ch = document.getElementById(id+'_chips'); if(ch) ch.innerHTML = '';
+    });
+  }
+  wireFoto('cp_fileCompra', function(f){ compraFile = f; });
+  wireFoto('cp_fileFlete', function(f){ compraFleteFile = f; });
+  wireFoto('cp_filePago', function(f){ compraPagoFile = f; });
+  wireCompraOcr('cp_fileCompra','cp_fileCompra_chips','cp_total','cp_fileCompra_ocr');
+  wireCompraOcr('cp_fileFlete','cp_fileFlete_chips','cp_flete','cp_fileFlete_ocr');
   document.getElementById('cp_condicion').addEventListener('change', actualizarCondicionPagoCompraVisibilidad);
   actualizarCondicionPagoCompraVisibilidad();
+  compraCalc();
   fetchProveedores(populateProveedoresDatalist);
 }
 /* al crédito, el comprobante de pago y la cuenta de origen se registran después (en Pagos de Compras) */
@@ -5699,63 +5800,65 @@ function submitCompra(){
   var proveedor = document.getElementById('cp_proveedor').value.trim();
   var fecha = document.getElementById('cp_fecha').value || null;
   var cantidad = parseFloat(document.getElementById('cp_cantidad').value);
-  var precio = parseFloat(document.getElementById('cp_precio').value);
-  var actualizarPrecio = document.getElementById('cp_actualizarPrecio').checked;
+  var total = parseFloat(document.getElementById('cp_total').value);
+  var documento = document.getElementById('cp_documento').value;
+  var metodo = document.getElementById('cp_metodo').value;
   var fleteStr = document.getElementById('cp_flete').value;
   var flete = fleteStr==='' ? null : parseFloat(fleteStr);
+  var fleteEnCosto = document.getElementById('cp_fleteEnCosto').checked;
   var notas = document.getElementById('cp_notas').value.trim();
   var condicion = document.getElementById('cp_condicion').value;
   var esCredito = condicion === 'credito';
   var diasCredito = esCredito ? parseInt(document.getElementById('cp_diasCredito').value, 10) : null;
   var cuentaOrigen = esCredito ? null : document.getElementById('cp_cuentaOrigen').value.trim();
-  if(!insumoId){ toast('Elegí un insumo'); return; }
+  if(!insumoId){ toast('Elegí un insumo del stock'); return; }
   if(!cantidad || cantidad<=0){ toast('Poné una cantidad válida'); return; }
-  if(!precio || isNaN(precio) || precio<0){ toast('Poné un precio unitario válido'); return; }
+  if(isNaN(total) || total<0){ toast('Poné el precio total de la compra'); return; }
   if(esCredito && (!diasCredito || isNaN(diasCredito) || diasCredito<=0)){ toast('Indicá a cuántos días de crédito corresponde'); return; }
+  if(!compraFile && !window.confirm('No subiste la foto de la factura o recibo. ¿Registrar igual?')) return;
   var btn = document.getElementById('btnGuardarCompra');
-  btn.disabled = true;
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  function fin(){ btn.disabled = false; btn.textContent = 'Registrar compra'; }
   function conArchivos(pathCompra, pathFlete, pathPago){
-    sb.rpc('registrar_compra_insumo', {
+    sb.rpc('registrar_compra_insumo_v2', {
       p_insumo_id: insumoId, p_proveedor: proveedor||null, p_fecha: fecha, p_cantidad: cantidad,
-      p_precio_unitario: precio, p_actualizar_precio: actualizarPrecio,
-      p_monto_flete: (flete===null||isNaN(flete))?null:flete,
+      p_precio_total: total, p_tipo_documento: documento, p_metodo_valor: metodo,
+      p_monto_flete: (flete===null||isNaN(flete))?null:flete, p_flete_en_costo: fleteEnCosto,
       p_comprobante_compra_path: pathCompra, p_comprobante_flete_path: pathFlete, p_notas: notas||null,
       p_condicion_pago: condicion, p_dias_credito: (esCredito?diasCredito:null),
       p_comprobante_pago_path: pathPago, p_cuenta_origen: cuentaOrigen||null
     }).then(function(res){
-      btn.disabled = false;
+      fin();
       if(res.error){ toast('No se pudo registrar la compra: '+errMsg(res.error)); return; }
       var row = Array.isArray(res.data) ? res.data[0] : res.data;
+      var ins = state.insumos.find(function(i){ return i.id===insumoId; });
+      if(ins && row){ ins.stockActual = Number(row.stock_anterior||0) + Number(row.cantidad||0); if(row.precio_nuevo!=null) ins.precioIngresado = Number(row.precio_nuevo); }
       fetchCompras(function(){
         closeCompraModal();
         if(activeTab()==='compras') renderComprasRows();
         if(activeTab()==='pagoscompra') renderPagosCompraRows();
         if(activeTab()==='cxpagar') renderCXPagarRows();
       });
-      toast('Compra registrada — stock actualizado');
+      toast('Compra registrada — stock sumado'+(row && row.precio_nuevo!=null && Number(row.precio_nuevo)!==Number(row.precio_anterior) ? ' y precio actualizado a Bs '+fmt(row.precio_nuevo,3) : ''));
     });
   }
-  var pathCompra = null, pathFlete = null, pathPago = null;
   var ts = Date.now();
   function subir(file, sufijo, bucket, cb){
     if(!file){ cb(null); return; }
     var ext = ((file.name||'').split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
     var path = 'compra_'+ts+'_'+sufijo+'.'+ext;
     sb.storage.from(bucket).upload(path, file, {upsert:false}).then(function(res){
-      if(res.error){ toast('No se pudo subir el comprobante: '+errMsg(res.error)); btn.disabled=false; cb(false); return; }
+      if(res.error){ toast('No se pudo subir la foto: '+errMsg(res.error)); fin(); cb(false); return; }
       cb(path);
     });
   }
   subir(compraFile, 'compra', 'comprobantes-compras', function(p1){
     if(p1===false) return;
-    pathCompra = p1;
     subir(compraFleteFile, 'flete', 'comprobantes-compras', function(p2){
       if(p2===false) return;
-      pathFlete = p2;
       subir(esCredito?null:compraPagoFile, 'pago', 'comprobantes-pagos-compra', function(p3){
         if(p3===false) return;
-        pathPago = p3;
-        conArchivos(pathCompra, pathFlete, pathPago);
+        conArchivos(p1, p2, p3);
       });
     });
   });
