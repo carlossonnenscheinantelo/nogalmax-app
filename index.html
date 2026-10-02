@@ -293,6 +293,16 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
 .pf-table.pf-6 th:first-child,.pf-table.pf-6 td:first-child{width:24%}
 .pf-table.pf-6 th:nth-child(2),.pf-table.pf-6 td:nth-child(2){width:10%}
 .pf-table.pf-recibo th:first-child,.pf-table.pf-recibo td:first-child{width:30%}
+/* recibo de pago: letra más grande */
+#reciboDocCard .fi-brand{font-size:20px}
+#reciboDocCard .fi-logo{height:30px}
+#reciboDocCard .doc-meta{font-size:15px;gap:7px 22px}
+#reciboDocCard .doc-meta-item{font-size:15px}
+#reciboDocCard .fi-section{font-size:13px}
+#reciboDocCard .pf-table th{font-size:12.5px}
+#reciboDocCard .pf-table td{font-size:15px;padding:8px 4px}
+#reciboDocCard .doc-total-row{font-size:18px}
+#reciboDocCard .fi-foot{font-size:12px}
 .bolsa-badge{display:inline-block;font-weight:700;font-size:13px;padding:6px 14px;border-radius:8px;margin:2px 0 12px;letter-spacing:.02em}
 .bolsa-naranja{background:#ff8c1a;color:#fff}
 .bolsa-verde{background:#2ea043;color:#fff}
@@ -4554,18 +4564,18 @@ function renderReciboDocCard(nota, pago){
   var flete = Number(pv.flete_bs)||0;
   function metaItem(l,val){ return '<div class="doc-meta-item"><span class="l">'+l+'</span><span class="v">'+escapeHtml(String(val))+'</span></div>'; }
   var filas = items.map(function(it){
-    return '<tr><td>'+escapeHtml(it.producto_nombre)+(it.variante?' <span class="muted" style="font-size:10px">('+escapeHtml(it.variante)+')</span>':'')+'</td>'+
-      '<td>'+escapeHtml(it.lote||'—')+'<br><span class="muted" style="font-size:10px">'+escapeHtml(it.numero_produccion||'')+'</span></td>'+
+    return '<tr><td>'+escapeHtml(it.producto_nombre)+(it.variante?' <span class="muted" style="font-size:12px">('+escapeHtml(it.variante)+')</span>':'')+'</td>'+
+      '<td>'+escapeHtml(it.lote||'—')+'<br><span class="muted" style="font-size:12px">'+escapeHtml(it.numero_produccion||'')+'</span></td>'+
       '<td class="num">'+fmt(it.cantidad_toneladas,3)+'</td>'+
       '<td class="num">'+(it.precio_pactado!=null?fmt(it.precio_pactado,2):'—')+'</td>'+
       '<td class="num">'+(it.total_pactado!=null?fmt(it.total_pactado,2):'—')+'</td></tr>';
   }).join('') + (flete>0 ? '<tr><td>Flete</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num">'+fmt(flete,2)+'</td></tr>' : '');
   document.getElementById('reciboDocCard').innerHTML =
-    '<div class="fi-head"><span class="fi-brand"><img src="'+LOGO_DATA_URI+'" class="fi-logo" alt="NOGALMAX"> Recibo de pago</span><span class="fi-date" style="font-size:14px;font-weight:700;color:var(--brand-dark)">'+escapeHtml(pago.numero_recibo||'')+'</span></div>'+
+    '<div class="fi-head"><span class="fi-brand"><img src="'+LOGO_DATA_URI+'" class="fi-logo" alt="NOGALMAX"> Recibo de pago</span><span class="fi-date" style="font-size:18px;font-weight:700;color:var(--brand-dark)">'+escapeHtml(pago.numero_recibo||'')+'</span></div>'+
     '<div class="doc-grand-total-box" style="margin-top:0">'+
-      '<div class="doc-meta-item"><span class="l">Recibí de</span><span class="v" style="font-size:15px">'+escapeHtml(nota.cliente||'—')+'</span></div>'+
-      '<div class="doc-meta-item"><span class="l">La suma de</span><span class="v" style="font-size:17px">'+fmtBs(monto)+'</span></div>'+
-      '<div style="font-size:11.5px;padding:4px 0 2px;color:var(--muted)">Son: <b style="color:#1c2128">'+numeroALetras(monto)+'</b></div>'+
+      '<div class="doc-meta-item"><span class="l">Recibí de</span><span class="v" style="font-size:19px">'+escapeHtml(nota.cliente||'—')+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">La suma de</span><span class="v" style="font-size:23px">'+fmtBs(monto)+'</span></div>'+
+      '<div style="font-size:14px;padding:6px 0 4px;color:var(--muted)">Son: <b style="color:#1c2128">'+numeroALetras(monto)+'</b></div>'+
       '<div class="doc-meta-item"><span class="l">Por concepto de</span><span class="v">'+(cancela?'Cancelación':'Pago a cuenta')+' de la nota de venta '+escapeHtml(nota.numero_nota)+'</span></div>'+
     '</div>'+
     '<div class="doc-meta">'+
@@ -4584,7 +4594,7 @@ function renderReciboDocCard(nota, pago){
       '<div class="doc-meta-item"><span class="l">Este pago ('+escapeHtml(pago.numero_recibo||'')+')</span><span class="v" style="color:var(--brand-dark)">'+fmtBs(monto)+'</span></div>'+
       '<div class="doc-total-row">SALDO PENDIENTE: '+fmtBs(saldoDespues)+(cancela?' — NOTA CANCELADA':'')+'</div>'+
     '</div>'+
-    '<div style="display:flex;justify-content:space-around;gap:30px;margin-top:46px;font-size:11px;color:var(--muted);text-align:center">'+
+    '<div style="display:flex;justify-content:space-around;gap:30px;margin-top:56px;font-size:14px;color:var(--muted);text-align:center">'+
       '<div style="flex:1;border-top:1px solid #1c2128;padding-top:4px">Recibí conforme<br><b style="color:#1c2128">NOGALMAX</b></div>'+
       '<div style="flex:1;border-top:1px solid #1c2128;padding-top:4px">Entregué conforme<br><b style="color:#1c2128">'+escapeHtml(nota.cliente||'')+'</b></div>'+
     '</div>'+
