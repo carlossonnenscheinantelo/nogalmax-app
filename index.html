@@ -686,7 +686,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
         <tbody id="recibosBody"></tbody>
       </table>
     </div>
-    <p class="footnote">Todos los recibos generados por los pagos registrados en «💳 Pagos». Cada recibo queda guardado con su número correlativo: lo podés ver, volver a descargar en PDF o abrir el comprobante que se subió con el pago.</p>
+    <p class="footnote">Todos los recibos generados por los pagos registrados (en «💳 Pagos» o con «+ Nuevo recibo», que permite pagar varias notas del mismo cliente con un solo comprobante). Cada recibo queda guardado con su número correlativo: lo podés ver, volver a descargar en PDF o abrir el comprobante que se subió con el pago.</p>
   </section>
 
   <!-- CUENTAS POR COBRAR -->
@@ -4505,6 +4505,8 @@ function renderPagoForm(){
       pagoFile = (e.target.files && e.target.files[0]) ? e.target.files[0] : null;
       document.getElementById('pg_preview').innerHTML = pagoFile ? '<img src="'+URL.createObjectURL(pagoFile)+'" style="max-width:220px;border-radius:8px;margin-top:6px">' : '';
       document.getElementById('pg_chips').innerHTML = '';
+      /* lee el monto del comprobante solo, apenas se elige la foto */
+      if(pagoFile) leerMontoComprobante(pagoFile, notaTotales(pagoModalState).saldo, 'pg_chips', function(v){ document.getElementById('pg_monto').value = Math.round(v*100)/100; });
     });
     wireCompraOcr('pg_file','pg_chips','pg_monto','pg_btnDetect');
   }
@@ -4561,55 +4563,83 @@ function numeroALetras(num){
   var txt = entero===0 ? 'CERO' : apocope(mill(entero));
   return txt+' '+String(cent).padStart(2,'0')+'/100 BOLIVIANOS';
 }
+/* todos los pagos que comparten el mismo N° de recibo (un pago puede cubrir varias notas del cliente) */
+function reciboEntradas(nota, pago){
+  var out = [];
+  if(pago.numero_recibo){
+    notaVentaState.rows.forEach(function(nv){
+      (nv.pagos_venta||[]).forEach(function(p){ if(p.numero_recibo===pago.numero_recibo) out.push({nota:nv, pago:p}); });
+    });
+  }
+  if(!out.length) out.push({nota:nota, pago:pago});
+  out.sort(function(a,b){ return (a.nota.numero_nota||'').localeCompare(b.nota.numero_nota||''); });
+  return out;
+}
 function renderReciboDocCard(nota, pago){
-  var t = notaTotales(nota);
-  var pv = nota.pedidos_venta || {};
-  var items = (pv.pedido_venta_items||[]).slice().sort(function(a,b){ return (a.orden||0)-(b.orden||0); });
+  var entradas = reciboEntradas(nota, pago);
+  var varias = entradas.length > 1;
   function clave(p){ return (p.fecha_pago||'')+'|'+String(p.id).padStart(10,'0'); }
-  var pagos = t.pagos.slice().sort(function(a,b){ return clave(a)<clave(b)?-1:1; });
-  var antes = 0;
-  for(var i=0;i<pagos.length;i++){ if(pagos[i].id===pago.id) break; antes += Number(pagos[i].monto_bs)||0; }
-  antes = Math.round(antes*100)/100;
-  var monto = Number(pago.monto_bs)||0;
-  var saldoDespues = Math.max(0, Math.round((t.total - antes - monto)*100)/100);
-  var cancela = saldoDespues <= 0.005;
-  var flete = Number(pv.flete_bs)||0;
+  var montoTotal = 0, cuentas = [], filas = '';
+  entradas.forEach(function(e){
+    var t = notaTotales(e.nota);
+    var pv = e.nota.pedidos_venta || {};
+    var pagos = t.pagos.slice().sort(function(a,b){ return clave(a)<clave(b)?-1:1; });
+    var antes = 0;
+    for(var i=0;i<pagos.length;i++){ if(pagos[i].id===e.pago.id) break; antes += Number(pagos[i].monto_bs)||0; }
+    antes = Math.round(antes*100)/100;
+    var monto = Number(e.pago.monto_bs)||0;
+    montoTotal += monto;
+    var saldo = Math.max(0, Math.round((t.total - antes - monto)*100)/100);
+    cuentas.push({nota:e.nota, total:t.total, antes:antes, monto:monto, saldo:saldo});
+    var items = (pv.pedido_venta_items||[]).slice().sort(function(a,b){ return (a.orden||0)-(b.orden||0); });
+    var flete = Number(pv.flete_bs)||0;
+    if(varias) filas += '<tr><td colspan="5" style="background:#f3f7f5;font-weight:700">Nota '+escapeHtml(e.nota.numero_nota)+(e.nota.numero_pedido?' · Pedido '+escapeHtml(e.nota.numero_pedido):'')+'</td></tr>';
+    filas += items.map(function(it){
+      return '<tr><td>'+escapeHtml(it.producto_nombre)+(it.variante?' <span class="muted" style="font-size:12px">('+escapeHtml(it.variante)+')</span>':'')+'</td>'+
+        '<td>'+escapeHtml(it.lote||'—')+'<br><span class="muted" style="font-size:12px">'+escapeHtml(it.numero_produccion||'')+'</span></td>'+
+        '<td class="num">'+fmt(it.cantidad_toneladas,3)+'</td>'+
+        '<td class="num">'+(it.precio_pactado!=null?fmt(it.precio_pactado,2):'—')+'</td>'+
+        '<td class="num">'+(it.total_pactado!=null?fmt(it.total_pactado,2):'—')+'</td></tr>';
+    }).join('') + (flete>0 ? '<tr><td>Flete</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num">'+fmt(flete,2)+'</td></tr>' : '');
+  });
+  montoTotal = Math.round(montoTotal*100)/100;
+  var cancelaTodo = cuentas.every(function(c){ return c.saldo<=0.005; });
+  var saldoTotal = Math.round(cuentas.reduce(function(s,c){ return s+c.saldo; },0)*100)/100;
+  var notasTxt = cuentas.map(function(c){ return c.nota.numero_nota; }).join(', ');
+  var pv0 = (entradas[0].nota.pedidos_venta||{});
   function metaItem(l,val){ return '<div class="doc-meta-item"><span class="l">'+l+'</span><span class="v">'+escapeHtml(String(val))+'</span></div>'; }
-  var filas = items.map(function(it){
-    return '<tr><td>'+escapeHtml(it.producto_nombre)+(it.variante?' <span class="muted" style="font-size:12px">('+escapeHtml(it.variante)+')</span>':'')+'</td>'+
-      '<td>'+escapeHtml(it.lote||'—')+'<br><span class="muted" style="font-size:12px">'+escapeHtml(it.numero_produccion||'')+'</span></td>'+
-      '<td class="num">'+fmt(it.cantidad_toneladas,3)+'</td>'+
-      '<td class="num">'+(it.precio_pactado!=null?fmt(it.precio_pactado,2):'—')+'</td>'+
-      '<td class="num">'+(it.total_pactado!=null?fmt(it.total_pactado,2):'—')+'</td></tr>';
-  }).join('') + (flete>0 ? '<tr><td>Flete</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num">'+fmt(flete,2)+'</td></tr>' : '');
+  var cuentaHtml = varias
+    ? '<table class="pf-table" style="margin-top:4px"><thead><tr><th>Nota</th><th class="num">Total</th><th class="num">Pagado antes</th><th class="num">Este pago</th><th class="num">Saldo</th></tr></thead><tbody>'+
+        cuentas.map(function(c){ return '<tr><td><b>'+escapeHtml(c.nota.numero_nota)+'</b></td><td class="num">'+fmt(c.total,2)+'</td><td class="num">'+fmt(c.antes,2)+'</td><td class="num"><b>'+fmt(c.monto,2)+'</b></td><td class="num">'+fmt(c.saldo,2)+'</td></tr>'; }).join('')+
+      '</tbody></table>'+
+      '<div class="doc-total-row">TOTAL PAGADO: '+fmtBs(montoTotal)+' · SALDO PENDIENTE: '+fmtBs(saldoTotal)+(cancelaTodo?' — NOTAS CANCELADAS':'')+'</div>'
+    : '<div class="doc-meta-item"><span class="l">Total nota de venta</span><span class="v">'+fmtBs(cuentas[0].total)+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">Pagado anteriormente</span><span class="v">'+fmtBs(cuentas[0].antes)+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">Este pago ('+escapeHtml(pago.numero_recibo||'')+')</span><span class="v" style="color:var(--brand-dark)">'+fmtBs(montoTotal)+'</span></div>'+
+      '<div class="doc-total-row">SALDO PENDIENTE: '+fmtBs(saldoTotal)+(cancelaTodo?' — NOTA CANCELADA':'')+'</div>';
   document.getElementById('reciboDocCard').innerHTML =
     '<div class="fi-head"><span class="fi-brand"><img src="'+LOGO_DATA_URI+'" class="fi-logo" alt="NOGALMAX"></span><span class="fi-date" style="font-size:18px;font-weight:700;color:var(--brand-dark)">N° '+escapeHtml(pago.numero_recibo||'')+'</span></div>'+
     '<div style="text-align:center;font-size:32px;font-weight:800;letter-spacing:.06em;color:var(--brand-dark);margin:6px 0 16px">RECIBO DE PAGO</div>'+
     '<div class="doc-grand-total-box" style="margin-top:0">'+
-      '<div class="doc-meta-item"><span class="l">Recibí de</span><span class="v" style="font-size:19px">'+escapeHtml(nota.cliente||'—')+'</span></div>'+
-      '<div class="doc-meta-item"><span class="l">La suma de</span><span class="v" style="font-size:23px">'+fmtBs(monto)+'</span></div>'+
-      '<div style="font-size:14px;padding:6px 0 4px;color:var(--muted)">Son: <b style="color:#1c2128">'+numeroALetras(monto)+'</b></div>'+
-      '<div class="doc-meta-item"><span class="l">Por concepto de</span><span class="v">'+(cancela?'Cancelación':'Pago a cuenta')+' de la nota de venta '+escapeHtml(nota.numero_nota)+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">Recibí de</span><span class="v" style="font-size:19px">'+escapeHtml(entradas[0].nota.cliente||'—')+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">La suma de</span><span class="v" style="font-size:23px">'+fmtBs(montoTotal)+'</span></div>'+
+      '<div style="font-size:14px;padding:6px 0 4px;color:var(--muted)">Son: <b style="color:#1c2128">'+numeroALetras(montoTotal)+'</b></div>'+
+      '<div class="doc-meta-item"><span class="l">Por concepto de</span><span class="v">'+(cancelaTodo?'Cancelación':'Pago a cuenta')+(varias?' de las notas de venta ':' de la nota de venta ')+escapeHtml(notasTxt)+'</span></div>'+
     '</div>'+
     '<div class="doc-meta">'+
       metaItem('Fecha de pago', fmtFecha(pago.fecha_pago))+
-      metaItem('N° Nota de venta', nota.numero_nota)+
-      metaItem('N° Pedido', nota.numero_pedido||'—')+
-      metaItem('Condición', pv.condicion_pago ? (CONDICION_PAGO_LABEL[pv.condicion_pago]||pv.condicion_pago)+(pv.condicion_pago_nota?(' · '+pv.condicion_pago_nota):'') : '—')+
+      metaItem(varias?'N° Notas de venta':'N° Nota de venta', notasTxt)+
+      metaItem(varias?'N° Pedidos':'N° Pedido', cuentas.map(function(c){ return c.nota.numero_pedido||'—'; }).join(', '))+
+      (varias ? '' : metaItem('Condición', pv0.condicion_pago ? (CONDICION_PAGO_LABEL[pv0.condicion_pago]||pv0.condicion_pago)+(pv0.condicion_pago_nota?(' · '+pv0.condicion_pago_nota):'') : '—'))+
       metaItem('Registrado por', pago.registrado_por_nombre||'—')+
       metaItem('Comprobante', pago.comprobante_path ? 'Adjunto en el sistema' : 'Sin comprobante')+
     '</div>'+
     '<div class="fi-section">Detalle de la venta</div>'+
     '<table class="pf-table pf-recibo"><thead><tr><th>Producto</th><th>Lote</th><th class="num">Cant.<br>(Ton)</th><th class="num">Precio<br>(Bs/Ton)</th><th class="num">Total<br>(Bs)</th></tr></thead><tbody>'+filas+'</tbody></table>'+
-    '<div class="doc-grand-total-box">'+
-      '<div class="doc-meta-item"><span class="l">Total nota de venta</span><span class="v">'+fmtBs(t.total)+'</span></div>'+
-      '<div class="doc-meta-item"><span class="l">Pagado anteriormente</span><span class="v">'+fmtBs(antes)+'</span></div>'+
-      '<div class="doc-meta-item"><span class="l">Este pago ('+escapeHtml(pago.numero_recibo||'')+')</span><span class="v" style="color:var(--brand-dark)">'+fmtBs(monto)+'</span></div>'+
-      '<div class="doc-total-row">SALDO PENDIENTE: '+fmtBs(saldoDespues)+(cancela?' — NOTA CANCELADA':'')+'</div>'+
-    '</div>'+
+    '<div class="doc-grand-total-box">'+cuentaHtml+'</div>'+
     '<div style="display:flex;justify-content:space-around;gap:30px;margin-top:56px;font-size:14px;color:var(--muted);text-align:center">'+
       '<div style="flex:1;border-top:1px solid #1c2128;padding-top:4px">Recibí conforme<br><b style="color:#1c2128">NOGALMAX</b></div>'+
-      '<div style="flex:1;border-top:1px solid #1c2128;padding-top:4px">Entregué conforme<br><b style="color:#1c2128">'+escapeHtml(nota.cliente||'')+'</b></div>'+
+      '<div style="flex:1;border-top:1px solid #1c2128;padding-top:4px">Entregué conforme<br><b style="color:#1c2128">'+escapeHtml(entradas[0].nota.cliente||'')+'</b></div>'+
     '</div>'+
     '<div class="fi-foot">Generado desde NOGALMAX — Precios y Fórmulas</div>';
 }
@@ -4618,6 +4648,45 @@ function openReciboModal(nota, pago){
   reciboDocState = {nota:nota, pago:pago};
   renderReciboDocCard(nota, pago);
   document.getElementById('reciboModalOverlay').classList.add('active');
+}
+/* lee el comprobante con OCR y elige solo el monto más probable (el que coincide con lo que se espera cobrar, o el que tiene centavos y está más cerca) */
+function elegirMontoProbable(cands, esperado){
+  if(!cands || !cands.length) return null;
+  esperado = Number(esperado)||0;
+  if(esperado>0){
+    var exacto = cands.find(function(v){ return Math.abs(v-esperado) < 0.5; });
+    if(exacto!=null) return exacto;
+  }
+  var conCent = cands.filter(function(v){ return Math.round(v*100)%100 !== 0; });
+  var pool = conCent.length ? conCent : cands.filter(function(v){ return v>=10 && !(v>=1990 && v<=2100 && v%1===0); });
+  if(!pool.length) pool = cands;
+  if(esperado>0){
+    var dentro = pool.filter(function(v){ return v <= esperado*1.02; });
+    if(dentro.length) pool = dentro;
+    pool = pool.slice().sort(function(a,b){ return Math.abs(a-esperado)-Math.abs(b-esperado); });
+    return pool[0];
+  }
+  return pool.slice().sort(function(a,b){ return b-a; })[0];
+}
+function leerMontoComprobante(file, esperado, chipWrapId, onMonto){
+  var chipWrap = document.getElementById(chipWrapId);
+  if(!file || !chipWrap) return;
+  if(typeof Tesseract === 'undefined'){ chipWrap.innerHTML = '<span class="muted">No se pudo cargar el lector de imágenes — cargá el monto a mano.</span>'; return; }
+  chipWrap.innerHTML = '<span class="muted">🔍 Leyendo el monto del comprobante…</span>';
+  Tesseract.recognize(file, 'spa', { workerPath: 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/7.0.0/worker.min.js' }).then(function(result){
+    var cands = extractMoneyCandidates((result && result.data && result.data.text) || '');
+    if(!cands.length){ chipWrap.innerHTML = '<span class="muted">No se detectaron montos en la imagen — cargalo a mano.</span>'; return; }
+    var best = elegirMontoProbable(cands, typeof esperado==='function' ? esperado() : esperado);
+    if(best!=null) onMonto(best);
+    chipWrap.innerHTML = '<p class="footnote" style="margin:6px 0 0">✅ Monto leído del comprobante: <b>Bs '+fmt(best,2)+'</b> — revisalo. Si no es ese, tocá el correcto:</p><div class="ocr-money-list">'+cands.map(function(v){
+      return '<button type="button" class="ocr-money-chip" data-v="'+v+'"'+(v===best?' style="outline:2px solid var(--brand)"':'')+'>'+fmt(v,2)+'</button>';
+    }).join('')+'</div>';
+    chipWrap.querySelectorAll('.ocr-money-chip').forEach(function(chip){
+      chip.addEventListener('click', function(){ onMonto(Number(chip.dataset.v)); toast('Monto aplicado — revisalo antes de guardar'); });
+    });
+  }).catch(function(err){
+    chipWrap.innerHTML = '<span class="k-warn">No se pudo leer la imagen: '+escapeHtml(err&&err.message?err.message:String(err))+'</span>';
+  });
 }
 document.getElementById('btnCerrarRecibo').addEventListener('click', function(){
   document.getElementById('reciboModalOverlay').classList.remove('active');
@@ -4646,9 +4715,16 @@ function renderRecibos(forceReload){
   renderRecibosRows();
 }
 function recibosLista(){
-  var out = [];
+  var grupos = {}, out = [];
   notaVentaState.rows.forEach(function(nv){
-    (nv.pagos_venta||[]).forEach(function(p){ out.push({nota:nv, pago:p}); });
+    (nv.pagos_venta||[]).forEach(function(p){
+      var k = p.numero_recibo || ('ID'+p.id);
+      if(!grupos[k]){ grupos[k] = {nota:nv, pago:p, notas:[], pedidos:[], monto:0}; out.push(grupos[k]); }
+      var g = grupos[k];
+      g.notas.push(nv.numero_nota||'—'); g.pedidos.push(nv.numero_pedido||'—');
+      g.monto += Number(p.monto_bs)||0;
+      if(!g.pago.comprobante_path && p.comprobante_path){ g.pago = p; g.nota = nv; }
+    });
   });
   out.sort(function(a,b){
     var ka = (a.pago.fecha_pago||'')+'|'+String(a.pago.id).padStart(10,'0'), kb = (b.pago.fecha_pago||'')+'|'+String(b.pago.id).padStart(10,'0');
@@ -4665,12 +4741,12 @@ function renderRecibosRows(){
     if(desde && f < desde) return false;
     if(hasta && f > hasta) return false;
     if(q){
-      var hay = ((r.pago.numero_recibo||'')+' '+(r.nota.cliente||'')+' '+(r.nota.numero_nota||'')+' '+(r.nota.numero_pedido||'')).toLowerCase();
+      var hay = ((r.pago.numero_recibo||'')+' '+(r.nota.cliente||'')+' '+r.notas.join(' ')+' '+r.pedidos.join(' ')).toLowerCase();
       if(hay.indexOf(q)===-1) return false;
     }
     return true;
   });
-  var total = rows.reduce(function(s,r){ return s+(Number(r.pago.monto_bs)||0); }, 0);
+  var total = rows.reduce(function(s,r){ return s+r.monto; }, 0);
   document.getElementById('rcResumen').innerHTML = rows.length+' recibo'+(rows.length===1?'':'s')+' · <b>Bs '+fmt(total,2)+'</b>';
   document.getElementById('recibosBody').innerHTML = rows.map(function(r, i){
     var p = r.pago, nv = r.nota;
@@ -4678,9 +4754,9 @@ function renderRecibosRows(){
       '<td><b>'+escapeHtml(p.numero_recibo||'—')+'</b></td>'+
       '<td>'+fmtFecha(p.fecha_pago)+'</td>'+
       '<td>'+escapeHtml(nv.cliente||'—')+'</td>'+
-      '<td>'+escapeHtml(nv.numero_nota||'—')+'</td>'+
-      '<td>'+escapeHtml(nv.numero_pedido||'—')+'</td>'+
-      '<td class="num"><b>'+fmt(p.monto_bs,2)+'</b></td>'+
+      '<td>'+escapeHtml(r.notas.join(', '))+'</td>'+
+      '<td>'+escapeHtml(r.pedidos.join(', '))+'</td>'+
+      '<td class="num"><b>'+fmt(r.monto,2)+'</b></td>'+
       '<td>'+escapeHtml(p.registrado_por_nombre||'—')+'</td>'+
       '<td style="white-space:nowrap">'+
         '<button class="ghost btn-rc-ver" title="Ver recibo">🧾 Ver</button> '+
@@ -4703,45 +4779,142 @@ function renderRecibosRows(){
 document.getElementById('rcSearch').addEventListener('input', renderRecibosRows);
 document.getElementById('rcDesde').addEventListener('change', renderRecibosRows);
 document.getElementById('rcHasta').addEventListener('change', renderRecibosRows);
-/* nuevo recibo: elegís el cliente, la nota de venta con saldo y registrás el cobro — el recibo sale solo */
 function openNuevoRecibo(){
   document.getElementById('nuevoReciboOverlay').classList.add('active');
   document.getElementById('nuevoReciboBody').innerHTML = '<p class="muted">Cargando notas de venta…</p>';
   fetchNotasVenta(renderNuevoReciboForm);
 }
+/* nuevo recibo / cobro: un comprobante puede pagar 1 o varias notas del mismo cliente */
+var nrState = null; // {notas:[nota], sel:{id:true}, aplicar:{id:monto}, file}
 function renderNuevoReciboForm(){
   var conSaldo = notaVentaState.rows.filter(function(nv){ return notaTotales(nv).saldo > 0.005; });
   var clientes = {};
   conSaldo.forEach(function(nv){ var k=(nv.cliente||'').trim(); if(k) clientes[k.toLowerCase()] = k; });
   var lista = Object.keys(clientes).map(function(k){ return clientes[k]; }).sort(function(a,b){ return a.localeCompare(b); });
+  nrState = {notas:[], sel:{}, aplicar:{}, file:null};
   document.getElementById('nuevoReciboBody').innerHTML =
     '<div class="inline-field"><label>Cliente</label><select id="nr_cliente" style="min-width:260px"><option value="">— elegí el cliente —</option>'+
       lista.map(function(c){ return '<option value="'+escapeHtml(c)+'">'+escapeHtml(c)+'</option>'; }).join('')+
     '</select></div>'+
     '<div id="nr_notas" style="margin-top:12px"></div>'+
-    '<p class="footnote">Solo aparecen los clientes con notas de venta que tienen saldo pendiente. Elegí la nota que está pagando y tocá «Cobrar»: cargás el monto, la fecha y el comprobante, y el recibo se genera solo y queda guardado en esta lista.</p>';
+    '<p class="footnote">Solo aparecen los clientes con notas de venta con saldo. Marcá una o varias notas que paga con el mismo comprobante y subí la foto: el sistema lee el monto solo y lo reparte entre las notas (de la más antigua a la más nueva). Se genera un único recibo por todo el pago.</p>';
   document.getElementById('nr_cliente').addEventListener('change', function(){
     var cli = this.value.toLowerCase();
-    var notas = conSaldo.filter(function(nv){ return (nv.cliente||'').trim().toLowerCase()===cli; });
-    var wrap = document.getElementById('nr_notas');
-    if(!cli){ wrap.innerHTML=''; return; }
-    var totSaldo = notas.reduce(function(s,nv){ return s+notaTotales(nv).saldo; },0);
-    wrap.innerHTML = '<div class="section-title">Notas de venta con saldo — total Bs '+fmt(totSaldo,2)+'</div>'+
-      '<table class="pf-table"><thead><tr><th>N° Nota</th><th>Fecha</th><th class="num">Total</th><th class="num">Saldo</th><th>Estado</th><th></th></tr></thead><tbody>'+
-      notas.map(function(nv){
-        var t = notaTotales(nv);
-        return '<tr data-id="'+nv.id+'"><td><b>'+escapeHtml(nv.numero_nota)+'</b><br><span class="muted" style="font-size:11px">'+escapeHtml(nv.numero_pedido||'')+'</span></td><td>'+fmtFecha(nv.fecha)+'</td><td class="num">'+fmt(t.total,2)+'</td><td class="num"><b>'+fmt(t.saldo,2)+'</b></td><td><span class="pill-estado pill-'+t.estadoClass+'">'+t.estado+'</span></td>'+
-          '<td><button class="primary nr-cobrar" style="padding:5px 10px;font-size:12px">💳 Cobrar</button></td></tr>';
-      }).join('')+'</tbody></table>';
-    wrap.querySelectorAll('.nr-cobrar').forEach(function(btn){
-      btn.addEventListener('click', function(){
-        var id = Number(btn.closest('tr').dataset.id);
-        var nv = notaVentaState.rows.find(function(x){ return x.id===id; });
-        if(!nv) return;
-        document.getElementById('nuevoReciboOverlay').classList.remove('active');
-        openPagoModal(nv);
+    nrState.notas = conSaldo.filter(function(nv){ return (nv.cliente||'').trim().toLowerCase()===cli; })
+      .sort(function(a,b){ return (a.fecha||'')<(b.fecha||'')?-1:((a.fecha||'')>(b.fecha||'')?1:a.id-b.id); });
+    nrState.sel = {}; nrState.aplicar = {};
+    if(nrState.notas.length===1) nrState.sel[nrState.notas[0].id] = true;
+    renderNrNotas();
+  });
+}
+function nrSaldoSel(){ return Math.round(nrState.notas.reduce(function(s,nv){ return s + (nrState.sel[nv.id] ? notaTotales(nv).saldo : 0); },0)*100)/100; }
+function nrRepartir(){
+  var montoEl = document.getElementById('nr_monto');
+  var resto = parseFloat(montoEl && montoEl.value) || 0;
+  nrState.aplicar = {};
+  nrState.notas.forEach(function(nv){
+    if(!nrState.sel[nv.id]) return;
+    var a = Math.round(Math.min(notaTotales(nv).saldo, resto)*100)/100;
+    nrState.aplicar[nv.id] = a;
+    resto = Math.round((resto - a)*100)/100;
+  });
+}
+function renderNrNotas(){
+  var wrap = document.getElementById('nr_notas');
+  if(!nrState.notas.length){ wrap.innerHTML=''; return; }
+  var montoPrev = document.getElementById('nr_monto') ? document.getElementById('nr_monto').value : '';
+  var fechaPrev = document.getElementById('nr_fecha') ? document.getElementById('nr_fecha').value : new Date().toISOString().slice(0,10);
+  var totSaldo = nrState.notas.reduce(function(s,nv){ return s+notaTotales(nv).saldo; },0);
+  wrap.innerHTML = '<div class="section-title">Notas con saldo — total Bs '+fmt(totSaldo,2)+'</div>'+
+    '<table class="pf-table"><thead><tr><th style="width:8%"></th><th>N° Nota</th><th>Fecha</th><th class="num">Saldo</th><th class="num">Aplicar (Bs)</th></tr></thead><tbody>'+
+    nrState.notas.map(function(nv){
+      var t = notaTotales(nv);
+      var on = !!nrState.sel[nv.id];
+      return '<tr data-id="'+nv.id+'"><td><input type="checkbox" class="nr-chk"'+(on?' checked':'')+'></td>'+
+        '<td><b>'+escapeHtml(nv.numero_nota)+'</b><br><span class="muted" style="font-size:11px">'+escapeHtml(nv.numero_pedido||'')+' · '+t.estado+'</span></td>'+
+        '<td>'+fmtFecha(nv.fecha)+'</td><td class="num"><b>'+fmt(t.saldo,2)+'</b></td>'+
+        '<td class="num"><input type="number" step="0.01" min="0" class="pill-input nr-aplicar" style="max-width:120px"'+(on?'':' disabled')+' value="'+(on && nrState.aplicar[nv.id]!=null ? nrState.aplicar[nv.id] : '')+'"></td></tr>';
+    }).join('')+'</tbody></table>'+
+    '<div class="section-title" style="margin-top:14px">Pago</div>'+
+    '<div class="inline-field"><label>Comprobante de pago (foto)</label><input type="file" id="nr_file" accept="image/*"></div>'+
+    '<div id="nr_preview"></div><div id="nr_chips"></div>'+
+    '<div class="inline-field"><label>Fecha de pago</label><input type="date" id="nr_fecha" value="'+fechaPrev+'"></div>'+
+    '<div class="inline-field"><label>Monto total pagado (Bs)</label><input type="number" step="0.01" min="0.01" id="nr_monto" class="pill-input" value="'+montoPrev+'" placeholder="'+nrSaldoSel()+'"></div>'+
+    '<div id="nr_resumen" class="footnote"></div>'+
+    '<div style="margin-top:14px;display:flex;gap:10px"><button class="primary" id="nr_guardar">💳 Registrar pago y generar recibo</button><button id="nr_cancelar">Cancelar</button></div>';
+  if(nrState.file) document.getElementById('nr_preview').innerHTML = '<img src="'+URL.createObjectURL(nrState.file)+'" style="max-width:200px;border-radius:8px;margin-top:6px">';
+  wrap.querySelectorAll('tr[data-id]').forEach(function(tr){
+    var id = Number(tr.dataset.id);
+    tr.querySelector('.nr-chk').addEventListener('change', function(){
+      if(this.checked) nrState.sel[id] = true; else delete nrState.sel[id];
+      nrRepartir(); renderNrNotas();
+    });
+    tr.querySelector('.nr-aplicar').addEventListener('input', function(){ nrState.aplicar[id] = parseFloat(this.value)||0; nrResumen(); });
+  });
+  document.getElementById('nr_monto').addEventListener('input', function(){ nrRepartir(); nrPintarAplicar(); });
+  document.getElementById('nr_file').addEventListener('change', function(e){
+    nrState.file = (e.target.files && e.target.files[0]) ? e.target.files[0] : null;
+    document.getElementById('nr_preview').innerHTML = nrState.file ? '<img src="'+URL.createObjectURL(nrState.file)+'" style="max-width:200px;border-radius:8px;margin-top:6px">' : '';
+    if(nrState.file) leerMontoComprobante(nrState.file, nrSaldoSel, 'nr_chips', function(v){
+      document.getElementById('nr_monto').value = Math.round(v*100)/100;
+      nrRepartir(); nrPintarAplicar();
+    });
+  });
+  document.getElementById('nr_cancelar').addEventListener('click', function(){ document.getElementById('nuevoReciboOverlay').classList.remove('active'); });
+  document.getElementById('nr_guardar').addEventListener('click', submitNuevoRecibo);
+  nrResumen();
+}
+function nrPintarAplicar(){
+  document.querySelectorAll('#nr_notas tr[data-id]').forEach(function(tr){
+    var id = Number(tr.dataset.id), inp = tr.querySelector('.nr-aplicar');
+    if(nrState.sel[id]) inp.value = nrState.aplicar[id]!=null ? nrState.aplicar[id] : '';
+  });
+  nrResumen();
+}
+function nrResumen(){
+  var el = document.getElementById('nr_resumen'); if(!el) return;
+  var monto = parseFloat(document.getElementById('nr_monto').value)||0;
+  var aplicado = Math.round(Object.keys(nrState.aplicar).reduce(function(s,k){ return s + (nrState.sel[k] ? (Number(nrState.aplicar[k])||0) : 0); },0)*100)/100;
+  var nSel = Object.keys(nrState.sel).length, saldoSel = nrSaldoSel();
+  var msg = nSel+' nota'+(nSel===1?'':'s')+' seleccionada'+(nSel===1?'':'s')+' · saldo Bs '+fmt(saldoSel,2)+' · aplicado Bs '+fmt(aplicado,2);
+  if(monto>0 && Math.abs(monto-aplicado)>0.01) msg += ' <span class="k-warn">— el monto pagado (Bs '+fmt(monto,2)+') no coincide con lo aplicado'+(monto>saldoSel+0.05?': supera el saldo de las notas elegidas':'')+'</span>';
+  el.innerHTML = msg;
+}
+function submitNuevoRecibo(){
+  var monto = parseFloat(document.getElementById('nr_monto').value)||0;
+  var fecha = document.getElementById('nr_fecha').value || null;
+  var items = nrState.notas.filter(function(nv){ return nrState.sel[nv.id] && (Number(nrState.aplicar[nv.id])||0) > 0; })
+    .map(function(nv){ return {nota_venta_id: nv.id, monto_bs: Math.round(Number(nrState.aplicar[nv.id])*100)/100}; });
+  if(!items.length){ toast('Marcá al menos una nota y poné el monto'); return; }
+  var aplicado = Math.round(items.reduce(function(s,i){ return s+i.monto_bs; },0)*100)/100;
+  if(monto>0 && Math.abs(monto-aplicado)>0.01){ toast('El monto pagado (Bs '+fmt(monto,2)+') tiene que ser igual a lo aplicado en las notas (Bs '+fmt(aplicado,2)+').'); return; }
+  var btn = document.getElementById('nr_guardar'); btn.disabled = true;
+  function conArchivo(path){
+    sb.rpc('registrar_pago_multiple', {p_items: items, p_fecha_pago: fecha, p_comprobante_path: path}).then(function(res){
+      btn.disabled = false;
+      if(res.error){ toast('No se pudo registrar el pago: '+errMsg(res.error)); return; }
+      var filas = res.data || [];
+      var primero = filas[0];
+      document.getElementById('nuevoReciboOverlay').classList.remove('active');
+      toast('Pago registrado'+(primero?' — recibo '+primero.numero_recibo:''));
+      fetchNotasVenta(function(){
+        if(activeTab()==='recibos') renderRecibosRows();
+        if(activeTab()==='pagos') renderPagosRows();
+        if(activeTab()==='cuentasxcobrar') renderCuentasXCobrarRows(); if(activeTab()==='resumen') renderHomeCobros();
+        if(activeTab()==='notasventa') renderNotasVentaRows();
+        if(!primero) return;
+        var nv = notaVentaState.rows.find(function(x){ return x.id===primero.nota_venta_id; });
+        var pg = nv && (nv.pagos_venta||[]).find(function(x){ return x.id===primero.id; });
+        if(pg) openReciboModal(nv, pg);
       });
     });
+  }
+  if(!nrState.file){ conArchivo(null); return; }
+  var ext = ((nrState.file.name||'').split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
+  var path = 'pago_multi_'+items[0].nota_venta_id+'_'+Date.now()+'.'+ext;
+  sb.storage.from('comprobantes-pagos-venta').upload(path, nrState.file, {upsert:false}).then(function(res){
+    if(res.error){ toast('No se pudo subir el comprobante: '+errMsg(res.error)); btn.disabled=false; return; }
+    conArchivo(path);
   });
 }
 document.getElementById('btnNuevoRecibo').addEventListener('click', openNuevoRecibo);
