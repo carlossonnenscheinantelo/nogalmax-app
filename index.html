@@ -285,6 +285,11 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
 .pf-table td{padding:6px 3px;border-bottom:1px solid var(--line);font-size:12px;white-space:normal;word-break:break-word}
 .pf-table td.num{white-space:nowrap}
 .pf-table th:first-child,.pf-table td:first-child{width:20%}
+.pf-table th.num{text-align:right}
+.pf-table th{word-break:normal;overflow-wrap:normal}
+.pf-table.pf-6 th,.pf-table.pf-6 td{font-size:11px;padding-left:4px;padding-right:4px}
+.pf-table.pf-6 th:first-child,.pf-table.pf-6 td:first-child{width:24%}
+.pf-table.pf-6 th:nth-child(2),.pf-table.pf-6 td:nth-child(2){width:10%}
 .bolsa-badge{display:inline-block;font-weight:700;font-size:13px;padding:6px 14px;border-radius:8px;margin:2px 0 12px;letter-spacing:.02em}
 .bolsa-naranja{background:#ff8c1a;color:#fff}
 .bolsa-verde{background:#2ea043;color:#fff}
@@ -4432,15 +4437,16 @@ function renderNotaVentaDocCard(nota){
     if(!hayDescuento){
       return '<tr><td>'+escapeHtml(it.producto_nombre)+'</td><td class="num">'+fmt(it.cantidad_toneladas,2)+'</td><td class="num">'+(it.precio_pactado!=null?fmtBs(it.precio_pactado):'—')+'</td><td class="num">'+total+'</td></tr>';
     }
+    /* con descuento son 6 columnas: los montos van sin «Bs» (ya lo dice el encabezado) para que no se pisen en el PDF */
     return '<tr><td>'+escapeHtml(it.producto_nombre)+'</td><td class="num">'+fmt(it.cantidad_toneladas,2)+'</td>'+
-      '<td class="num">'+(it.precio_lista!=null?fmtBs(it.precio_lista):(it.precio_pactado!=null?fmtBs(it.precio_pactado):'—'))+'</td>'+
-      '<td class="num">'+(d>0?fmtBs(d):'—')+'</td>'+
-      '<td class="num">'+(it.precio_pactado!=null?fmtBs(it.precio_pactado):'—')+'</td>'+
-      '<td class="num">'+total+'</td></tr>';
+      '<td class="num">'+(it.precio_lista!=null?fmt(it.precio_lista,2):(it.precio_pactado!=null?fmt(it.precio_pactado,2):'—'))+'</td>'+
+      '<td class="num">'+(d>0?fmt(d,2):'—')+'</td>'+
+      '<td class="num">'+(it.precio_pactado!=null?fmt(it.precio_pactado,2):'—')+'</td>'+
+      '<td class="num">'+(it.total_pactado!=null?fmt(it.total_pactado,2):'—')+'</td></tr>';
   }).join('');
   descuentoTotal = Math.round(descuentoTotal*100)/100;
   var theadProductos = hayDescuento
-    ? '<th>Producto</th><th class="num">Cantidad<br>(Ton)</th><th class="num">Precio lista<br>(Bs/Ton)</th><th class="num">Descuento<br>(Bs/Ton)</th><th class="num">Precio final<br>(Bs/Ton)</th><th class="num">Total<br>(Bs)</th>'
+    ? '<th>Producto</th><th class="num">Cant.<br>(Ton)</th><th class="num">Precio lista<br>(Bs/Ton)</th><th class="num">Desc.<br>(Bs/Ton)</th><th class="num">Precio final<br>(Bs/Ton)</th><th class="num">Total<br>(Bs)</th>'
     : '<th>Producto</th><th class="num">Cantidad (Ton)</th><th class="num">Precio (Bs/Ton)</th><th class="num">Total (Bs)</th>';
   var flete = Number(pv.flete_bs)||0;
   var totalProductos = Math.round((t.total-flete)*100)/100;
@@ -4462,7 +4468,7 @@ function renderNotaVentaDocCard(nota){
       metaItem('Entrega', pv.modo_entrega==='recoge' ? 'Recoge cliente' : (pv.modo_entrega==='envio' ? 'Envío a cliente' : '—'))+
     '</div>'+
     '<div class="fi-section">Productos</div>'+
-    '<table class="pf-table"><thead><tr>'+theadProductos+'</tr></thead><tbody>'+filasProductos+'</tbody></table>'+
+    '<table class="pf-table'+(hayDescuento?' pf-6':'')+'"><thead><tr>'+theadProductos+'</tr></thead><tbody>'+filasProductos+'</tbody></table>'+
     '<div class="doc-grand-total-box">'+
       (hayDescuento ? ('<div class="doc-meta-item"><span class="l">Subtotal a precio de lista</span><span class="v">'+fmtBs(Math.round((totalProductos+descuentoTotal)*100)/100)+'</span></div>'+
         '<div class="doc-meta-item"><span class="l">Descuento aplicado</span><span class="v" style="color:#b45309">- '+fmtBs(descuentoTotal)+'</span></div>') : '')+
