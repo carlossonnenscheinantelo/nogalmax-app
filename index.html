@@ -669,6 +669,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
       <label class="inline-field" style="align-items:center;flex-direction:row;gap:6px">Hasta <input type="date" id="rcHasta"></label>
       <div class="spacer"></div>
       <span id="rcResumen" class="muted" style="font-size:13px"></span>
+      <button class="primary" id="btnNuevoRecibo">+ Nuevo recibo</button>
     </div>
     <div class="table-wrap">
       <table>
@@ -1205,6 +1206,16 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
       <button class="close-x" id="btnCerrarPago">✕</button>
     </div>
     <div id="pagoBody" class="ocr-body"></div>
+  </div>
+</div>
+
+<div id="nuevoReciboOverlay" class="overlay2">
+  <div class="ocr-box" style="max-width:640px">
+    <div class="ocr-head">
+      <h3>Nuevo recibo</h3>
+      <button class="close-x" id="btnCerrarNuevoRecibo">✕</button>
+    </div>
+    <div class="ocr-body" id="nuevoReciboBody"></div>
   </div>
 </div>
 
@@ -4514,6 +4525,7 @@ function submitPago(){
       fetchNotasVenta(function(){
         pagoModalState = notaVentaState.rows.find(function(x){return x.id===nota.id;}) || nota;
         renderPagoForm();
+        if(activeTab()==='recibos') renderRecibosRows();
         /* el recibo se genera solo con cada pago */
         var pg = pagoRow && (pagoModalState.pagos_venta||[]).find(function(x){ return x.id===pagoRow.id; });
         if(pg) openReciboModal(pagoModalState, pg);
@@ -4691,6 +4703,49 @@ function renderRecibosRows(){
 document.getElementById('rcSearch').addEventListener('input', renderRecibosRows);
 document.getElementById('rcDesde').addEventListener('change', renderRecibosRows);
 document.getElementById('rcHasta').addEventListener('change', renderRecibosRows);
+/* nuevo recibo: elegís el cliente, la nota de venta con saldo y registrás el cobro — el recibo sale solo */
+function openNuevoRecibo(){
+  document.getElementById('nuevoReciboOverlay').classList.add('active');
+  document.getElementById('nuevoReciboBody').innerHTML = '<p class="muted">Cargando notas de venta…</p>';
+  fetchNotasVenta(renderNuevoReciboForm);
+}
+function renderNuevoReciboForm(){
+  var conSaldo = notaVentaState.rows.filter(function(nv){ return notaTotales(nv).saldo > 0.005; });
+  var clientes = {};
+  conSaldo.forEach(function(nv){ var k=(nv.cliente||'').trim(); if(k) clientes[k.toLowerCase()] = k; });
+  var lista = Object.keys(clientes).map(function(k){ return clientes[k]; }).sort(function(a,b){ return a.localeCompare(b); });
+  document.getElementById('nuevoReciboBody').innerHTML =
+    '<div class="inline-field"><label>Cliente</label><select id="nr_cliente" style="min-width:260px"><option value="">— elegí el cliente —</option>'+
+      lista.map(function(c){ return '<option value="'+escapeHtml(c)+'">'+escapeHtml(c)+'</option>'; }).join('')+
+    '</select></div>'+
+    '<div id="nr_notas" style="margin-top:12px"></div>'+
+    '<p class="footnote">Solo aparecen los clientes con notas de venta que tienen saldo pendiente. Elegí la nota que está pagando y tocá «Cobrar»: cargás el monto, la fecha y el comprobante, y el recibo se genera solo y queda guardado en esta lista.</p>';
+  document.getElementById('nr_cliente').addEventListener('change', function(){
+    var cli = this.value.toLowerCase();
+    var notas = conSaldo.filter(function(nv){ return (nv.cliente||'').trim().toLowerCase()===cli; });
+    var wrap = document.getElementById('nr_notas');
+    if(!cli){ wrap.innerHTML=''; return; }
+    var totSaldo = notas.reduce(function(s,nv){ return s+notaTotales(nv).saldo; },0);
+    wrap.innerHTML = '<div class="section-title">Notas de venta con saldo — total Bs '+fmt(totSaldo,2)+'</div>'+
+      '<table class="pf-table"><thead><tr><th>N° Nota</th><th>Fecha</th><th class="num">Total</th><th class="num">Saldo</th><th>Estado</th><th></th></tr></thead><tbody>'+
+      notas.map(function(nv){
+        var t = notaTotales(nv);
+        return '<tr data-id="'+nv.id+'"><td><b>'+escapeHtml(nv.numero_nota)+'</b><br><span class="muted" style="font-size:11px">'+escapeHtml(nv.numero_pedido||'')+'</span></td><td>'+fmtFecha(nv.fecha)+'</td><td class="num">'+fmt(t.total,2)+'</td><td class="num"><b>'+fmt(t.saldo,2)+'</b></td><td><span class="pill-estado pill-'+t.estadoClass+'">'+t.estado+'</span></td>'+
+          '<td><button class="primary nr-cobrar" style="padding:5px 10px;font-size:12px">💳 Cobrar</button></td></tr>';
+      }).join('')+'</tbody></table>';
+    wrap.querySelectorAll('.nr-cobrar').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var id = Number(btn.closest('tr').dataset.id);
+        var nv = notaVentaState.rows.find(function(x){ return x.id===id; });
+        if(!nv) return;
+        document.getElementById('nuevoReciboOverlay').classList.remove('active');
+        openPagoModal(nv);
+      });
+    });
+  });
+}
+document.getElementById('btnNuevoRecibo').addEventListener('click', openNuevoRecibo);
+document.getElementById('btnCerrarNuevoRecibo').addEventListener('click', function(){ document.getElementById('nuevoReciboOverlay').classList.remove('active'); });
 
 /* ---- documento imprimible: nota de venta ---- */
 function renderNotaVentaDocCard(nota){
