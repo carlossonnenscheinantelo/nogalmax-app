@@ -590,13 +590,14 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
           <th class="num">Total general (Bs)</th>
           <th>Entrega</th>
           <th>Fecha entrega</th>
+          <th>Estado</th>
           <th></th>
           <th></th>
         </tr></thead>
         <tbody id="proformasBody"></tbody>
       </table>
     </div>
-    <p class="footnote">La proforma toma el precio público del sistema (precio de venta con comisión) — podés modificarlo por producto al crearla o editarla (✏️) —, aplicás el % de descuento por producto y se suma el flete si corresponde. No genera producción ni descuenta stock de insumos — es solo una cotización para el cliente.</p>
+    <p class="footnote">La proforma toma el precio público del sistema (precio de venta con comisión) — podés modificarlo por producto al crearla o editarla (✏️) —, aplicás el % de descuento por producto y se suma el flete si corresponde. No genera producción ni descuenta stock de insumos — es solo una cotización para el cliente. Cuando el cliente confirma, tocá <b>✅ Aprobar venta</b>: se abre el pedido de venta ya cargado con los productos y precios de la proforma — elegís condición de pago, stock a asignar y cuotas — y al crearlo sigue todo el circuito (producción, nota de venta, despacho y cobro).</p>
   </section>
 
   <!-- NOTAS DE VENTA -->
@@ -3522,10 +3523,38 @@ function renderPedidoVentaPreview(){
   var notaStock = huboStock ? '<p class="footnote" style="margin-top:6px">Lo que se toma de Stock en Fábrica no aparece acá — no consume insumos nuevos. Solo se descuenta lo que se manda a producir.</p>' : '';
   wrap.innerHTML = '<div class="section-title">Insumos que se van a descontar (productos nuevos del pedido)</div><div class="swap-preview">'+(linea||'<span class="muted">Sin insumos a descontar</span>')+'</div>'+notaStock;
 }
-function openPedidoVentaModal(){
+var pvDesdeProforma = null; // proforma que se está aprobando (el pedido sale precargado con sus productos y precios)
+function openPedidoVentaModal(pf){
+  pvDesdeProforma = (pf && pf.numero_proforma) ? pf : null;
   document.getElementById('pedidoVentaModalOverlay').classList.add('active');
   document.getElementById('pedidoVentaBody').innerHTML = '<p class="muted">Cargando stock de fábrica…</p>';
-  fetchProducciones(renderPedidoVentaForm);
+  fetchProducciones(function(){
+    renderPedidoVentaForm();
+    if(pvDesdeProforma) prefillPedidoDesdeProforma(pvDesdeProforma);
+  });
+}
+function prefillPedidoDesdeProforma(pf){
+  var items = pfItemsOf(pf);
+  document.getElementById('pv_cliente').value = pf.cliente || '';
+  var fe = document.getElementById('pv_fechaEntrega');
+  if(pf.fecha_entrega){ fe.value = pf.fecha_entrega; fe.dispatchEvent(new Event('change')); }
+  var me = document.getElementById('pv_modoEntrega');
+  me.value = pf.modo_entrega || ''; me.dispatchEvent(new Event('change'));
+  if(pf.modo_entrega==='envio') document.getElementById('pv_flete').value = Number(pf.flete_bs)||0;
+  pvLineas = items.map(function(it){
+    return {
+      producto_hoja: it.producto_hoja, cantidad: Number(it.cantidad_toneladas)||0,
+      precio: it.precio_final_ton!=null ? Number(it.precio_final_ton) : '',
+      descuentoPct: Number(it.descuento_pct) ? Number(it.descuento_pct) : '',
+      precioLista: it.precio_publico_ton!=null ? Math.round(Number(it.precio_publico_ton)*100)/100 : null,
+      asig: {}, variante: ''
+    };
+  });
+  if(!pvLineas.length) pvLineas = [{producto_hoja:'', cantidad:1, precio:'', asig:{}, descuentoPct:''}];
+  renderPvLineas(); renderPedidoVentaPreview(); updatePvTotalBox();
+  document.getElementById('pedidoVentaBody').insertAdjacentHTML('afterbegin',
+    '<div style="background:var(--brand-light,#eef7f1);border:1px solid var(--brand);border-radius:8px;padding:8px 12px;margin-bottom:12px">✅ Aprobando la proforma <b>'+escapeHtml(pf.numero_proforma)+'</b> de <b>'+escapeHtml(pf.cliente||'')+'</b>. Ya están cargados los productos, cantidades y precios. Elegí la <b>condición de pago</b>, asigná stock de fábrica si hay, revisá las cuotas y tocá «Aprobar y crear pedido».</div>');
+  document.getElementById('btnCrearPedidoVenta').textContent = '✅ Aprobar y crear pedido';
 }
 function closePedidoVentaModal(){ document.getElementById('pedidoVentaModalOverlay').classList.remove('active'); }
 document.getElementById('btnNuevoPedidoVenta').addEventListener('click', openPedidoVentaModal);
@@ -3548,7 +3577,7 @@ function submitPedidoVenta(){
       producto_hoja: l.producto_hoja,
       cantidad_toneladas: l.cantidad,
       precio_pactado: (l.precio===''||l.precio==null||isNaN(l.precio)) ? null : l.precio,
-      precio_lista: (function(){ var t = precioTablaFor(l.producto_hoja); return t==null ? null : Math.round(t*100)/100; })(),
+      precio_lista: (l.precioLista!=null ? l.precioLista : (function(){ var t = precioTablaFor(l.producto_hoja); return t==null ? null : Math.round(t*100)/100; })()),
       variante: l.variante || null,
       stock_asignaciones: Object.keys(l.asig||{}).filter(function(k){ return Number(l.asig[k])>0; }).map(function(k){ return {produccion_id:Number(k), cantidad_toneladas:Number(l.asig[k])}; })
     });
@@ -3593,6 +3622,13 @@ function submitPedidoVenta(){
     if(res.error){ toast((ex?'No se pudieron agregar los productos: ':'No se pudo crear el pedido de venta: ')+errMsg(res.error)); return; }
     var row = Array.isArray(res.data) ? res.data[0] : res.data;
     closePedidoVentaModal();
+    if(pvDesdeProforma){
+      var pfA = pvDesdeProforma; pvDesdeProforma = null;
+      sb.rpc('aprobar_proforma', {p_proforma_id: pfA.id, p_pedido_id: row.id}).then(function(r2){
+        if(r2.error) toast('El pedido se creó, pero no se pudo marcar la proforma como aprobada: '+errMsg(r2.error));
+        renderProformas(true);
+      });
+    }
     var kgStock = pvLineas.reduce(function(t,l){ return t+pvAsignadoLinea(l); }, 0);
     var kgProd = pvLineas.reduce(function(t,l){ return t+pvAProducirLinea(l); }, 0);
     var msg = ex ? ('Productos agregados al pedido '+row.numero_pedido+' — misma nota '+ex.numero_nota) : ('Pedido de venta '+row.numero_pedido+' creado');
@@ -3764,6 +3800,7 @@ function renderProformasRows(){
     return (av-bv)*d;
   });
   var esAdminPf = currentProfile && currentProfile.rol==='admin';
+  var puedeAprobarPf = currentProfile && (currentProfile.rol==='admin' || currentProfile.rol==='comercial');
   document.getElementById('proformasBody').innerHTML = rows.map(function(pf){
     var items = pfItemsOf(pf);
     var cantidadTotal = items.reduce(function(s,it){ return s+(Number(it.cantidad_toneladas)||0); }, 0);
@@ -3786,10 +3823,20 @@ function renderProformasRows(){
       '<td class="num"><b>'+fmt(totalGeneral,2)+'</b></td>'+
       '<td>'+entregaLabel+'</td>'+
       '<td>'+(pf.fecha_entrega?fmtFecha(pf.fecha_entrega):'—')+'</td>'+
+      '<td style="white-space:nowrap">'+(pf.pedido_venta_id
+        ? '<span class="pill-estado pill-pagada">✅ Aprobada</span><br><span class="muted" style="font-size:11px">'+escapeHtml(pf.pedido_venta_numero||'')+(pf.aprobada_en?' · '+fmtFecha(pf.aprobada_en):'')+'</span>'
+        : (puedeAprobarPf ? '<button class="primary btn-aprobar-pf" style="padding:5px 10px" title="El cliente cerró la compra: generar el pedido de venta">✅ Aprobar venta</button>' : '<span class="pill-estado pill-pendiente">Pendiente</span>'))+'</td>'+
       '<td style="white-space:nowrap"><button class="ghost btn-doc-pf" title="Ver / descargar proforma">📄</button> <button class="ghost btn-editar-pf" title="Editar proforma">✏️</button></td>'+
       eliminarCell+
     '</tr>';
-  }).join('') || '<tr><td colspan="'+(esAdminPf?12:11)+'" class="empty">Sin proformas registradas</td></tr>';
+  }).join('') || '<tr><td colspan="'+(esAdminPf?13:12)+'" class="empty">Sin proformas registradas</td></tr>';
+  document.querySelectorAll('.btn-aprobar-pf').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var id = Number(btn.closest('tr').dataset.id);
+      var pf = proformaState.rows.find(function(x){return x.id===id;});
+      if(pf) openPedidoVentaModal(pf);
+    });
+  });
   document.querySelectorAll('.btn-doc-pf').forEach(function(btn){
     btn.addEventListener('click', function(){
       var id = Number(btn.closest('tr').dataset.id);
