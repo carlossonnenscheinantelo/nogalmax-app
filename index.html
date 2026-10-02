@@ -900,6 +900,19 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
   </section>
 
   <!-- RENTABILIDAD REAL (contabilidad) -->
+  <!-- COMISIONES (solo administración) -->
+  <section id="view-comisiones" class="view">
+    <div class="toolbar">
+      <select id="comVendedor"><option value="">Todos los vendedores</option><option>FERNANDA CANDIA</option><option>FERNANDO VIRUEZ</option><option>MARIANA ROCHA</option><option value="(SIN VENDEDOR)">Sin vendedor asignado</option></select>
+      <select id="comMes"><option value="">Todos los meses</option></select>
+      <input type="search" id="comSearch" placeholder="Buscar cliente o N° pedido…">
+      <div class="spacer"></div>
+      <span id="comResumen" class="muted" style="font-size:13px"></span>
+    </div>
+    <div id="comisionesWrap"></div>
+    <p class="footnote">Ventas de cada vendedor agrupadas por mes. Asigná el % de comisión de cada venta (cada negociación es distinta): la comisión se calcula sobre el precio final de los productos × cantidad, <b>sin contar el flete</b>. Se guarda al salir de la casilla. También podés asignar o cambiar el vendedor de cada pedido. Esta sección solo la ve el administrador.</p>
+  </section>
+
   <section id="view-rentabilidad" class="view">
     <div class="toolbar">
       <input type="search" id="rentSearch" placeholder="Buscar producto…">
@@ -990,6 +1003,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
     <button class="nav-group-head" type="button">💰 Contabilidad <span class="chev">▾</span></button>
     <div class="nav-group-items">
       <button data-tab="rentabilidad" class="nav-item">📊 Rentabilidad real</button>
+      <button data-tab="comisiones" class="nav-item" id="navComisiones">💼 Comisiones</button>
     </div>
   </div>
 </nav>
@@ -1545,6 +1559,7 @@ document.querySelectorAll('.nav-item').forEach(function(btn){
     if(btn.dataset.tab==='clientescardex') renderClientesCardex(!clientesState.loaded || !notaVentaState.loaded);
     if(btn.dataset.tab==='proveedorescardex') renderProveedoresCardex(!proveedoresState.loaded || !comprasState.loaded);
     if(btn.dataset.tab==='rentabilidad') renderRentabilidad(!ventaState.loaded);
+    if(btn.dataset.tab==='comisiones') renderComisiones();
   });
 });
 document.querySelectorAll('.nav-group-head').forEach(function(head){
@@ -3106,6 +3121,129 @@ if(btnCsvEntregadosEl) btnCsvEntregadosEl.addEventListener('click', function(){
   downloadBlob('productos_entregados_nogalmax.csv', new Blob(["﻿"+lines.join('\n')], {type:'text/csv;charset=utf-8'}));
 });
 
+/* ================= COMISIONES DE VENDEDORES (solo administración) ================= */
+var VENDEDORES = ['FERNANDA CANDIA','FERNANDO VIRUEZ','MARIANA ROCHA'];
+function vendedorOptions(sel){
+  return '<option value="">— sin vendedor —</option>'+VENDEDORES.map(function(v){ return '<option value="'+v+'"'+((sel||'').toUpperCase()===v?' selected':'')+'>'+v+'</option>'; }).join('');
+}
+function vendedorPorNombre(nombre){
+  var n = (nombre||'').toUpperCase().trim();
+  return VENDEDORES.find(function(v){ return n && (v===n || v.indexOf(n)===0 || n.indexOf(v)===0); }) || '';
+}
+var comisionesState = { pendientes: 0 };
+function renderComisiones(){
+  var wrap = document.getElementById('comisionesWrap');
+  if(wrap) wrap.innerHTML = '<p class="muted">Cargando ventas…</p>';
+  comisionesState.pendientes = 2;
+  function listo(){ comisionesState.pendientes--; if(comisionesState.pendientes<=0) renderComisionesRows(); }
+  sb.from('pedidos_venta').select('*, pedido_venta_items(*, producciones(id, numero_produccion, lote, estado, despachado, despachado_cantidad, cantidad_toneladas, completado_en, fecha_pedido, formula_usada, insumos_requeridos, desde_stock_existente, es_stock_fabrica, origen_stock_id))').order('fecha_pedido',{ascending:false}).order('id',{ascending:false}).then(function(res){
+    if(res.error){ toast('No se pudieron cargar los pedidos: '+errMsg(res.error)); return; }
+    ventaState.rows = res.data || []; ventaState.loaded = true; listo();
+  });
+  fetchNotasVenta(listo);
+}
+function comisionBase(v){
+  /* base de la comisión = precio final de los productos × cantidad, SIN el flete */
+  return Math.round(pvItems(v).reduce(function(s,it){ return s+(Number(it.total_pactado)||0); },0)*100)/100;
+}
+var MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+function mesLabel(k){ var p=k.split('-'); return MESES_ES[Number(p[1])-1]+' '+p[0]; }
+function renderComisionesRows(){
+  var wrap = document.getElementById('comisionesWrap'); if(!wrap) return;
+  var fVend = document.getElementById('comVendedor').value;
+  var fMes = document.getElementById('comMes').value;
+  var q = (document.getElementById('comSearch').value||'').toLowerCase();
+  var notaPorPedido = {};
+  notaVentaState.rows.forEach(function(nv){ notaPorPedido[nv.pedido_venta_id] = nv; });
+  var meses = {};
+  ventaState.rows.forEach(function(v){ var k=(v.fecha_pedido||'').slice(0,7); if(k) meses[k]=true; });
+  var mesSel = document.getElementById('comMes');
+  var mesesOrd = Object.keys(meses).sort().reverse();
+  var actual = mesSel.value;
+  mesSel.innerHTML = '<option value="">Todos los meses</option>'+mesesOrd.map(function(k){ return '<option value="'+k+'"'+(k===actual?' selected':'')+'>'+mesLabel(k)+'</option>'; }).join('');
+  var grupos = {}; // vendedor -> mes -> [v]
+  ventaState.rows.forEach(function(v){
+    var vend = (v.vendedor||'').toUpperCase() || '(SIN VENDEDOR)';
+    var mes = (v.fecha_pedido||'').slice(0,7) || 'sin-fecha';
+    if(fVend && fVend!==vend) return;
+    if(fMes && fMes!==mes) return;
+    if(q && ((v.cliente||'')+' '+(v.numero_pedido||'')).toLowerCase().indexOf(q)===-1) return;
+    (grupos[vend] = grupos[vend]||{});
+    (grupos[vend][mes] = grupos[vend][mes]||[]).push(v);
+  });
+  var orden = VENDEDORES.concat(['(SIN VENDEDOR)']).filter(function(x){ return grupos[x]; });
+  Object.keys(grupos).forEach(function(k){ if(orden.indexOf(k)===-1) orden.push(k); });
+  var granBase = 0, granCom = 0;
+  var html = orden.map(function(vend){
+    var sinVend = vend==='(SIN VENDEDOR)';
+    var totB = 0, totC = 0;
+    var mesesHtml = Object.keys(grupos[vend]).sort().reverse().map(function(mes){
+      var lista = grupos[vend][mes].slice().sort(function(a,b){ return (a.fecha_pedido||'')<(b.fecha_pedido||'')?-1:1; });
+      var mB = 0, mC = 0, sinPct = 0;
+      var filas = lista.map(function(v){
+        var base = comisionBase(v);
+        var pct = v.comision_pct!=null ? Number(v.comision_pct) : null;
+        var com = pct!=null ? Math.round(base*pct)/100 : 0;
+        mB += base; mC += com; if(pct==null) sinPct++;
+        var nv = notaPorPedido[v.id];
+        var t = nv ? notaTotales(nv) : null;
+        var prods = pvItems(v).map(function(it){ return fmt(it.cantidad_toneladas,2)+' t '+escapeHtml(it.producto_nombre); }).join('<br>');
+        return '<tr data-id="'+v.id+'">'+
+          '<td>'+fmtFecha(v.fecha_pedido)+'</td>'+
+          '<td><b>'+escapeHtml(v.numero_pedido)+'</b>'+(nv?'<br><span class="muted" style="font-size:11px">'+escapeHtml(nv.numero_nota)+'</span>':'')+'</td>'+
+          '<td>'+escapeHtml(v.cliente||'—')+'</td>'+
+          '<td style="font-size:12px">'+prods+'</td>'+
+          '<td class="num">'+fmt(base,2)+(Number(v.flete_bs)>0?'<br><span class="muted" style="font-size:11px">flete '+fmt(v.flete_bs,2)+' no comisiona</span>':'')+'</td>'+
+          '<td class="num"><input type="number" step="0.1" min="0" max="100" class="pill-input com-pct" style="max-width:80px" value="'+(pct!=null?pct:'')+'" placeholder="%"></td>'+
+          '<td class="num"><b>'+(pct!=null?fmt(com,2):'—')+'</b></td>'+
+          '<td>'+(t?'<span class="pill-estado pill-'+t.estadoClass+'">'+t.estado+'</span>':'—')+'</td>'+
+          '<td><select class="com-vend" style="font-size:12px">'+vendedorOptions(v.vendedor)+'</select></td>'+
+        '</tr>';
+      }).join('');
+      totB += mB; totC += mC;
+      return '<div class="section-title" style="margin-top:12px">'+(mes==='sin-fecha'?'Sin fecha':mesLabel(mes))+' — ventas Bs '+fmt(mB,2)+' · comisión <b>Bs '+fmt(mC,2)+'</b>'+(sinPct?' · <span class="k-warn">'+sinPct+' sin % asignado</span>':'')+'</div>'+
+        '<div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Pedido / Nota</th><th>Cliente</th><th>Productos</th><th class="num">Base sin flete (Bs)</th><th class="num">% Comisión</th><th class="num">Comisión (Bs)</th><th>Cobro</th><th>Vendedor</th></tr></thead><tbody>'+filas+'</tbody>'+
+        '<tfoot><tr><td colspan="4" style="text-align:right;font-weight:700">Total '+(mes==='sin-fecha'?'':mesLabel(mes))+'</td><td class="num"><b>'+fmt(mB,2)+'</b></td><td></td><td class="num"><b>'+fmt(mC,2)+'</b></td><td colspan="2"></td></tr></tfoot></table></div>';
+    }).join('');
+    granBase += totB; granCom += totC;
+    return '<div class="card" style="margin-bottom:18px;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:var(--panel,#fff)">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px"><h3 style="margin:0">'+(sinVend?'⚠️ Ventas sin vendedor asignado':'👤 '+escapeHtml(vend))+'</h3>'+
+      '<span>Ventas: <b>Bs '+fmt(totB,2)+'</b> · Comisión: <b style="color:var(--brand-dark)">Bs '+fmt(totC,2)+'</b></span></div>'+
+      mesesHtml+'</div>';
+  }).join('') || '<p class="empty">Sin ventas para mostrar</p>';
+  document.getElementById('comResumen').innerHTML = 'Ventas <b>Bs '+fmt(granBase,2)+'</b> · Comisiones <b>Bs '+fmt(granCom,2)+'</b>';
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('tr[data-id]').forEach(function(tr){
+    var id = Number(tr.dataset.id);
+    var v = ventaState.rows.find(function(x){ return x.id===id; });
+    tr.querySelector('.com-pct').addEventListener('change', function(){
+      var val = this.value==='' ? null : parseFloat(this.value);
+      if(val!=null && (isNaN(val) || val<0 || val>100)){ toast('Poné un porcentaje entre 0 y 100'); return; }
+      var inp = this; inp.disabled = true;
+      sb.rpc('asignar_comision_pedido', {p_pedido_id:id, p_pct:val}).then(function(res){
+        inp.disabled = false;
+        if(res.error){ toast('No se pudo guardar la comisión: '+errMsg(res.error)); return; }
+        if(v) v.comision_pct = val;
+        toast('Comisión guardada');
+        renderComisionesRows();
+      });
+    });
+    tr.querySelector('.com-vend').addEventListener('change', function(){
+      var val = this.value, sel = this; sel.disabled = true;
+      sb.rpc('asignar_vendedor_pedido', {p_pedido_id:id, p_vendedor:val||null}).then(function(res){
+        sel.disabled = false;
+        if(res.error){ toast('No se pudo asignar el vendedor: '+errMsg(res.error)); return; }
+        if(v) v.vendedor = val||null;
+        toast('Vendedor asignado');
+        renderComisionesRows();
+      });
+    });
+  });
+}
+document.getElementById('comVendedor').addEventListener('change', renderComisionesRows);
+document.getElementById('comMes').addEventListener('change', renderComisionesRows);
+document.getElementById('comSearch').addEventListener('input', renderComisionesRows);
+
 /* ================= PEDIDOS DE VENTA (multi-producto) ================= */
 var CONDICION_PAGO_LABEL = {contado:'Contado', credito:'Crédito', otro:'Otro'};
 var pvLineas = []; // [{producto_hoja, cantidad, precio, asig:{stockId: toneladas}, descuentoPct}]
@@ -3238,6 +3376,7 @@ function renderPedidoVentaForm(){
   pvLineas = [{producto_hoja:'', cantidad:1, precio:'', asig:{}, descuentoPct:''}];
   document.getElementById('pedidoVentaBody').innerHTML =
     '<div class="inline-field"><label>Cliente</label><input type="text" id="pv_cliente" list="clientesDatalist" style="min-width:220px" placeholder="Nombre del cliente"></div>'+
+    '<div class="inline-field"><label>Vendedor</label><select id="pv_vendedor" style="min-width:200px">'+vendedorOptions(vendedorPorNombre(currentProfile&&currentProfile.nombre))+'</select></div>'+
     '<div class="inline-field"><label>Condición de pago</label><select id="pv_condicion">'+
       '<option value="">— Sin especificar —</option>'+
       '<option value="contado">Contado</option>'+
@@ -3606,6 +3745,7 @@ function openPedidoVentaModal(pf){
 function prefillPedidoDesdeProforma(pf){
   var items = pfItemsOf(pf);
   document.getElementById('pv_cliente').value = pf.cliente || '';
+  var vPf = vendedorPorNombre(pf.creado_por_nombre); if(vPf) document.getElementById('pv_vendedor').value = vPf;
   var fe = document.getElementById('pv_fechaEntrega');
   if(pf.fecha_entrega){ fe.value = pf.fecha_entrega; fe.dispatchEvent(new Event('change')); }
   var me = document.getElementById('pv_modoEntrega');
@@ -3634,6 +3774,7 @@ function submitPedidoVenta(){
   var condicion = document.getElementById('pv_condicion').value || null;
   var condicionNota = document.getElementById('pv_condicionNota').value.trim();
   var fechaEntrega = document.getElementById('pv_fechaEntrega').value || null;
+  var vendedorSel = (document.getElementById('pv_vendedor')||{}).value || '';
   var modoEntrega = document.getElementById('pv_modoEntrega').value || null;
   var flete = fletePedidoActual();
   if(!cliente){ toast('Poné el cliente'); return; }
@@ -3692,6 +3833,7 @@ function submitPedidoVenta(){
     if(res.error){ toast((ex?'No se pudieron agregar los productos: ':'No se pudo crear el pedido de venta: ')+errMsg(res.error)); return; }
     var row = Array.isArray(res.data) ? res.data[0] : res.data;
     closePedidoVentaModal();
+    if(vendedorSel && row) sb.rpc('asignar_vendedor_pedido', {p_pedido_id: row.id, p_vendedor: vendedorSel}).then(function(r3){ if(r3.error) toast('No se pudo asignar el vendedor: '+errMsg(r3.error)); });
     if(pvDesdeProforma){
       var pfA = pvDesdeProforma; pvDesdeProforma = null;
       sb.rpc('aprobar_proforma', {p_proforma_id: pfA.id, p_pedido_id: row.id}).then(function(r2){
@@ -7205,6 +7347,8 @@ function aplicarPermisosRol(){
   var btnCompra = document.getElementById('btnNuevaCompra');
   if(btnCompra) btnCompra.style.display = puedeIngreso ? '' : 'none';
   var puedeVenta = rol==='admin' || rol==='comercial';
+  var navCom = document.getElementById('navComisiones');
+  if(navCom) navCom.style.display = rol==='admin' ? '' : 'none';
   var btnPv = document.getElementById('btnNuevoPedidoVenta');
   if(btnPv) btnPv.style.display = puedeVenta ? '' : 'none';
   var ocultaPrecio = rol==='produccion';
