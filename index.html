@@ -3376,7 +3376,7 @@ function renderPedidoVentaForm(){
   pvLineas = [{producto_hoja:'', cantidad:1, precio:'', asig:{}, descuentoPct:''}];
   document.getElementById('pedidoVentaBody').innerHTML =
     '<div class="inline-field"><label>Cliente</label><input type="text" id="pv_cliente" list="clientesDatalist" style="min-width:220px" placeholder="Nombre del cliente"></div>'+
-    '<div class="inline-field"><label>Vendedor</label><select id="pv_vendedor" style="min-width:200px">'+vendedorOptions(vendedorPorNombre(currentProfile&&currentProfile.nombre))+'</select></div>'+
+    '<div class="inline-field"><label>Vendedor de esta venta</label><select id="pv_vendedor" style="min-width:200px">'+vendedorOptions('').replace('— sin vendedor —','— elegí el vendedor —')+'</select></div>'+
     '<div class="inline-field"><label>Condición de pago</label><select id="pv_condicion">'+
       '<option value="">— Sin especificar —</option>'+
       '<option value="contado">Contado</option>'+
@@ -3745,7 +3745,6 @@ function openPedidoVentaModal(pf){
 function prefillPedidoDesdeProforma(pf){
   var items = pfItemsOf(pf);
   document.getElementById('pv_cliente').value = pf.cliente || '';
-  var vPf = vendedorPorNombre(pf.creado_por_nombre); if(vPf) document.getElementById('pv_vendedor').value = vPf;
   var fe = document.getElementById('pv_fechaEntrega');
   if(pf.fecha_entrega){ fe.value = pf.fecha_entrega; fe.dispatchEvent(new Event('change')); }
   var me = document.getElementById('pv_modoEntrega');
