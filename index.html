@@ -286,6 +286,8 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
 .pf-table td.num{white-space:nowrap}
 .pf-table th:first-child,.pf-table td:first-child{width:20%}
 .pf-table th.num{text-align:right}
+/* en los documentos (PDF) el encabezado de tabla no puede ser «sticky»: html2canvas lo dibuja encima de las primeras filas */
+.fi-card th{position:static}
 .pf-table th{word-break:normal;overflow-wrap:normal}
 .pf-table.pf-6 th,.pf-table.pf-6 td{font-size:11px;padding-left:4px;padding-right:4px}
 .pf-table.pf-6 th:first-child,.pf-table.pf-6 td:first-child{width:24%}
