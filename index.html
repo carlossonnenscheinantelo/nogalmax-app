@@ -3155,8 +3155,11 @@ function renderPedidosVentaRows(){
     }).join('')+'</div>';
     var precioCell = items.map(function(it){ return '<div>'+(it.precio_pactado!=null?fmt(it.precio_pactado,2):'—')+'</div>'; }).join('');
     var lotesCell = '<div class="pv-multi">'+items.map(function(it){ return '<div>'+escapeHtml(it.lote||'—')+'</div>'; }).join('')+'</div>';
+    /* si el pedido lleva flete, se muestra el flete por tonelada y el total incluye el flete (igual que la nota de venta) */
+    var fletePv = Number(v.flete_bs)||0;
+    if(fletePv>0 && cantidadTotal>0) precioCell += '<div class="muted" style="font-size:11px">+ flete '+fmt(fletePv/cantidadTotal,2)+'/Ton</div>';
     var celdaPrecio = ocultaPrecio ? '' : '<td class="num"><div class="pv-multi">'+precioCell+'</div></td>';
-    var celdaTotal = ocultaPrecio ? '' : '<td class="num">'+(hayPrecio?fmt(totalPactado,2):'—')+'</td>';
+    var celdaTotal = ocultaPrecio ? '' : '<td class="num">'+(hayPrecio?('<b>'+fmt(totalPactado+fletePv,2)+'</b>'+(fletePv>0?'<div class="muted" style="font-size:11px">incl. flete '+fmt(fletePv,2)+'</div>':'')):'—')+'</td>';
     var puedeEliminarPv = items.every(function(it){ var p = it.producciones; return !p || (!p.despachado && !(Number(p.despachado_cantidad)>0) && (p.estado!=='completada' || p.desde_stock_existente)); });
     var eliminarCellPv = !esAdminPv ? '' : (puedeEliminarPv
       ? '<td><button class="ghost danger btn-eliminar-pv" title="Eliminar este pedido de venta">🗑️</button></td>'
