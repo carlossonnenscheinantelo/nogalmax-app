@@ -685,6 +685,27 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
     <p class="footnote">Un pedido de venta puede incluir varios productos — cada uno genera su propia orden de producción y lote. El documento (📄) imprime la fórmula de cada producto y el total general de insumos. El seguimiento de fabricación, completado y despacho se hace desde «🏭 Producción → Órdenes de Producción».</p>
   </section>
 
+  <!-- APROBACIONES de cambios (pedidos de venta y órdenes de producción) -->
+  <section id="view-aprobaciones" class="view">
+    <div class="toolbar">
+      <div id="aprobFiltros" style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="filter-chip active" data-f="pendiente">⏳ Pendientes</button>
+        <button class="filter-chip" data-f="aprobada">✅ Aprobadas</button>
+        <button class="filter-chip" data-f="rechazada">✖ Rechazadas</button>
+        <button class="filter-chip" data-f="">Todas</button>
+      </div>
+      <div class="spacer"></div>
+      <button class="ghost" id="btnAprobRefrescar">🔄 Actualizar</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Fecha</th><th>Pidió</th><th>Cambio solicitado</th><th>Motivo</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="aprobBody"></tbody>
+      </table>
+    </div>
+    <p class="footnote">Los cambios que pide Comercial a pedidos de venta y órdenes de producción no se aplican hasta que el administrador los aprueba. Al aprobar, se actualiza toda la cadena sola: orden de producción, insumos descontados del stock, nota de venta y sus cuotas. Al eliminar un pedido, se borran sus órdenes y su nota de venta y el insumo vuelve al stock.</p>
+  </section>
+
   <!-- PROFORMAS -->
   <section id="view-proformas" class="view">
     <div class="toolbar">
@@ -1082,6 +1103,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
     <div class="nav-group-items">
       <button data-tab="pedidosventa" class="nav-item">🧾 Pedidos de Venta</button>
       <button data-tab="proformas" class="nav-item">📄 Proformas</button>
+      <button data-tab="aprobaciones" class="nav-item" id="navAprobaciones" style="display:none">✅ Aprobaciones <span id="navBadgeAprob" class="nav-badge" hidden>0</span></button>
     </div>
   </div>
   <div class="nav-group open" data-group="cobranzasgrp">
@@ -1714,6 +1736,7 @@ document.querySelectorAll('.nav-item').forEach(function(btn){
     if(btn.dataset.tab==='ordenes') renderOrdenes(!ordenesState.loaded);
     if(btn.dataset.tab==='pedidosventa') renderPedidosVenta(!ventaState.loaded);
     if(btn.dataset.tab==='proformas') renderProformas(!proformaState.loaded);
+    if(btn.dataset.tab==='aprobaciones') renderAprobaciones(true);
     if(btn.dataset.tab==='notasventa') renderNotasVenta(!notaVentaState.loaded);
     if(btn.dataset.tab==='pagos') renderPagos(!notaVentaState.loaded);
     if(btn.dataset.tab==='recibos') renderRecibos(true);
@@ -3148,6 +3171,7 @@ function renderOrdenesRows(){
   });
   var puedeCompletar = currentProfile && (currentProfile.rol==='admin' || currentProfile.rol==='produccion');
   var esAdminOrd = currentProfile && currentProfile.rol==='admin';
+  var puedeGestionOrd = esAdminOrd || esGestorVentas();
   document.getElementById('ordenesBody').innerHTML = rows.map(function(o){
     var clienteLabel = o.es_stock_fabrica ? '<span class="tag">Stock fábrica</span>' : (escapeHtml(o.cliente||'—')+(o.desde_stock_existente?' <span class="tag" title="Esta producción salió de un lote que ya estaba en stock">📦 desde stock</span>':''));
     var estadoCell = puedeCompletar
@@ -3161,16 +3185,17 @@ function renderOrdenesRows(){
         ? '<button class="ghost btn-despachar" title="Despachado parcialmente — saldo por despachar: '+fmt(saldoDesp*1000,0)+' Kg">🚚 <span class="despacho-parcial">Llevan '+fmt(despCant*1000,0)+' de '+fmt((Number(o.cantidad_toneladas)||0)*1000,0)+' Kg</span></button>'
         : '<button class="ghost btn-despachar" title="Marcar despachado y subir boleta">🚚 Marcar</button>');
     var puedeEliminarOrd = o.estado!=='completada' && !o.despachado && despCant===0;
-    var eliminarCell = !esAdminOrd ? '' : (puedeEliminarOrd
+    var solOrd = !esAdminOrd && solicitudPendiente('orden', o.id);
+    var eliminarCell = !puedeGestionOrd ? '' : solOrd ? '<button class="ghost" disabled title="Ya tiene un cambio esperando aprobación">🗑️</button>' : (puedeEliminarOrd
       ? '<button class="ghost danger btn-eliminar-ord" title="Eliminar esta producción">🗑️</button>'
       : '<button class="ghost" disabled title="Ya está completada, despachada o con despacho parcial — no se puede eliminar">🗑️</button>');
-    var editarCell = !esAdminOrd ? '' : (puedeEliminarOrd
+    var editarCell = !puedeGestionOrd ? '' : solOrd ? '<button class="ghost" disabled title="Ya tiene un cambio esperando aprobación">✏️</button>' : (puedeEliminarOrd
       ? '<button class="ghost btn-editar-ord" title="Editar esta producción">✏️</button>'
       : '<button class="ghost" disabled title="Ya está completada, despachada o con despacho parcial — no se puede editar">✏️</button>');
     var rowClass = o.despachado ? 'ord-row-despachado' : (despCant>0 ? 'ord-row-parcial' : (o.estado==='completada' ? 'ord-row-completada' : ''));
     return '<tr data-id="'+o.id+'"'+(rowClass?' class="'+rowClass+'"':'')+'>'+
       '<td>'+fmtFecha(o.fecha_pedido)+'</td>'+
-      '<td><b>'+escapeHtml(o.numero_produccion)+'</b></td>'+
+      '<td><b>'+escapeHtml(o.numero_produccion)+'</b>'+solicitudTag('orden', o.id)+'</td>'+
       '<td>'+escapeHtml(o.lote)+'</td>'+
       '<td>'+escapeHtml(o.producto_nombre)+formulaCellOrd(o, puedeCompletar && puedeEliminarOrd)+(o.bloqueado?' <span class="tag" style="background:#fde3e3;color:#b91c1c">🚫 '+escapeHtml(o.nota||'Bloqueado')+'</span>':'')+'</td>'+
       '<td class="num">'+fmt(o.cantidad_toneladas,2)+'</td>'+
@@ -3246,6 +3271,13 @@ function renderOrdenesRows(){
       var id = Number(btn.closest('tr').dataset.id);
       var o = ordenesState.rows.find(function(x){return x.id===id;});
       if(!o) return;
+      if(necesitaAprobacion()){
+        var motivoOrd = prompt('Pedir eliminar la orden «'+o.numero_produccion+'» ('+o.producto_nombre+', '+fmt(o.cantidad_toneladas,2)+' Ton).'+(o.pedido_venta_numero?'\nTambién sale del pedido '+o.pedido_venta_numero+' y se recalcula su nota de venta.':'')+'\n\nSe elimina recién cuando el administrador lo apruebe.\n\nMotivo:', '');
+        if(motivoOrd===null) return;
+        btn.disabled = true;
+        enviarSolicitud('eliminar_orden', id, null, motivoOrd, function(){ btn.disabled = false; renderOrdenesRows(); });
+        return;
+      }
       if(!confirm('¿Eliminar la producción «'+o.numero_produccion+'» ('+o.producto_nombre+', '+fmt(o.cantidad_toneladas,2)+' Ton)?\n\nSe va a devolver al stock el insumo que se había descontado. Esta acción no se puede deshacer.')) return;
       btn.disabled = true;
       sb.rpc('eliminar_produccion', {p_id:id}).then(function(res){
@@ -3665,6 +3697,7 @@ function renderPedidosVentaRows(){
   });
   var ocultaPrecio = currentProfile && currentProfile.rol==='produccion';
   var esAdminPv = currentProfile && currentProfile.rol==='admin';
+  var puedeGestionPv = esGestorVentas();
   document.getElementById('pedidosVentaBody').innerHTML = rows.map(function(v){
     var items = pvItems(v);
     var cantidadTotal = items.reduce(function(s,it){ return s+(Number(it.cantidad_toneladas)||0); }, 0);
@@ -3681,13 +3714,14 @@ function renderPedidosVentaRows(){
     var celdaPrecio = ocultaPrecio ? '' : '<td class="num"><div class="pv-multi">'+precioCell+'</div></td>';
     var celdaTotal = ocultaPrecio ? '' : '<td class="num">'+(hayPrecio?('<b>'+fmt(totalPactado+fletePv,2)+'</b>'+(fletePv>0?'<div class="muted" style="font-size:11px">incl. flete '+fmt(fletePv,2)+'</div>':'')):'—')+'</td>';
     var puedeEliminarPv = items.every(function(it){ var p = it.producciones; return !p || (!p.despachado && !(Number(p.despachado_cantidad)>0) && (p.estado!=='completada' || p.desde_stock_existente)); });
-    var eliminarCellPv = !esAdminPv ? '' : (puedeEliminarPv
+    var solPv = !esAdminPv && solicitudPendiente('pedido', v.id);
+    var eliminarCellPv = !puedeGestionPv ? '' : solPv ? '<td><button class="ghost" disabled title="Ya tiene un cambio esperando aprobación">🗑️</button></td>' : (puedeEliminarPv
       ? '<td><button class="ghost danger btn-eliminar-pv" title="Eliminar este pedido de venta">🗑️</button></td>'
       : '<td><button class="ghost" disabled title="Ya tiene alguna línea completada o despachada — no se puede eliminar">🗑️</button></td>');
-    var editarCellPv = !esAdminPv ? '' : '<td><button class="ghost btn-editar-pv" title="Editar este pedido de venta">✏️</button></td>';
+    var editarCellPv = !puedeGestionPv ? '' : solPv ? '<td><button class="ghost" disabled title="Ya tiene un cambio esperando aprobación">✏️</button></td>' : '<td><button class="ghost btn-editar-pv" title="Editar este pedido de venta">✏️</button></td>';
     return '<tr data-id="'+v.id+'">'+
       '<td>'+fmtFecha(v.fecha_pedido)+'</td>'+
-      '<td><b>'+escapeHtml(v.numero_pedido)+'</b></td>'+
+      '<td><b>'+escapeHtml(v.numero_pedido)+'</b>'+solicitudTag('pedido', v.id)+'</td>'+
       '<td>'+escapeHtml(v.cliente||'—')+'</td>'+
       '<td>'+productosCell+'</td>'+
       '<td class="num">'+fmt(cantidadTotal,2)+'</td>'+
@@ -3701,7 +3735,7 @@ function renderPedidosVentaRows(){
       editarCellPv+
       eliminarCellPv+
     '</tr>';
-  }).join('') || '<tr><td colspan="'+(ocultaPrecio?(esAdminPv?12:10):(esAdminPv?14:12))+'" class="empty">Sin pedidos de venta registrados</td></tr>';
+  }).join('') || '<tr><td colspan="'+(ocultaPrecio?(puedeGestionPv?12:10):(puedeGestionPv?14:12))+'" class="empty">Sin pedidos de venta registrados</td></tr>';
   document.querySelectorAll('.btn-desp-pv').forEach(function(btn){
     btn.addEventListener('click', function(){
       var id = Number(btn.closest('tr').dataset.id);
@@ -3728,6 +3762,13 @@ function renderPedidosVentaRows(){
       var id = Number(btn.closest('tr').dataset.id);
       var v = ventaState.rows.find(function(x){return x.id===id;});
       if(!v) return;
+      if(necesitaAprobacion()){
+        var motivoPv = prompt('Pedir eliminar el pedido «'+v.numero_pedido+'» de '+(v.cliente||'—')+'.\n\nSe elimina recién cuando el administrador lo apruebe (con sus órdenes de producción y su nota de venta).\n\nMotivo:', '');
+        if(motivoPv===null) return;
+        btn.disabled = true;
+        enviarSolicitud('eliminar_pedido', id, null, motivoPv, function(){ btn.disabled = false; renderPedidosVentaRows(); });
+        return;
+      }
       if(!confirm('¿Eliminar el pedido de venta «'+v.numero_pedido+'» de '+(v.cliente||'—')+'?\n\nSe van a eliminar todas sus líneas y se va a devolver al stock el insumo que se había descontado. Lo que se tomó de Stock en Fábrica vuelve al stock (si era parte de un lote, se vuelve a unir a su lote). Esta acción no se puede deshacer.')) return;
       btn.disabled = true;
       sb.rpc('eliminar_pedido_venta', {p_id:id}).then(function(res){
@@ -6444,6 +6485,7 @@ function renderEditarOrdModalBody(){
   }
   document.getElementById('eo_producto').addEventListener('change', refrescarFormulaEo);
   refrescarFormulaEo();
+  if(necesitaAprobacion()) modoSolicitudEditarOrd();
 }
 function submitEditarOrd(){
   var o = editarOrdState;
@@ -6461,6 +6503,14 @@ function submitEditarOrd(){
   btn.disabled = true;
   var fWrap = document.getElementById('eo_formulaWrap');
   var varianteNueva = (fWrap && fWrap.style.display!=='none') ? (document.getElementById('eo_formula').value||'') : null;
+  if(necesitaAprobacion()){
+    var cambiosOrd = {producto_hoja:productoHoja, cantidad_toneladas:cantidadTon};
+    if(clienteEl) cambiosOrd.cliente = cliente;
+    if(fechaEl) cambiosOrd.fecha_entrega = fecha || '';
+    if(varianteNueva!==null) cambiosOrd.variante = varianteNueva;
+    enviarSolicitud('editar_orden', o.id, cambiosOrd, (document.getElementById('eo_motivo')||{}).value||'', function(ok){ btn.disabled = false; if(ok) closeEditarOrdModal(); });
+    return;
+  }
   sb.rpc('editar_produccion', {p_id:o.id, p_producto_hoja:productoHoja, p_cantidad_toneladas:cantidadTon, p_cliente:cliente, p_fecha_entrega:fecha}).then(function(res){
     if(res.error){ btn.disabled = false; toast('No se pudo editar: '+errMsg(res.error)); return; }
     var row = Array.isArray(res.data) ? res.data[0] : res.data;
@@ -6548,6 +6598,7 @@ function renderEditarPvModalBody(){
   document.querySelectorAll('.btn-guardar-linea-pv').forEach(function(btn){
     btn.addEventListener('click', function(){ submitEditarPvLinea(Number(btn.dataset.itemid), btn); });
   });
+  if(necesitaAprobacion()) modoSolicitudEditarPv();
 }
 function submitEditarPvHeader(){
   var v = editarPvState;
@@ -8958,6 +9009,180 @@ function onSignedIn(session){
     });
   }
 }
+/* ================= APROBACIONES (solicitudes de cambio) ================= */
+var solicitudesState = {rows:[], loaded:false, filtro:'pendiente'};
+function esAdminUsr(){ return !!(currentProfile && currentProfile.rol==='admin'); }
+function esGestorVentas(){ return !!(currentProfile && (currentProfile.rol==='admin' || currentProfile.puede_gestionar_ventas)); }
+function necesitaAprobacion(){ return !!(currentProfile && currentProfile.rol!=='admin' && currentProfile.puede_gestionar_ventas); }
+function solicitudPendiente(clase, id){
+  return solicitudesState.rows.find(function(r){
+    if(r.estado!=='pendiente') return false;
+    return clase==='pedido' ? ((r.tipo==='editar_pedido'||r.tipo==='eliminar_pedido') && r.pedido_venta_id===id)
+                            : ((r.tipo==='editar_orden'||r.tipo==='eliminar_orden') && r.produccion_id===id);
+  }) || null;
+}
+function solicitudTag(clase, id){
+  var r = solicitudPendiente(clase, id);
+  if(!r) return '';
+  var t = r.tipo.indexOf('eliminar')===0 ? '⏳ Eliminación por aprobar' : '⏳ Cambio por aprobar';
+  return ' <span class="tag" style="background:#fff4e5;color:#8a4b00" title="'+escapeHtml(r.resumen||'')+'">'+t+'</span>';
+}
+function fetchSolicitudes(cb){
+  if(!sb || !esGestorVentas()){ solicitudesState.rows=[]; actualizarBadgeAprob(); if(cb) cb(); return; }
+  sb.from('solicitudes_cambio').select('*').order('creado_en', {ascending:false}).limit(300).then(function(res){
+    if(!res.error){ solicitudesState.rows = res.data||[]; solicitudesState.loaded = true; }
+    actualizarBadgeAprob();
+    if(cb) cb();
+  });
+}
+function refreshSolicitudes(){
+  fetchSolicitudes(function(){
+    if(activeTab()==='aprobaciones') renderAprobacionesRows();
+    if(ventaState.loaded && activeTab()==='pedidosventa') renderPedidosVentaRows();
+    if(ordenesState.loaded && activeTab()==='ordenes') renderOrdenesRows();
+  });
+}
+function actualizarBadgeAprob(){
+  var b = document.getElementById('navBadgeAprob');
+  var n = solicitudesState.rows.filter(function(r){ return r.estado==='pendiente' && (esAdminUsr() || r.solicitado_por===(currentUser&&currentUser.id)); }).length;
+  if(b){ if(n>0){ b.textContent = n>99?'99+':String(n); b.hidden=false; } else b.hidden=true; }
+  var m = document.getElementById('btnMenuMovil');
+  if(m) m.textContent = (esAdminUsr() && n>0) ? '☰ •' : '☰';
+}
+setInterval(function(){ if(currentProfile && esGestorVentas()) refreshSolicitudes(); }, 60000);
+function enviarSolicitud(tipo, id, cambios, motivo, cb){
+  sb.rpc('solicitar_cambio', {p_tipo:tipo, p_id:id, p_cambios:cambios||null, p_motivo:(motivo||'').trim()||null}).then(function(res){
+    if(res.error){ toast('No se pudo enviar: '+errMsg(res.error)); if(cb) cb(false); return; }
+    toast('📨 Enviado para aprobación del administrador. No se aplica hasta que lo apruebe.');
+    refreshSolicitudes();
+    if(cb) cb(true);
+  });
+}
+var SOL_TIPO = {editar_pedido:'✏️ Editar pedido', eliminar_pedido:'🗑️ Eliminar pedido', editar_orden:'✏️ Editar orden', eliminar_orden:'🗑️ Eliminar orden'};
+var SOL_ESTADO = {pendiente:['pill-parcial','Pendiente'], aprobada:['pill-pagada','Aprobada'], rechazada:['pill-vencida','Rechazada'], cancelada:['pill-pendiente','Cancelada']};
+function renderAprobaciones(forceReload){
+  if(forceReload){ fetchSolicitudes(renderAprobacionesRows); return; }
+  renderAprobacionesRows();
+}
+function renderAprobacionesRows(){
+  var f = solicitudesState.filtro;
+  var rows = solicitudesState.rows.filter(function(r){ return !f || r.estado===f; });
+  var miId = currentUser && currentUser.id;
+  document.getElementById('aprobBody').innerHTML = rows.map(function(r){
+    var est = SOL_ESTADO[r.estado] || ['pill-pendiente', r.estado];
+    var acciones = '';
+    if(r.estado==='pendiente'){
+      if(esAdminUsr()) acciones = '<button class="primary btn-aprob-ok">✅ Aprobar</button> <button class="danger btn-aprob-no">✖ Rechazar</button>';
+      else if(r.solicitado_por===miId) acciones = '<button class="ghost btn-aprob-cancel">Cancelar solicitud</button>';
+    }
+    var resuelto = r.resuelto_en ? '<div class="muted" style="font-size:11px">'+escapeHtml(r.resuelto_por_nombre||'')+' · '+fmtFecha(String(r.resuelto_en).slice(0,10))+'</div>'+(r.comentario?'<div class="muted" style="font-size:11px">💬 '+escapeHtml(r.comentario)+'</div>':'') : '';
+    return '<tr data-id="'+r.id+'">'+
+      '<td>'+fmtFecha(String(r.creado_en).slice(0,10))+'<div class="muted" style="font-size:11px">'+String(r.creado_en).slice(11,16)+'</div></td>'+
+      '<td>'+escapeHtml(r.solicitado_por_nombre||'—')+'</td>'+
+      '<td style="white-space:normal;min-width:260px"><b>'+(SOL_TIPO[r.tipo]||r.tipo)+'</b>'+(r.cliente?' · '+escapeHtml(r.cliente):'')+'<div style="font-size:12.5px;margin-top:2px">'+escapeHtml(r.resumen||'')+'</div></td>'+
+      '<td style="white-space:normal">'+escapeHtml(r.motivo||'—')+'</td>'+
+      '<td><span class="pill-estado '+est[0]+'">'+est[1]+'</span>'+resuelto+'</td>'+
+      '<td style="white-space:nowrap">'+acciones+'</td>'+
+    '</tr>';
+  }).join('') || '<tr><td colspan="6" class="empty">'+(f==='pendiente'?'No hay cambios esperando aprobación 👍':'Sin solicitudes')+'</td></tr>';
+  document.querySelectorAll('.btn-aprob-ok, .btn-aprob-no').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var id = Number(btn.closest('tr').dataset.id);
+      var r = solicitudesState.rows.find(function(x){ return x.id===id; });
+      if(!r) return;
+      var aprobar = btn.classList.contains('btn-aprob-ok');
+      var comentario = null;
+      if(aprobar){
+        if(!confirm('¿Aprobar este cambio?\n\n'+(r.resumen||'')+'\n\nSe aplica ahora y se actualiza toda la cadena (orden de producción, stock de insumos, nota de venta y cuotas).')) return;
+      } else {
+        comentario = prompt('¿Por qué lo rechazás? (opcional, lo ve quien lo pidió)', '');
+        if(comentario===null) return;
+      }
+      btn.disabled = true;
+      sb.rpc('resolver_solicitud_cambio', {p_id:id, p_aprobar:aprobar, p_comentario:comentario}).then(function(res){
+        btn.disabled = false;
+        if(res.error){ toast('No se pudo '+(aprobar?'aplicar':'rechazar')+': '+errMsg(res.error)); return; }
+        toast(aprobar ? '✅ Cambio aprobado y aplicado' : 'Solicitud rechazada');
+        refreshSolicitudes();
+        if(aprobar){
+          if(ventaState.loaded) renderPedidosVenta(true);
+          fetchProducciones(function(){ if(activeTab()==='ordenes') renderOrdenesRows(); if(activeTab()==='stockfabrica') renderStockFabricaRows(); if(activeTab()==='entregados') renderEntregadosRows(); });
+          if(typeof fetchNotasVenta==='function') fetchNotasVenta(function(){});
+        }
+      });
+    });
+  });
+  document.querySelectorAll('.btn-aprob-cancel').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var id = Number(btn.closest('tr').dataset.id);
+      btn.disabled = true;
+      sb.rpc('cancelar_solicitud_cambio', {p_id:id}).then(function(res){
+        btn.disabled = false;
+        if(res.error){ toast('No se pudo cancelar: '+errMsg(res.error)); return; }
+        toast('Solicitud cancelada'); refreshSolicitudes();
+      });
+    });
+  });
+}
+document.querySelectorAll('#aprobFiltros .filter-chip').forEach(function(ch){
+  ch.addEventListener('click', function(){
+    document.querySelectorAll('#aprobFiltros .filter-chip').forEach(function(x){ x.classList.remove('active'); });
+    ch.classList.add('active'); solicitudesState.filtro = ch.dataset.f; renderAprobacionesRows();
+  });
+});
+document.getElementById('btnAprobRefrescar').addEventListener('click', function(){ renderAprobaciones(true); });
+/* edición de pedido en modo «solicitud» (Comercial): un solo botón que envía todo para aprobar */
+function modoSolicitudEditarPv(){
+  var v = editarPvState; if(!v) return;
+  var hb = document.getElementById('btnGuardarEditarPvHeader'); if(hb) hb.parentNode.style.display='none';
+  document.querySelectorAll('#editarPvBody .btn-guardar-linea-pv').forEach(function(b){ b.style.display='none'; });
+  document.querySelectorAll('#editarPvBody .epvi-formula').forEach(function(sel){ var w = sel.closest('.inline-field'); if(w) w.style.display='none'; });
+  var cerrar = document.getElementById('btnCerrarEditarPv2');
+  var box = document.createElement('div');
+  box.innerHTML = '<div class="section-title">Enviar para aprobación</div>'+
+    '<p class="footnote" style="margin-top:0">Estos cambios no se aplican hasta que el administrador los apruebe. Cuando los apruebe, se actualizan solas la orden de producción, la nota de venta y sus cuotas.</p>'+
+    '<div class="inline-field"><label>Motivo del cambio</label><input type="text" id="epv_motivo" style="min-width:220px" placeholder="Ej.: el cliente pidió 5 toneladas menos"></div>'+
+    '<div style="margin-top:10px"><button class="primary" id="btnEnviarSolicitudPv">📨 Enviar para aprobación</button></div>';
+  cerrar.parentNode.parentNode.insertBefore(box, cerrar.parentNode);
+  document.getElementById('btnEnviarSolicitudPv').addEventListener('click', function(){
+    var btn = this;
+    var cliente = document.getElementById('epv_cliente').value.trim();
+    if(!cliente){ toast('Poné el cliente'); return; }
+    var modo = document.getElementById('epv_modoEntrega').value || null;
+    var fleteEl = document.getElementById('epv_flete');
+    var header = {
+      cliente: cliente,
+      condicion_pago: document.getElementById('epv_condicion').value || '',
+      condicion_pago_nota: document.getElementById('epv_condicionNota').value.trim(),
+      fecha_entrega: document.getElementById('epv_fechaEntrega').value || '',
+      modo_entrega: modo || '',
+      flete_bs: (modo==='envio' && fleteEl) ? (parseFloat(fleteEl.value)||0) : 0
+    };
+    var items = [], error = null;
+    var lista = pvItems(v);
+    document.querySelectorAll('#editarPvBody .pv-linea-row[data-itemid]').forEach(function(row){
+      var itemId = Number(row.dataset.itemid);
+      var it = lista.find(function(x){ return x.id===itemId; }) || {};
+      var pSel = row.querySelector('.epvi-producto'), cIn = row.querySelector('.epvi-cantidad'), prIn = row.querySelector('.epvi-precio');
+      var cant = cIn.disabled ? Number(it.cantidad_toneladas) : (parseFloat(cIn.value)||0)/1000;
+      if(!(cant>0)) error = 'La cantidad debe ser mayor a 0';
+      items.push({item_id:itemId, producto_hoja: pSel.disabled ? it.producto_hoja : pSel.value, cantidad_toneladas: cant, precio_pactado: prIn.value===''? null : parseFloat(prIn.value)});
+    });
+    if(error){ toast(error); return; }
+    btn.disabled = true;
+    enviarSolicitud('editar_pedido', v.id, {header:header, items:items}, document.getElementById('epv_motivo').value, function(ok){
+      btn.disabled = false; if(ok) closeEditarPvModal();
+    });
+  });
+}
+function modoSolicitudEditarOrd(){
+  var btn = document.getElementById('btnGuardarEditarOrd'); if(!btn) return;
+  btn.textContent = '📨 Enviar para aprobación';
+  var w = document.createElement('div');
+  w.innerHTML = '<div class="inline-field"><label>Motivo del cambio</label><input type="text" id="eo_motivo" style="min-width:220px" placeholder="Ej.: se corrigió la cantidad"></div>'+
+    '<p class="footnote" style="margin-top:4px">El cambio no se aplica hasta que el administrador lo apruebe.</p>';
+  btn.parentNode.parentNode.insertBefore(w, btn.parentNode);
+}
 function aplicarPermisosRol(){
   var rol = currentProfile ? currentProfile.rol : null;
   var puedeIngreso = rol==='admin' || rol==='produccion';
@@ -8966,6 +9191,9 @@ function aplicarPermisosRol(){
   var btnCompra = document.getElementById('btnNuevaCompra');
   if(btnCompra) btnCompra.style.display = puedeIngreso ? '' : 'none';
   var puedeVenta = rol==='admin' || rol==='comercial';
+  var navAp = document.getElementById('navAprobaciones');
+  if(navAp) navAp.style.display = esGestorVentas() ? '' : 'none';
+  refreshSolicitudes();
   var navCom = document.getElementById('navComisiones');
   if(navCom) navCom.style.display = rol==='admin' ? '' : 'none';
   var btnPv = document.getElementById('btnNuevoPedidoVenta');
