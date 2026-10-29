@@ -1518,12 +1518,6 @@ function opcionesFormula(p, sel){
     return '<option value="'+escapeHtml(val)+'"'+((sel||'')===val?' selected':'')+'>'+escapeHtml(f.nombre || 'Fórmula principal')+(i===0?' (principal)':'')+'</option>';
   }).join('');
 }
-function formulaCellOrd(o, editable){
-  var p = state.productos.find(function(x){ return x.hoja===o.producto_hoja; });
-  if(!editable || !tieneVariantes(p) || o.desde_stock_existente) return varianteTag(o.variante);
-  var actual = (o.variante && String(o.variante).toLowerCase()!==String(p.formula_nombre||'').toLowerCase()) ? o.variante : '';
-  return '<div style="margin-top:4px"><select class="ord-formula-sel" title="Elegí con qué fórmula se produce" style="font-size:12px;padding:3px 6px">'+opcionesFormula(p, actual)+'</select></div>';
-}
 function varianteTag(v){ return v ? ' <span class="tag" style="background:#eef2ff;color:#3730a3">'+escapeHtml(v)+'</span>' : ''; }
 function computeProducto(p){
   var mpCosto=0, mpKg=0, envCosto=0;
@@ -3077,7 +3071,7 @@ function renderOrdenesRows(){
       '<td>'+fmtFecha(o.fecha_pedido)+'</td>'+
       '<td><b>'+escapeHtml(o.numero_produccion)+'</b></td>'+
       '<td>'+escapeHtml(o.lote)+'</td>'+
-      '<td>'+escapeHtml(o.producto_nombre)+formulaCellOrd(o, puedeCompletar && puedeEliminarOrd)+(o.bloqueado?' <span class="tag" style="background:#fde3e3;color:#b91c1c">🚫 '+escapeHtml(o.nota||'Bloqueado')+'</span>':'')+'</td>'+
+      '<td>'+escapeHtml(o.producto_nombre)+varianteTag(o.variante)+(o.bloqueado?' <span class="tag" style="background:#fde3e3;color:#b91c1c">🚫 '+escapeHtml(o.nota||'Bloqueado')+'</span>':'')+'</td>'+
       '<td class="num">'+fmt(o.cantidad_toneladas,2)+'</td>'+
       '<td>'+clienteLabel+'</td>'+
       '<td>'+(o.fecha_entrega?fmtFecha(o.fecha_entrega):'—')+'</td>'+
@@ -3102,26 +3096,6 @@ function renderOrdenesRows(){
         if(idx!==-1) ordenesState.rows[idx] = row;
         renderOrdenesRows();
         toast(completar ? 'Producción marcada como completada' : 'Producción marcada como pendiente');
-      });
-    });
-  });
-  document.querySelectorAll('.ord-formula-sel').forEach(function(sel){
-    sel.addEventListener('change', function(){
-      var id = Number(sel.closest('tr').dataset.id);
-      var o = ordenesState.rows.find(function(x){return x.id===id;});
-      if(!o) return;
-      var etiqueta = sel.options[sel.selectedIndex].text;
-      sel.disabled = true;
-      sb.rpc('cambiar_formula_produccion', {p_id:id, p_variante: sel.value||null}).then(function(res){
-        sel.disabled = false;
-        if(res.error){ toast('No se pudo cambiar la fórmula: '+errMsg(res.error)); renderOrdenesRows(); return; }
-        var row = Array.isArray(res.data) ? res.data[0] : res.data;
-        var idx = ordenesState.rows.findIndex(function(x){return x.id===id;});
-        if(idx!==-1 && row) ordenesState.rows[idx] = row;
-        renderOrdenesRows();
-        if(typeof renderStockFabricaRows==='function') renderStockFabricaRows();
-        if(typeof ventaState!=='undefined' && ventaState.loaded) renderPedidosVenta(true);
-        toast(o.numero_produccion+' — fórmula cambiada a '+((row&&row.variante)||etiqueta)+'. Se recalcularon los insumos.');
       });
     });
   });
