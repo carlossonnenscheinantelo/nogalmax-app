@@ -457,6 +457,11 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
 
   <!-- RESUMEN -->
   <section id="view-resumen" class="view active">
+    <div id="bannerPush" class="card" style="display:none;margin-bottom:14px;border-color:#f0d585;background:#fff8e6">
+      <b>🔔 Avisos en tu celular</b>
+      <p style="margin:6px 0 10px;font-size:13px">Activalos para que la app te avise apenas haya un cambio de pedido u orden esperando tu aprobación, aunque la tengas cerrada. Se activa una vez en cada teléfono o computadora.</p>
+      <button class="primary btn-activar-push" type="button">🔔 Activar avisos en este celular</button>
+    </div>
     <div class="section-title" style="margin-top:0">Secciones</div>
     <div class="home-cards-grid" id="homeCards">
       <div class="home-card" data-tab="productos"><div class="hc-icon">📖</div><div class="hc-title">Recetario</div><div class="hc-sub">Fórmulas y precios de productos</div></div>
@@ -695,6 +700,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
         <button class="filter-chip" data-f="">Todas</button>
       </div>
       <div class="spacer"></div>
+      <button class="ghost btn-activar-push" type="button" style="display:none">🔔 Activar avisos en este celular</button>
       <button class="ghost" id="btnAprobRefrescar">🔄 Actualizar</button>
     </div>
     <div class="table-wrap">
@@ -9183,6 +9189,61 @@ function modoSolicitudEditarOrd(){
     '<p class="footnote" style="margin-top:4px">El cambio no se aplica hasta que el administrador lo apruebe.</p>';
   btn.parentNode.parentNode.insertBefore(w, btn.parentNode);
 }
+/* ================= AVISOS PUSH EN EL CELULAR ================= */
+var VAPID_PUBLIC = 'BMNiiHc8wTjitBykdFICvERkXWodnpVkxq5mHfrgpF3a_uO6y2LjTv1kFiGKEGXKqkhXxMWqcVziFdVkMbKTTnA';
+var swReg = null;
+function b64UrlToU8(b64){
+  var pad = '='.repeat((4 - b64.length % 4) % 4);
+  var raw = atob((b64 + pad).replace(/-/g,'+').replace(/_/g,'/'));
+  var out = new Uint8Array(raw.length); for(var i=0;i<raw.length;i++) out[i] = raw.charCodeAt(i); return out;
+}
+function pushSoportado(){ return ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window); }
+function esIphoneSinInstalar(){ return /iPhone|iPad|iPod/.test(navigator.userAgent) && !(window.navigator.standalone || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)); }
+function irATab(tab){
+  var b = document.querySelector('.nav-item[data-tab="'+tab+'"]');
+  if(b && b.style.display!=='none') b.click();
+}
+if(('serviceWorker' in navigator) && /^https?:/.test(location.protocol)){
+  navigator.serviceWorker.register('sw.js').then(function(r){ swReg = r; actualizarBotonPush(); }).catch(function(){});
+  navigator.serviceWorker.addEventListener('message', function(ev){ if(ev.data && ev.data.tab) irATab(ev.data.tab); });
+}
+function guardarSuscripcionPush(silencioso){
+  var regP = swReg ? Promise.resolve(swReg) : navigator.serviceWorker.ready;
+  return regP.then(function(reg){
+    return reg.pushManager.getSubscription().then(function(sub){
+      return sub || reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64UrlToU8(VAPID_PUBLIC)});
+    });
+  }).then(function(sub){
+    var j = sub.toJSON();
+    return sb.rpc('guardar_suscripcion_push', {p_endpoint:j.endpoint, p_p256dh:j.keys.p256dh, p_auth:j.keys.auth, p_dispositivo:navigator.userAgent.slice(0,200)});
+  }).then(function(res){
+    if(res && res.error){ if(!silencioso) toast('No se pudieron activar los avisos: '+errMsg(res.error)); return false; }
+    return true;
+  });
+}
+function activarPush(){
+  if(esIphoneSinInstalar()){ toast('En iPhone: primero agregá la app a la pantalla de inicio (Compartir → Agregar a inicio), abrila desde el ícono y tocá de nuevo este botón.'); return; }
+  if(!pushSoportado()){ toast('Este navegador no permite avisos. En el celular usá Chrome (Android) o la app instalada (iPhone).'); return; }
+  Notification.requestPermission().then(function(p){
+    if(p!=='granted'){ toast('No se dio permiso de notificaciones. Activalo en los ajustes del teléfono para la app NOGALMAX.'); actualizarBotonPush(); return; }
+    return guardarSuscripcionPush(false).then(function(ok){
+      actualizarBotonPush();
+      if(!ok) return;
+      return sb.rpc('probar_aviso_push').then(function(){ toast('🔔 Avisos activados. Te mandé uno de prueba: debería llegarte en unos segundos.'); });
+    });
+  }).catch(function(e){ toast('No se pudieron activar los avisos: '+((e&&e.message)||e)); });
+}
+function actualizarBotonPush(){
+  var mostrar = esAdminUsr();
+  var activo = ('Notification' in window) && Notification.permission==='granted';
+  document.querySelectorAll('.btn-activar-push').forEach(function(b){
+    b.style.display = mostrar ? '' : 'none';
+    b.textContent = activo ? '🔔 Avisos activos · enviar prueba' : '🔔 Activar avisos en este celular';
+  });
+  var ban = document.getElementById('bannerPush');
+  if(ban) ban.style.display = (mostrar && !activo) ? '' : 'none';
+}
+document.querySelectorAll('.btn-activar-push').forEach(function(b){ b.addEventListener('click', activarPush); });
 function aplicarPermisosRol(){
   var rol = currentProfile ? currentProfile.rol : null;
   var puedeIngreso = rol==='admin' || rol==='produccion';
@@ -9191,6 +9252,9 @@ function aplicarPermisosRol(){
   var btnCompra = document.getElementById('btnNuevaCompra');
   if(btnCompra) btnCompra.style.display = puedeIngreso ? '' : 'none';
   var puedeVenta = rol==='admin' || rol==='comercial';
+  actualizarBotonPush();
+  if(esAdminUsr() && pushSoportado() && Notification.permission==='granted') guardarSuscripcionPush(true).catch(function(){});
+  if(location.hash && location.hash.length>1){ var tabHash = location.hash.slice(1); setTimeout(function(){ irATab(tabHash); }, 300); }
   var navAp = document.getElementById('navAprobaciones');
   if(navAp) navAp.style.display = esGestorVentas() ? '' : 'none';
   refreshSolicitudes();
