@@ -95,6 +95,7 @@ main{padding:22px;flex:1;min-width:0}
 .cat-PROTEINADOS{background:#fef3e0;color:#8a5a00}
 .cat-PROTEICOS{background:#e6f4fb;color:#0b6a8f}
 .cat-OTROS{background:#f1f0fe;color:#4c3fae}
+.cat-MAQUILA{background:#fff4e5;color:#8a4b00}
 .section-title{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;margin:22px 0 8px}
 /* modal */
 #modalOverlay{position:fixed;inset:0;background:rgba(15,22,19,.55);backdrop-filter:blur(2px);display:none;align-items:flex-start;justify-content:center;z-index:100;padding:26px 14px;overflow:auto}
@@ -439,6 +440,14 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
       <div style="display:flex;gap:10px;margin-top:6px">
         <button class="primary" id="btnAbrirNueva">+ Empezar fórmula nueva</button>
         <button id="btnNuevaDesdeImagen">📷 Crear fórmula desde imagen</button>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px;border:1px solid #f0c27a;background:#fffaf2">
+      <h2>🏭 Maquila — fórmula del cliente</h2>
+      <p class="muted">Para cuando un cliente te pide fabricar <b>su propia fórmula</b>. Subís la fórmula (foto/PDF) y armás los insumos por tonelada; se cobra el <b>precio de los insumos + el servicio de maquila (Bs/Ton)</b>. Queda guardada como producto de categoría MAQUILA, así la elegís en Proformas y Pedidos de Venta y la producción descuenta los insumos del stock como cualquier producto.</p>
+      <div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">
+        <button class="primary" id="btnNuevaMaquila">+ Nueva maquila</button>
+        <button id="btnNuevaMaquilaImagen">📷 Maquila desde foto de la fórmula</button>
       </div>
     </div>
   </section>
@@ -917,7 +926,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
   <!-- COMISIONES (solo administración) -->
   <section id="view-comisiones" class="view">
     <div class="toolbar">
-      <select id="comVendedor"><option value="">Todos los vendedores</option><option>FERNANDA CANDIA</option><option>FERNANDO VIRUEZ</option><option>MARIANA ROCHA</option><option value="(SIN VENDEDOR)">Sin vendedor asignado</option></select>
+      <select id="comVendedor"><option value="">Todos los vendedores</option><option>FERNANDA CANDIA</option><option>FERNANDO VIRUEZ</option><option>MARIANA ROCHA</option><option>CARLOS SONNENSCHEIN</option><option>SOCIOS</option><option value="(SIN VENDEDOR)">Sin vendedor asignado</option></select>
       <select id="comMes"><option value="">Todos los meses</option></select>
       <input type="search" id="comSearch" placeholder="Buscar cliente o N° pedido…">
       <div class="spacer"></div>
@@ -1065,6 +1074,23 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
           </div>
         </div>
         <div>
+          <div id="pf_maquilaBox" style="display:none">
+            <div class="section-title">🏭 Maquila (fórmula del cliente)</div>
+            <div class="card" style="padding:14px;border:1px solid #f0c27a;background:#fffaf2">
+              <div class="inline-field"><label>Cliente de la maquila</label><input type="text" id="pf_maqCliente" list="clientesDatalist" placeholder="Nombre del cliente" style="min-width:200px"></div>
+              <div class="inline-field"><label>Servicio de maquila (Bs / Ton)</label><input type="number" step="1" min="0" id="pf_maqTarifa" class="pill-input" placeholder="Ej: 350"></div>
+              <div id="pf_maqPedidoWrap" style="border-top:1px dashed #f0c27a;margin-top:8px;padding-top:8px">
+                <div class="inline-field"><label>Toneladas a fabricar</label><input type="number" step="0.01" min="0" id="pf_maqTon" class="pill-input" placeholder="Ej: 5"></div>
+                <div class="inline-field"><label>Fecha de entrega</label><input type="date" id="pf_maqFecha"></div>
+                <p class="footnote" style="margin:4px 0 0">Al guardar se abre el <b>Pedido de Venta</b> ya cargado (cliente, maquila, toneladas y precio). Elegís vendedor y condición de pago, y al crearlo se genera sola la orden de producción, la nota de venta y lo demás.</p>
+              </div>
+              <div class="inline-field" style="display:block"><label>Fórmula del cliente (foto o PDF)</label>
+                <input type="file" id="pf_maqArchivos" accept="image/*,application/pdf" multiple style="margin-top:4px">
+                <div id="pf_maqArchivosLista" style="margin-top:6px;font-size:12px"></div>
+              </div>
+              <p class="footnote" style="margin:6px 0 0">Se cobra: <b>precio de los insumos de la fórmula</b> (con el margen/comisión de abajo, podés dejar margen 0 para cobrarlos al costo) <b>+ el servicio de maquila por tonelada</b>. Para cargar las cantidades desde la foto usá 📷.</p>
+            </div>
+          </div>
           <div class="section-title">Márgen y comisión</div>
           <div class="card" style="padding:14px">
             <div class="inline-field"><label>% Utilidad / margen</label><input type="number" step="0.01" min="0" max="0.95" id="pf_margen" class="pill-input"></div>
@@ -1080,6 +1106,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
       <button class="primary" id="btnGuardarProducto">Guardar producto</button>
       <button id="btnCancelarModal">Cancelar</button>
       <button id="btnVerImgFormula" style="display:none">🖼️ Imagen para producción</button>
+      <button id="btnPedidoMaquila" style="display:none" title="Guarda los cambios y abre un pedido de venta de esta maquila">🧾 Guardar y hacer pedido</button>
       <div class="spacer"></div>
       <button class="danger" id="btnEliminarProducto" style="display:none">Eliminar producto</button>
     </div>
@@ -1455,14 +1482,14 @@ function reindexInsumos(){
   state.insumos.forEach(function(i){ insumoIndex[i.nombre] = i; });
 }
 
-var CAT_CLASS = {"SALES MINERALES":"cat-SALES","PROTEINADOS":"cat-PROTEINADOS","PROTEICOS ENERGETICOS":"cat-PROTEICOS","OTROS PRODUCTOS":"cat-OTROS"};
+var CAT_CLASS = {"MAQUILA":"cat-MAQUILA","SALES MINERALES":"cat-SALES","PROTEINADOS":"cat-PROTEINADOS","PROTEICOS ENERGETICOS":"cat-PROTEICOS","OTROS PRODUCTOS":"cat-OTROS"};
 
 /* ---------- mapping DB rows <-> app objects ---------- */
 function rowToInsumo(r){
   return { id:r.id, nombre:r.nombre, unidad:r.unidad, precioIngresado:Number(r.precio_ingresado)||0, unidadPrecio:r.unidad_precio, tipo:r.tipo, stockActual:Number(r.stock_actual)||0 };
 }
 function rowToProducto(r){
-  return { id:r.id, hoja:r.hoja, nombre:r.nombre, categoria:r.categoria, formula: r.formula || {}, margen:Number(r.margen)||0, comision:Number(r.comision)||0, con_factura: r.con_factura!==false, formula_nombre: r.formula_nombre||'', variantes: Array.isArray(r.variantes) ? r.variantes : [] };
+  return { id:r.id, hoja:r.hoja, nombre:r.nombre, categoria:r.categoria, formula: r.formula || {}, margen:Number(r.margen)||0, comision:Number(r.comision)||0, con_factura: r.con_factura!==false, formula_nombre: r.formula_nombre||'', variantes: Array.isArray(r.variantes) ? r.variantes : [], es_maquila: r.es_maquila===true, maquila_cliente: r.maquila_cliente||'', maquila_tarifa: Number(r.maquila_tarifa)||0, maquila_archivos: Array.isArray(r.maquila_archivos) ? r.maquila_archivos : [] };
 }
 
 /* ---------- calculation engine (mirrors the original Excel formulas — unchanged) ---------- */
@@ -1490,6 +1517,12 @@ function opcionesFormula(p, sel){
     var val = i===0 ? '' : f.nombre;
     return '<option value="'+escapeHtml(val)+'"'+((sel||'')===val?' selected':'')+'>'+escapeHtml(f.nombre || 'Fórmula principal')+(i===0?' (principal)':'')+'</option>';
   }).join('');
+}
+function formulaCellOrd(o, editable){
+  var p = state.productos.find(function(x){ return x.hoja===o.producto_hoja; });
+  if(!editable || !tieneVariantes(p) || o.desde_stock_existente) return varianteTag(o.variante);
+  var actual = (o.variante && String(o.variante).toLowerCase()!==String(p.formula_nombre||'').toLowerCase()) ? o.variante : '';
+  return '<div style="margin-top:4px"><select class="ord-formula-sel" title="Elegí con qué fórmula se produce" style="font-size:12px;padding:3px 6px">'+opcionesFormula(p, actual)+'</select></div>';
 }
 function varianteTag(v){ return v ? ' <span class="tag" style="background:#eef2ff;color:#3730a3">'+escapeHtml(v)+'</span>' : ''; }
 function computeProducto(p){
@@ -1521,6 +1554,10 @@ function computeProducto(p){
   var precioVentaConCom = margen<1 ? costoComisionado/(1-margen) : 0;
   var comisionBsTon = precioVentaConCom*comision;
   var ingresoEmpresa = precioVentaConCom - comisionBsTon;
+  // MAQUILA: al precio de los insumos se le suma el servicio de maquila (Bs/Ton), sin comisión sobre el servicio
+  var maquilaTarifa = p.es_maquila ? (Number(p.maquila_tarifa)||0) : 0;
+  var precioInsumosConCom = precioVentaConCom, precioInsumosSinCom = precioVentaSinCom;
+  if(maquilaTarifa){ precioVentaSinCom += maquilaTarifa; precioVentaConCom += maquilaTarifa; ingresoEmpresa += maquilaTarifa; }
   var utilidadNetaPct = ingresoEmpresa!==0 ? (ingresoEmpresa-costoFacturadoTon)/ingresoEmpresa : 0;
   mpRows.forEach(function(r){ r.pct = mpCosto>0 ? r.costo/mpCosto : 0; });
   return {
@@ -1529,7 +1566,8 @@ function computeProducto(p){
     precioVentaSinCom:precioVentaSinCom, costoComisionado:costoComisionado,
     precioVentaConCom:precioVentaConCom, comisionBsTon:comisionBsTon,
     ingresoEmpresa:ingresoEmpresa, utilidadNetaPct:utilidadNetaPct,
-    mpRows:mpRows, envRows:envRows
+    mpRows:mpRows, envRows:envRows,
+    maquilaTarifa:maquilaTarifa, precioInsumosConCom:precioInsumosConCom, precioInsumosSinCom:precioInsumosSinCom
   };
 }
 
@@ -1873,7 +1911,7 @@ function renderProductos(){
   document.getElementById('productosBody').innerHTML = rows.map(function(r){
     var p=r.p, c=r.c;
     return '<tr data-hoja="'+escapeHtml(p.hoja)+'">'+
-      '<td><b>'+escapeHtml(p.nombre)+'</b><br><span class="muted" style="font-size:11px">'+escapeHtml(p.hoja)+'</span></td>'+
+      '<td><b>'+escapeHtml(p.nombre)+'</b><br><span class="muted" style="font-size:11px">'+(p.es_maquila ? '🏭 Maquila · '+escapeHtml(p.maquila_cliente||'sin cliente')+' · servicio Bs '+fmt(p.maquila_tarifa,2)+'/t'+((p.maquila_archivos||[]).length?' · 📎'+p.maquila_archivos.length:'') : escapeHtml(p.hoja))+'</span></td>'+
       '<td><span class="badge-cat '+(CAT_CLASS[p.categoria]||'')+'">'+escapeHtml(p.categoria)+'</span></td>'+
       '<td class="num">'+fmtBs(c.costoMPTon)+'</td>'+
       '<td class="num">'+fmtBs(c.costoFacturadoTon)+'</td>'+
@@ -1900,6 +1938,8 @@ document.getElementById('prodSort').addEventListener('change', renderProductos);
 
 /* ================= NUEVA FORMULA ================= */
 document.getElementById('btnAbrirNueva').addEventListener('click', function(){ openModal(null); });
+document.getElementById('btnNuevaMaquila').addEventListener('click', function(){ openModal(null, {maquila:true}); });
+document.getElementById('btnNuevaMaquilaImagen').addEventListener('click', function(){ openModal(null, {maquila:true}); openOcrModal('formula'); });
 
 /* ================= VENTAS ================= */
 var ventaSort = {k:'numero', dir:1};
@@ -2078,20 +2118,32 @@ function cambiarFormulaModal(i){
   modalState.draft.formula = modalState.formulas[i].formula;
   renderFormulasBar(); renderModalComputed();
 }
-function openModal(hoja){
+function openModal(hoja, opts){
+  opts = opts||{};
   populateCategoriaFilters();
   var original = hoja ? state.productos.find(function(p){return p.hoja===hoja;}) : null;
   var draft = original ? JSON.parse(JSON.stringify(original)) : blankProducto();
+  if(!original && opts.maquila){ draft.es_maquila = true; draft.categoria = 'MAQUILA'; draft.margen = 0; draft.comision = 0; draft.maquila_tarifa = 0; draft.maquila_cliente = ''; draft.maquila_archivos = []; draft.nombre = 'MAQUILA '; }
+  draft.maquila_archivos = draft.maquila_archivos||[];
   // ensure draft has an entry for every current insumo
   state.insumos.forEach(function(i){ if(!(i.nombre in draft.formula)) draft.formula[i.nombre]=0; });
-  modalState = {hoja:hoja, draft:draft};
+  modalState = {hoja:hoja, draft:draft, nuevosArchivos:[], quitarArchivos:[]};
   draft.formula_nombre = draft.formula_nombre||''; draft.variantes = draft.variantes||[];
   modalState.formulas = formulasDeProducto(draft).map(function(f){ var ff = JSON.parse(JSON.stringify(f.formula||{})); state.insumos.forEach(function(i){ if(!(i.nombre in ff)) ff[i.nombre]=0; }); return {nombre:f.nombre, formula:ff}; });
   modalState.fIdx = 0;
   draft.formula = modalState.formulas[0].formula;
   renderFormulasBar();
   document.getElementById('pf_nombre').value = draft.nombre;
+  if(draft.categoria && !Array.from(document.getElementById('pf_categoria').options).some(function(o){ return o.value===draft.categoria; })){ var oc=document.createElement('option'); oc.value=draft.categoria; oc.textContent=draft.categoria; var selc=document.getElementById('pf_categoria'); selc.insertBefore(oc, selc.lastElementChild); }
   document.getElementById('pf_categoria').value = draft.categoria;
+  document.getElementById('pf_maquilaBox').style.display = draft.es_maquila ? '' : 'none';
+  document.getElementById('pf_maqCliente').value = draft.maquila_cliente||'';
+  document.getElementById('pf_maqTarifa').value = draft.es_maquila ? (draft.maquila_tarifa||'') : '';
+  document.getElementById('pf_maqArchivos').value = '';
+  document.getElementById('pf_maqTon').value = ''; document.getElementById('pf_maqFecha').value = '';
+  document.getElementById('btnPedidoMaquila') && (document.getElementById('btnPedidoMaquila').style.display = (hoja && draft.es_maquila) ? '' : 'none');
+  renderMaqArchivos();
+  if(draft.es_maquila && sb && !clientesState.loaded) fetchClientes(populateClientesDatalist);
   document.getElementById('pf_margen').value = draft.margen;
   document.getElementById('pf_comision').value = draft.comision;
   document.getElementById('pf_factura').value = draft.con_factura===false ? '0' : '1';
@@ -2105,6 +2157,43 @@ function openModal(hoja){
 document.getElementById('btnVerImgFormula').addEventListener('click', function(){
   if(modalState && modalState.hoja) openFormImgModal(modalState.hoja);
 });
+function renderMaqArchivos(){
+  var el = document.getElementById('pf_maqArchivosLista'); if(!el || !modalState) return;
+  var d = modalState.draft;
+  var exist = (d.maquila_archivos||[]).filter(function(pa){ return modalState.quitarArchivos.indexOf(pa)===-1; });
+  var html = exist.map(function(pa){ return '<div style="display:flex;gap:6px;align-items:center;margin:2px 0">📎 <a href="#" class="maq-ver" data-p="'+escapeHtml(pa)+'">'+escapeHtml(pa.split('/').pop())+'</a> <button type="button" class="ghost danger maq-quitar" data-p="'+escapeHtml(pa)+'" style="padding:1px 6px;font-size:11px">✕</button></div>'; }).join('');
+  html += modalState.nuevosArchivos.map(function(fl,i){ return '<div style="margin:2px 0">🆕 '+escapeHtml(fl.name)+' <span class="muted">(se sube al guardar)</span> <button type="button" class="ghost danger maq-quitar-nuevo" data-i="'+i+'" style="padding:1px 6px;font-size:11px">✕</button></div>'; }).join('');
+  el.innerHTML = html || '<span class="muted">Sin archivos adjuntos</span>';
+  el.querySelectorAll('.maq-ver').forEach(function(a){ a.addEventListener('click', function(e){ e.preventDefault(); verArchivoMaquila(a.dataset.p); }); });
+  el.querySelectorAll('.maq-quitar').forEach(function(b){ b.addEventListener('click', function(){ modalState.quitarArchivos.push(b.dataset.p); renderMaqArchivos(); }); });
+  el.querySelectorAll('.maq-quitar-nuevo').forEach(function(b){ b.addEventListener('click', function(){ modalState.nuevosArchivos.splice(Number(b.dataset.i),1); renderMaqArchivos(); }); });
+}
+function verArchivoMaquila(path){
+  var w = window.open('', '_blank');
+  sb.storage.from('formulas-maquila').createSignedUrl(path, 3600).then(function(res){
+    if(res.error || !res.data){ if(w) w.close(); toast('No se pudo abrir el archivo'); return; }
+    if(w) w.location.href = res.data.signedUrl; else window.location.href = res.data.signedUrl;
+  });
+}
+function subirArchivosMaquila(files, hoja, cb){
+  var paths = [], i = 0;
+  (function sig(){
+    if(i>=files.length){ cb(null, paths); return; }
+    var fl = files[i++];
+    var ext = ((fl.name||'').split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
+    var path = slugFilename(hoja)+'/'+Date.now()+'_'+i+'.'+ext;
+    sb.storage.from('formulas-maquila').upload(path, fl, {upsert:false}).then(function(r){
+      if(r.error){ cb(r.error); return; }
+      paths.push(path); sig();
+    });
+  })();
+}
+document.getElementById('pf_maqArchivos').addEventListener('change', function(){
+  if(!modalState) return;
+  Array.from(this.files||[]).forEach(function(fl){ modalState.nuevosArchivos.push(fl); });
+  this.value = ''; renderMaqArchivos();
+});
+document.getElementById('pf_maqTarifa').addEventListener('input', function(){ if(modalState) renderModalComputedLight(); });
 function closeModal(){
   document.getElementById('modalOverlay').classList.remove('active');
   modalState = null;
@@ -2128,6 +2217,7 @@ function renderModalComputed(){
   draft.margen = parseFloat(document.getElementById('pf_margen').value)||0;
   draft.comision = parseFloat(document.getElementById('pf_comision').value)||0;
   draft.con_factura = document.getElementById('pf_factura').value !== '0';
+  if(draft.es_maquila) draft.maquila_tarifa = parseFloat(document.getElementById('pf_maqTarifa').value)||0;
   var c = computeProducto(draft);
   var searchQ = (document.getElementById('pf_search').value||'').toLowerCase();
   var onlyUsed = document.getElementById('pf_onlyUsed').checked;
@@ -2153,18 +2243,7 @@ function renderModalComputed(){
       '<td class="num">'+fmt(r.costo,2)+'</td></tr>';
   }).join('');
 
-  document.getElementById('pf_summary').innerHTML =
-    row('Subtotal materias primas', fmtBs(c.mpCosto)) +
-    row('Subtotal envases y servicios', fmtBs(c.envCosto)) +
-    row('Total general (Bs)', fmtBs(c.totalBs), true) +
-    row('Peso total materias primas (Kg)', fmt(c.mpKg,1)) +
-    row('Costo materia prima / Ton', fmtBs(c.costoMPTon)) +
-    row(draft.con_factura===false ? 'Costo sin factura / Ton (sin ÷0.87)' : 'Costo facturado / Ton (÷0.87)', fmtBs(c.costoFacturadoTon)) +
-    row('Precio de venta SIN comisión', fmtBs(c.precioVentaSinCom), true) +
-    row('Precio de venta CON comisión', fmtBs(c.precioVentaConCom), true) +
-    row('Comisión vendedor / Ton', fmtBs(c.comisionBsTon)) +
-    row('Ingreso empresa / Ton', fmtBs(c.ingresoEmpresa)) +
-    row('Utilidad neta % (después comisión)', fmtPct(c.utilidadNetaPct));
+  document.getElementById('pf_summary').innerHTML = pfSummaryHtml(draft, c);
 
   document.querySelectorAll('.pf-qty').forEach(function(inp){
     inp.addEventListener('input', function(){
@@ -2180,6 +2259,7 @@ function renderModalComputedLight(){
   draft.margen = parseFloat(document.getElementById('pf_margen').value)||0;
   draft.comision = parseFloat(document.getElementById('pf_comision').value)||0;
   draft.con_factura = document.getElementById('pf_factura').value !== '0';
+  if(draft.es_maquila) draft.maquila_tarifa = parseFloat(document.getElementById('pf_maqTarifa').value)||0;
   var c = computeProducto(draft);
   document.querySelectorAll('#pf_mpBody tr').forEach(function(tr){
     var name = tr.dataset.name;
@@ -2196,16 +2276,20 @@ function renderModalComputedLight(){
     tr.children[2].textContent = fmt(r.precio,3);
     tr.children[3].textContent = fmt(r.costo,2);
   });
-  document.getElementById('pf_summary').innerHTML =
-    row('Subtotal materias primas', fmtBs(c.mpCosto)) +
+  document.getElementById('pf_summary').innerHTML = pfSummaryHtml(draft, c);
+}
+function pfSummaryHtml(draft, c){
+  var maq = draft.es_maquila;
+  return row('Subtotal materias primas', fmtBs(c.mpCosto)) +
     row('Subtotal envases y servicios', fmtBs(c.envCosto)) +
     row('Total general (Bs)', fmtBs(c.totalBs), true) +
     row('Peso total materias primas (Kg)', fmt(c.mpKg,1)) +
     row('Costo materia prima / Ton', fmtBs(c.costoMPTon)) +
     row(draft.con_factura===false ? 'Costo sin factura / Ton (sin ÷0.87)' : 'Costo facturado / Ton (÷0.87)', fmtBs(c.costoFacturadoTon)) +
-    row('Precio de venta SIN comisión', fmtBs(c.precioVentaSinCom), true) +
-    row('Precio de venta CON comisión', fmtBs(c.precioVentaConCom), true) +
-    row('Comisión vendedor / Ton', fmtBs(c.comisionBsTon)) +
+    (maq ? row('Precio de los insumos / Ton', fmtBs(c.precioInsumosConCom)) + row('+ Servicio de maquila / Ton', fmtBs(c.maquilaTarifa)) : '') +
+    row(maq ? 'Precio maquila SIN comisión (insumos + servicio)' : 'Precio de venta SIN comisión', fmtBs(c.precioVentaSinCom), true) +
+    row(maq ? 'PRECIO MAQUILA / Ton (insumos + servicio)' : 'Precio de venta CON comisión', fmtBs(c.precioVentaConCom), true) +
+    row('Comisión vendedor / Ton'+(maq?' (solo sobre insumos)':''), fmtBs(c.comisionBsTon)) +
     row('Ingreso empresa / Ton', fmtBs(c.ingresoEmpresa)) +
     row('Utilidad neta % (después comisión)', fmtPct(c.utilidadNetaPct));
 }
@@ -2245,34 +2329,84 @@ document.getElementById('btnGuardarProducto').addEventListener('click', function
   draft.comision = parseFloat(document.getElementById('pf_comision').value)||0;
   draft.con_factura = document.getElementById('pf_factura').value !== '0';
   if(!draft.nombre){ toast('Ponele un nombre al producto'); return; }
+  if(draft.es_maquila){
+    draft.maquila_cliente = document.getElementById('pf_maqCliente').value.trim();
+    draft.maquila_tarifa = parseFloat(document.getElementById('pf_maqTarifa').value)||0;
+    if(!/^MAQUILA\b/i.test(draft.nombre)) draft.nombre = 'MAQUILA ' + draft.nombre;
+    if(draft.nombre.trim().toUpperCase()==='MAQUILA'){ toast('Ponele un nombre a la maquila (ej: MAQUILA Juan Pérez Mineral)'); return; }
+    if(!draft.maquila_cliente){ toast('Poné el cliente de la maquila'); return; }
+    if(!(draft.maquila_tarifa>0) && !confirm('El servicio de maquila está en 0 Bs/Ton. ¿Guardar igual?')) return;
+  }
   var btn = document.getElementById('btnGuardarProducto');
   btn.disabled = true;
+  var maqCampos = {es_maquila: draft.es_maquila===true, maquila_cliente: draft.maquila_cliente||null, maquila_tarifa: Number(draft.maquila_tarifa)||0};
+  if(draft.es_maquila && (modalState.nuevosArchivos.length || modalState.quitarArchivos.length)){
+    var hojaArch = modalState.hoja || draft.nombre;
+    var quitar = modalState.quitarArchivos.slice();
+    subirArchivosMaquila(modalState.nuevosArchivos, hojaArch, function(err, paths){
+      if(err){ btn.disabled = false; toast('No se pudo subir el archivo: '+errMsg(err)); return; }
+      draft.maquila_archivos = (draft.maquila_archivos||[]).filter(function(pa){ return quitar.indexOf(pa)===-1; }).concat(paths);
+      if(quitar.length) sb.storage.from('formulas-maquila').remove(quitar);
+      modalState.nuevosArchivos = []; modalState.quitarArchivos = [];
+      guardarProductoDraft(draft, btn, maqCampos);
+    });
+    return;
+  }
+  guardarProductoDraft(draft, btn, maqCampos);
+});
+document.getElementById('btnPedidoMaquila').addEventListener('click', function(){
+  if(!modalState) return; modalState.pedirTrasGuardar = true;
+  document.getElementById('btnGuardarProducto').click();
+});
+function abrirPedidoDesdeMaquila(p, opt){
+  var nav = document.querySelector('.nav-item[data-tab="pedidosventa"]'); if(nav) nav.click();
+  pvDesdeProforma = null;
+  document.getElementById('pedidoVentaModalOverlay').classList.add('active');
+  document.getElementById('pedidoVentaBody').innerHTML = '<p class="muted">Armando el pedido de la maquila…</p>';
+  fetchProducciones(function(){
+    renderPedidoVentaForm();
+    document.getElementById('pv_cliente').value = p.maquila_cliente || '';
+    if(opt.fecha){ var fe = document.getElementById('pv_fechaEntrega'); fe.value = opt.fecha; fe.dispatchEvent(new Event('change')); }
+    var precio = Math.round(computeProducto(p).precioVentaConCom*100)/100;
+    pvLineas = [{producto_hoja: p.hoja, cantidad: opt.ton>0 ? opt.ton : 1, precio: precio, descuentoPct:'', precioLista: precio, asig:{}, variante:''}];
+    renderPvLineas(); renderPedidoVentaPreview(); updatePvTotalBox();
+    document.getElementById('pedidoVentaBody').insertAdjacentHTML('afterbegin',
+      '<div style="background:#fffaf2;border:1px solid #f0c27a;border-radius:8px;padding:8px 12px;margin-bottom:12px">🏭 Pedido de la maquila <b>'+escapeHtml(p.nombre)+'</b> para <b>'+escapeHtml(p.maquila_cliente||'')+'</b>. Ya está cargado: '+fmt(opt.ton>0?opt.ton:1,2)+' t × Bs '+fmt(precio,2)+'/t (insumos + servicio de maquila Bs '+fmt(p.maquila_tarifa,2)+'/t).'+(opt.ton>0?'':' <b class="k-warn">Revisá las toneladas.</b>')+' Elegí <b>vendedor</b> y <b>condición de pago</b> y tocá «Crear pedido de venta»: se genera sola la orden de producción, la nota de venta y el plan de cobro.</div>');
+  });
+}
+function guardarProductoDraft(draft, btn, maqCampos){
+  var maqPedido = (draft.es_maquila && (modalState.pedirTrasGuardar || !modalState.hoja)) ? {ton: parseFloat(document.getElementById('pf_maqTon').value)||0, fecha: document.getElementById('pf_maqFecha').value||''} : null;
+  modalState.pedirTrasGuardar = false;
+  maqCampos.maquila_archivos = draft.maquila_archivos||[];
+  function conMaq(o){ Object.keys(maqCampos).forEach(function(k){ o[k]=maqCampos[k]; }); return o; }
   if(modalState.hoja){
     var idx = state.productos.findIndex(function(p){return p.hoja===modalState.hoja;});
     draft.hoja = modalState.hoja;
-    sb.from('productos').update({nombre:draft.nombre, categoria:draft.categoria, margen:draft.margen, comision:draft.comision, con_factura:draft.con_factura!==false, formula:draft.formula, formula_nombre:draft.formula_nombre||null, variantes:draft.variantes||[]}).eq('id', draft.id).then(function(res){
+    sb.from('productos').update(conMaq({nombre:draft.nombre, categoria:draft.categoria, margen:draft.margen, comision:draft.comision, con_factura:draft.con_factura!==false, formula:draft.formula, formula_nombre:draft.formula_nombre||null, variantes:draft.variantes||[]})).eq('id', draft.id).then(function(res){
       btn.disabled = false;
       if(res.error){ toast('No se pudo guardar: '+errMsg(res.error)); return; }
       state.productos[idx] = draft;
       toast('Producto actualizado');
       closeModal();
       renderProductos(); renderVentas(); renderIndice(); renderResumen();
+      if(maqPedido){ abrirPedidoDesdeMaquila(draft, maqPedido); return; }
       document.querySelector('.nav-item[data-tab="productos"]').click();
     });
   } else {
     draft.hoja = slugHoja(draft.nombre);
-    sb.from('productos').insert({hoja:draft.hoja, nombre:draft.nombre, categoria:draft.categoria, margen:draft.margen, comision:draft.comision, con_factura:draft.con_factura!==false, formula:draft.formula, formula_nombre:draft.formula_nombre||null, variantes:draft.variantes||[]}).select().single().then(function(res){
+    sb.from('productos').insert(conMaq({hoja:draft.hoja, nombre:draft.nombre, categoria:draft.categoria, margen:draft.margen, comision:draft.comision, con_factura:draft.con_factura!==false, formula:draft.formula, formula_nombre:draft.formula_nombre||null, variantes:draft.variantes||[]})).select().single().then(function(res){
       btn.disabled = false;
       if(res.error){ toast('No se pudo crear la fórmula: '+errMsg(res.error)); return; }
       draft.id = res.data.id;
       state.productos.push(draft);
-      toast('Fórmula nueva creada');
+      toast(draft.es_maquila ? 'Maquila creada — armando el pedido de venta…' : 'Fórmula nueva creada');
       closeModal();
       renderProductos(); renderVentas(); renderIndice(); renderResumen();
+      if(maqPedido){ abrirPedidoDesdeMaquila(draft, maqPedido); return; }
       document.querySelector('.nav-item[data-tab="productos"]').click();
     });
   }
-});
+}
 document.getElementById('btnEliminarProducto').addEventListener('click', function(){
   if(!modalState.hoja) return;
   if(!confirm('¿Eliminar "'+modalState.draft.nombre+'"? Esta acción no se puede deshacer.')) return;
@@ -2282,6 +2416,8 @@ document.getElementById('btnEliminarProducto').addEventListener('click', functio
   sb.from('productos').delete().eq('id', id).then(function(res){
     btn.disabled = false;
     if(res.error){ toast('No se pudo eliminar: '+errMsg(res.error)); return; }
+    var archDel = (modalState && modalState.draft.maquila_archivos)||[];
+    if(archDel.length) sb.storage.from('formulas-maquila').remove(archDel);
     state.productos = state.productos.filter(function(p){return p.id!==id;});
     closeModal();
     renderProductos(); renderVentas(); renderIndice(); renderResumen();
@@ -2941,7 +3077,7 @@ function renderOrdenesRows(){
       '<td>'+fmtFecha(o.fecha_pedido)+'</td>'+
       '<td><b>'+escapeHtml(o.numero_produccion)+'</b></td>'+
       '<td>'+escapeHtml(o.lote)+'</td>'+
-      '<td>'+escapeHtml(o.producto_nombre)+varianteTag(o.variante)+(o.bloqueado?' <span class="tag" style="background:#fde3e3;color:#b91c1c">🚫 '+escapeHtml(o.nota||'Bloqueado')+'</span>':'')+'</td>'+
+      '<td>'+escapeHtml(o.producto_nombre)+formulaCellOrd(o, puedeCompletar && puedeEliminarOrd)+(o.bloqueado?' <span class="tag" style="background:#fde3e3;color:#b91c1c">🚫 '+escapeHtml(o.nota||'Bloqueado')+'</span>':'')+'</td>'+
       '<td class="num">'+fmt(o.cantidad_toneladas,2)+'</td>'+
       '<td>'+clienteLabel+'</td>'+
       '<td>'+(o.fecha_entrega?fmtFecha(o.fecha_entrega):'—')+'</td>'+
@@ -2966,6 +3102,26 @@ function renderOrdenesRows(){
         if(idx!==-1) ordenesState.rows[idx] = row;
         renderOrdenesRows();
         toast(completar ? 'Producción marcada como completada' : 'Producción marcada como pendiente');
+      });
+    });
+  });
+  document.querySelectorAll('.ord-formula-sel').forEach(function(sel){
+    sel.addEventListener('change', function(){
+      var id = Number(sel.closest('tr').dataset.id);
+      var o = ordenesState.rows.find(function(x){return x.id===id;});
+      if(!o) return;
+      var etiqueta = sel.options[sel.selectedIndex].text;
+      sel.disabled = true;
+      sb.rpc('cambiar_formula_produccion', {p_id:id, p_variante: sel.value||null}).then(function(res){
+        sel.disabled = false;
+        if(res.error){ toast('No se pudo cambiar la fórmula: '+errMsg(res.error)); renderOrdenesRows(); return; }
+        var row = Array.isArray(res.data) ? res.data[0] : res.data;
+        var idx = ordenesState.rows.findIndex(function(x){return x.id===id;});
+        if(idx!==-1 && row) ordenesState.rows[idx] = row;
+        renderOrdenesRows();
+        if(typeof renderStockFabricaRows==='function') renderStockFabricaRows();
+        if(typeof ventaState!=='undefined' && ventaState.loaded) renderPedidosVenta(true);
+        toast(o.numero_produccion+' — fórmula cambiada a '+((row&&row.variante)||etiqueta)+'. Se recalcularon los insumos.');
       });
     });
   });
@@ -3253,7 +3409,7 @@ document.getElementById('btnInvExcel').addEventListener('click', exportarInventa
 document.getElementById('btnInvRecalc').addEventListener('click', renderInventarioValorizado);
 
 /* ================= COMISIONES DE VENDEDORES (solo administración) ================= */
-var VENDEDORES = ['FERNANDA CANDIA','FERNANDO VIRUEZ','MARIANA ROCHA'];
+var VENDEDORES = ['FERNANDA CANDIA','FERNANDO VIRUEZ','MARIANA ROCHA','CARLOS SONNENSCHEIN','SOCIOS'];
 function vendedorOptions(sel){
   return '<option value="">— sin vendedor —</option>'+VENDEDORES.map(function(v){ return '<option value="'+v+'"'+((sel||'').toUpperCase()===v?' selected':'')+'>'+v+'</option>'; }).join('');
 }
