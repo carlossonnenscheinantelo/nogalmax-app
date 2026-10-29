@@ -3,6 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1e4a34">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NOGALMAX">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>NOGALMAX — Precios y Fórmulas</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -318,6 +326,92 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
 .cxc-total-saldo{font-weight:700;color:#b5560a}
 .pv-cuota-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;background:var(--brand-light);border-radius:8px;padding:8px 10px;margin-bottom:6px}
 .pv-total-box{margin-top:8px;font-weight:700;font-size:13.5px;color:var(--brand-dark)}
+
+/* ===== CELULAR (≤760px) ===== */
+#btnMenuMovil{display:none}
+#navBackdrop{display:none}
+@media (max-width:760px){
+  body{font-size:14.5px}
+  main{padding:12px 12px 80px}
+  #topbar{padding:calc(8px + env(safe-area-inset-top)) 12px 8px;gap:8px;flex-wrap:nowrap}
+  #topbar .brand .sub{display:none}
+  #topbar .brand-logo{height:24px}
+  #btnMenuMovil{display:inline-flex;align-items:center;gap:6px;font-size:15px;padding:8px 12px}
+  #btnExcel{display:none}
+  .user-badge{padding:3px 4px 3px 10px;max-width:58vw}
+  .user-badge #userBadgeName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:30vw}
+  /* menú lateral como cajón */
+  #appBody{flex-direction:column}
+  #sideNav{position:fixed;top:0;left:0;bottom:0;width:84vw;max-width:320px;margin:0;border-radius:0 16px 16px 0;z-index:400;overflow-y:auto;transform:translateX(-105%);transition:transform .22s var(--ease);padding-top:env(safe-area-inset-top)}
+  body.nav-abierto #sideNav{transform:none;box-shadow:var(--shadow-lg)}
+  #navBackdrop{position:fixed;inset:0;background:rgba(15,22,19,.45);z-index:390}
+  body.nav-abierto #navBackdrop{display:block}
+  .nav-group-items{flex-direction:column}
+  .nav-item{padding:12px 14px;font-size:14px}
+  .nav-group-head{padding:15px 16px;font-size:14px}
+  /* controles cómodos para el dedo; 16px evita el zoom automático en iPhone */
+  input,select,textarea{font-size:16px}
+  button{min-height:38px}
+  .toolbar{gap:8px}
+  .toolbar input[type=search],.toolbar select{width:100%;flex:1 1 100%}
+  .toolbar .spacer{display:none}
+  .toolbar button{flex:1 1 auto}
+  .grid-cards,.home-cards-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .stat{padding:12px}
+  .stat .n{font-size:20px}
+  .card{padding:14px}
+  .inline-field{flex-wrap:wrap}
+  .inline-field>input:not([type=checkbox]):not([type=radio]),.inline-field>select{flex:1 1 160px;min-width:0}
+  .pill-input,.qty-input{width:100px}
+  .idx-list{grid-template-columns:1fr}
+  .formula-cols{grid-template-columns:1fr}
+  .review-row{grid-template-columns:1fr;gap:4px}
+  .hist-row{grid-template-columns:1fr;gap:2px}
+  .desp-kpis{grid-template-columns:1fr 1fr 1fr}
+  .toast{left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom));max-width:none}
+  /* ventanas a pantalla completa */
+  #modalOverlay,.overlay2{padding:0}
+  #modal,.ocr-box{border-radius:0;min-height:100vh;max-width:none}
+  #modalBody,.ocr-body{max-height:none}
+  #modalHead,.ocr-head{padding:calc(10px + env(safe-area-inset-top)) 14px 10px;position:sticky;top:0;background:#fff;z-index:3}
+  #modalHead input#pf_nombre{width:auto;flex:1;min-width:0}
+  #modalBody{padding:14px}
+  .ocr-body{padding:14px}
+  #modalFoot{flex-wrap:wrap;padding:10px 14px calc(10px + env(safe-area-inset-bottom))}
+  .close-x{font-size:26px;padding:6px 10px}
+  /* documentos (PDF): mismo ancho que en la computadora, se desplazan de costado */
+  .fi-card{min-width:600px}
+  .ocr-body:has(.fi-card){overflow-x:auto}
+  /* tablas de listado → tarjetas */
+  .table-wrap{max-height:none;overflow:visible;border:none;border-radius:0}
+  .table-wrap>table>thead{display:none}
+  .table-wrap>table,.table-wrap>table>tbody{display:block}
+  .table-wrap>table>tbody>tr{display:flex;flex-wrap:wrap;justify-content:flex-end;column-gap:6px;background:#fff;border:1px solid var(--line);border-radius:12px;margin:0 0 10px;padding:4px 12px;box-shadow:var(--shadow-sm)}
+  .table-wrap>table>tbody>tr:nth-child(even){background:#fff}
+  .table-wrap>table>tbody>tr>td{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;border-bottom:1px dashed var(--line);white-space:normal;text-align:right;background:transparent!important;min-height:0}
+  .table-wrap>table>tbody>tr>td:last-child{border-bottom:none}
+  .table-wrap>table>tbody>tr>td::before{content:attr(data-label);flex:0 0 auto;max-width:45%;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .table-wrap>table>tbody>tr>td[data-label=""]::before,.table-wrap>table>tbody>tr>td:not([data-label])::before{content:none}
+  .table-wrap>table>tbody>tr>td{flex:1 1 100%}
+  .table-wrap>table>tbody>tr>td[data-label=""]{flex:0 0 auto;border-bottom:none;padding:6px 0}
+  .table-wrap>table>tbody>tr>td[data-label=""]:has(> :not(button):not(input):not(select)){flex:1 1 100%;justify-content:flex-start;text-align:left}
+  .table-wrap>table>tbody>tr>td[data-label=""] button{min-height:40px;min-width:44px;font-size:17px}
+  .table-wrap>table>tbody>tr>td:empty{display:none}
+  .table-wrap>table>tbody>tr>td:first-child{font-weight:600}
+  .table-wrap>table>tbody>tr>td.empty{display:block;text-align:center}
+  .table-wrap>table>tbody>tr>td.empty::before{content:none}
+  .table-wrap>table>tbody>tr>td input,.table-wrap>table>tbody>tr>td select{max-width:60%}
+  .table-wrap>table>tbody>tr.ord-row-completada{background:#fff6cc}
+  .table-wrap>table>tbody>tr.ord-row-despachado{background:#d9f2d9}
+  .table-wrap>table>tbody>tr.ord-row-parcial{background:#fbe6cc}
+  .table-wrap>table>tfoot{display:block}
+  .table-wrap>table>tfoot>tr{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;padding:8px 4px;font-weight:700}
+  .table-wrap>table>tfoot>tr>td,.table-wrap>table>tfoot>tr>th{border:none;padding:2px 0;white-space:normal}
+  .table-wrap>table>tfoot>tr>td:empty,.table-wrap>table>tfoot>tr>th:empty{display:none}
+  /* otras tablas sueltas: desplazamiento horizontal */
+  .pv-stock-box,.pv-lista-precios,.desp-hist{overflow-x:auto;display:block}
+  #authOverlay .auth-box{padding:22px 18px}
+}
 </style>
 </head>
 <body>
@@ -352,6 +446,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
 
 <div id="app-root" class="hidden">
 <div id="topbar">
+  <button id="btnMenuMovil" type="button" aria-label="Abrir menú">☰</button>
   <div class="brand"><img id="topbarLogoImg" class="brand-logo" alt="NOGALMAX"><span class="sub">Precios &amp; Fórmulas</span></div>
   <div class="spacer"></div>
   <div class="user-badge"><span class="dot"></span><span id="userBadgeName">—</span><button id="btnLogout" class="ghost" style="padding:3px 8px;color:#fff">Salir</button></div>
@@ -1517,6 +1612,12 @@ function opcionesFormula(p, sel){
     var val = i===0 ? '' : f.nombre;
     return '<option value="'+escapeHtml(val)+'"'+((sel||'')===val?' selected':'')+'>'+escapeHtml(f.nombre || 'Fórmula principal')+(i===0?' (principal)':'')+'</option>';
   }).join('');
+}
+function formulaCellOrd(o, editable){
+  var p = state.productos.find(function(x){ return x.hoja===o.producto_hoja; });
+  if(!editable || !tieneVariantes(p) || o.desde_stock_existente) return varianteTag(o.variante);
+  var actual = (o.variante && String(o.variante).toLowerCase()!==String(p.formula_nombre||'').toLowerCase()) ? o.variante : '';
+  return '<div style="margin-top:4px"><select class="ord-formula-sel" title="Elegí con qué fórmula se produce" style="font-size:12px;padding:3px 6px">'+opcionesFormula(p, actual)+'</select></div>';
 }
 function varianteTag(v){ return v ? ' <span class="tag" style="background:#eef2ff;color:#3730a3">'+escapeHtml(v)+'</span>' : ''; }
 function computeProducto(p){
@@ -3071,7 +3172,7 @@ function renderOrdenesRows(){
       '<td>'+fmtFecha(o.fecha_pedido)+'</td>'+
       '<td><b>'+escapeHtml(o.numero_produccion)+'</b></td>'+
       '<td>'+escapeHtml(o.lote)+'</td>'+
-      '<td>'+escapeHtml(o.producto_nombre)+varianteTag(o.variante)+(o.bloqueado?' <span class="tag" style="background:#fde3e3;color:#b91c1c">🚫 '+escapeHtml(o.nota||'Bloqueado')+'</span>':'')+'</td>'+
+      '<td>'+escapeHtml(o.producto_nombre)+formulaCellOrd(o, puedeCompletar && puedeEliminarOrd)+(o.bloqueado?' <span class="tag" style="background:#fde3e3;color:#b91c1c">🚫 '+escapeHtml(o.nota||'Bloqueado')+'</span>':'')+'</td>'+
       '<td class="num">'+fmt(o.cantidad_toneladas,2)+'</td>'+
       '<td>'+clienteLabel+'</td>'+
       '<td>'+(o.fecha_entrega?fmtFecha(o.fecha_entrega):'—')+'</td>'+
@@ -3096,6 +3197,26 @@ function renderOrdenesRows(){
         if(idx!==-1) ordenesState.rows[idx] = row;
         renderOrdenesRows();
         toast(completar ? 'Producción marcada como completada' : 'Producción marcada como pendiente');
+      });
+    });
+  });
+  document.querySelectorAll('.ord-formula-sel').forEach(function(sel){
+    sel.addEventListener('change', function(){
+      var id = Number(sel.closest('tr').dataset.id);
+      var o = ordenesState.rows.find(function(x){return x.id===id;});
+      if(!o) return;
+      var etiqueta = sel.options[sel.selectedIndex].text;
+      sel.disabled = true;
+      sb.rpc('cambiar_formula_produccion', {p_id:id, p_variante: sel.value||null}).then(function(res){
+        sel.disabled = false;
+        if(res.error){ toast('No se pudo cambiar la fórmula: '+errMsg(res.error)); renderOrdenesRows(); return; }
+        var row = Array.isArray(res.data) ? res.data[0] : res.data;
+        var idx = ordenesState.rows.findIndex(function(x){return x.id===id;});
+        if(idx!==-1 && row) ordenesState.rows[idx] = row;
+        renderOrdenesRows();
+        if(typeof renderStockFabricaRows==='function') renderStockFabricaRows();
+        if(typeof ventaState!=='undefined' && ventaState.loaded) renderPedidosVenta(true);
+        toast(o.numero_produccion+' — fórmula cambiada a '+((row&&row.variante)||etiqueta)+'. Se recalcularon los insumos.');
       });
     });
   });
@@ -8958,6 +9079,53 @@ setTimeout(function(){
 
 })();
 
+</script>
+<div id="navBackdrop"></div>
+<script>
+/* ===== Ajustes para celular: menú cajón y etiquetas de tablas-tarjeta ===== */
+(function(){
+  "use strict";
+  function cerrarMenu(){ document.body.classList.remove('nav-abierto'); }
+  var btn = document.getElementById('btnMenuMovil');
+  if(btn) btn.addEventListener('click', function(){ document.body.classList.toggle('nav-abierto'); });
+  var bd = document.getElementById('navBackdrop');
+  if(bd) bd.addEventListener('click', cerrarMenu);
+  document.addEventListener('click', function(e){
+    var t = e.target && e.target.closest ? e.target.closest('.nav-item, .home-card[data-tab]') : null;
+    if(t){ cerrarMenu(); try{ window.scrollTo(0,0); }catch(_){ } }
+  });
+  // cada celda recibe el título de su columna para mostrarlo en modo tarjeta
+  function etiquetar(table){
+    var head = table.tHead && table.tHead.rows[0];
+    if(!head) return;
+    var labels = [];
+    Array.prototype.forEach.call(head.cells, function(th){
+      var txt = (th.textContent||'').replace(/\s+/g,' ').trim();
+      var span = th.colSpan || 1;
+      for(var i=0;i<span;i++) labels.push(txt);
+    });
+    Array.prototype.forEach.call(table.tBodies, function(tb){
+      Array.prototype.forEach.call(tb.rows, function(tr){
+        var col = 0;
+        Array.prototype.forEach.call(tr.cells, function(td){
+          if(td.getAttribute('data-label')===null || td.dataset.lblAuto==='1'){
+            td.setAttribute('data-label', (td.colSpan>1) ? '' : (labels[col]||''));
+            td.dataset.lblAuto='1';
+          }
+          col += td.colSpan || 1;
+        });
+      });
+    });
+  }
+  var pendiente = false;
+  function etiquetarTodo(){
+    pendiente = false;
+    document.querySelectorAll('.table-wrap > table').forEach(etiquetar);
+  }
+  function programar(){ if(!pendiente){ pendiente = true; (window.requestAnimationFrame||setTimeout)(etiquetarTodo); } }
+  try{ new MutationObserver(programar).observe(document.body, {childList:true, subtree:true}); }catch(_){ }
+  programar();
+})();
 </script>
 </body>
 </html>
