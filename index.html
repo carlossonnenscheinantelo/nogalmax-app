@@ -765,7 +765,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
         <tbody id="notasVentaBody"></tbody>
       </table>
     </div>
-    <p class="footnote">La nota de venta se genera automáticamente al crear un pedido de venta — con el total, la cantidad de cuotas y sus fechas de vencimiento. Para registrar un pago, usá «💳 Pagos».</p>
+    <p class="footnote">La nota de venta se genera automáticamente al crear un pedido de venta — con el total, la cantidad de cuotas y sus fechas de vencimiento. Para registrar un pago, usá «💳 Pagos». Para cobrar solo una parte del pedido (lo que el cliente ya recogió), tocá 🧾 y generá una nota de cobro por esas toneladas; el resto queda como saldo.</p>
   </section>
 
   <!-- PAGOS -->
@@ -1374,6 +1374,32 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
         <button class="primary" id="btnDescargarNotaVentaPdf">⬇ Descargar PDF</button>
       </div>
       <p class="footnote">Documento con el detalle del pedido, el total y el plan de cuotas.</p>
+    </div>
+  </div>
+</div>
+
+<div id="cobroParcialModalOverlay" class="overlay2">
+  <div class="ocr-box" style="max-width:860px">
+    <div class="ocr-head">
+      <h3>🧾 Notas de cobro (cobro parcial)</h3>
+      <button class="close-x" id="btnCerrarCobroParcial">✕</button>
+    </div>
+    <div id="cobroParcialBody" class="ocr-body"></div>
+  </div>
+</div>
+
+<div id="notaCobroDocModalOverlay" class="overlay2">
+  <div class="ocr-box" style="max-width:680px">
+    <div class="ocr-head">
+      <h3>Nota de cobro</h3>
+      <button class="close-x" id="btnCerrarNotaCobroDoc">✕</button>
+    </div>
+    <div class="ocr-body">
+      <div id="notaCobroDocCard" class="fi-card"></div>
+      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+        <button class="primary" id="btnDescargarNotaCobroPdf">⬇ Descargar PDF</button>
+      </div>
+      <p class="footnote">Documento con lo que se cobra en esta nota y el saldo que queda del pedido.</p>
     </div>
   </div>
 </div>
@@ -4790,7 +4816,7 @@ document.getElementById('btnDescargarProformaPdf').addEventListener('click', fun
 
 /* ================= COBRANZAS: NOTAS DE VENTA / PAGOS / CUENTAS POR COBRAR ================= */
 function fetchNotasVenta(cb){
-  sb.from('notas_venta').select('*, cuotas_venta(*), pagos_venta(*), pedidos_venta(numero_pedido,cliente,condicion_pago,condicion_pago_nota,modo_entrega,flete_bs,fecha_entrega,fecha_pedido,pedido_venta_items(*))').order('creado_en',{ascending:false}).then(function(res){
+  sb.from('notas_venta').select('*, cuotas_venta(*), pagos_venta(*), notas_cobro(*), pedidos_venta(numero_pedido,cliente,condicion_pago,condicion_pago_nota,modo_entrega,flete_bs,fecha_entrega,fecha_pedido,pedido_venta_items(*))').order('creado_en',{ascending:false}).then(function(res){
     if(res.error){ toast('No se pudieron cargar las notas de venta: '+errMsg(res.error)); return; }
     notaVentaState.rows = res.data || [];
     notaVentaState.loaded = true;
@@ -4815,11 +4841,21 @@ function notaTotales(nota){
       if(c.fecha_vencimiento && c.fecha_vencimiento < hoy) vencida = true;
     }
   });
+  var cb = cobrosDeNota(nota, pagos);
+  if(cb.cobros.length){
+    /* con notas de cobro y el pedido aún no entregado del todo, lo exigible es lo emitido en las notas de cobro */
+    if(nota.estado_entrega!=='entregada'){ vencida = false; proximaFecha = null; }
+    cb.cobros.forEach(function(c){
+      if(c._saldo<=0.005) return;
+      if(c._vencida) vencida = true;
+      if(c.fecha_vencimiento && (proximaFecha===null || c.fecha_vencimiento < proximaFecha)) proximaFecha = c.fecha_vencimiento;
+    });
+  }
   var estado, estadoClass;
   if(saldo<=0.005){ estado='Pagada'; estadoClass='pagada'; }
   else if(pagado>0){ estado = vencida ? 'Vencida (parcial)' : 'Parcial'; estadoClass = vencida?'vencida':'parcial'; }
   else { estado = vencida ? 'Vencida' : 'Pendiente'; estadoClass = vencida?'vencida':'pendiente'; }
-  return { cuotas:cuotas, pagos:pagos, pagado:pagado, total:total, saldo:saldo, proximaFecha:proximaFecha, vencida:vencida, estado:estado, estadoClass:estadoClass };
+  return { cuotas:cuotas, pagos:pagos, pagado:pagado, total:total, saldo:saldo, proximaFecha:proximaFecha, vencida:vencida, estado:estado, estadoClass:estadoClass, cobros:cb.cobros, emitido:cb.emitido, saldoCobros:cb.saldoCobros, porEmitir:Math.max(0, Math.round((total-cb.emitido)*100)/100) };
 }
 
 /* estado de entrega del pedido de la nota: cuando se entrega todo, la nota queda lista para cobrar */
@@ -4878,9 +4914,10 @@ function renderNotasVentaRows(){
       '<td>'+nv.numero_cuotas+' '+(nv.numero_cuotas===1?'pago':'pagos')+'</td>'+
       '<td class="num">'+fmt(t.pagado,2)+'</td>'+
       '<td class="num"><b>'+fmt(t.saldo,2)+'</b></td>'+
-      '<td><span class="pill-estado pill-'+t.estadoClass+'">'+t.estado+'</span></td>'+
+      '<td><span class="pill-estado pill-'+t.estadoClass+'">'+t.estado+'</span>'+notaCobroTagHtml(nv)+'</td>'+
       '<td>'+notaEntregaHtml(nv)+'</td>'+
       '<td style="white-space:nowrap"><button class="ghost btn-doc-nv" title="Ver / descargar nota de venta">📄</button>'+
+        ' <button class="ghost btn-cobro-nv" title="Notas de cobro: cobrar solo una parte (lo que recogió el cliente)">🧾</button>'+
         (esAdminNv ? ' <button class="ghost btn-eliminar-nv" title="Eliminar nota de venta y todo lo relacionado (solo administrador)" style="color:var(--danger)">🗑</button>' : '')+'</td>'+
     '</tr>';
   }).join('') || '<tr><td colspan="11" class="empty">Sin notas de venta registradas</td></tr>';
@@ -4889,6 +4926,12 @@ function renderNotasVentaRows(){
       var id = Number(btn.closest('tr').dataset.id);
       var nv = notaVentaState.rows.find(function(x){return x.id===id;});
       if(nv) eliminarNotaVenta(nv, btn);
+    });
+  });
+  document.querySelectorAll('.btn-cobro-nv').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var nv = notaVentaState.rows.find(function(x){return x.id===Number(btn.closest('tr').dataset.id);});
+      if(nv) openCobroParcialModal(nv);
     });
   });
   document.querySelectorAll('.btn-doc-nv').forEach(function(btn){
@@ -4979,7 +5022,7 @@ function renderPagosRows(){
       '<td class="num"><b>'+fmt(t.saldo,2)+'</b></td>'+
       '<td>'+(t.proximaFecha?fmtFecha(t.proximaFecha):'—')+'</td>'+
       '<td><span class="pill-estado pill-'+t.estadoClass+'">'+t.estado+'</span></td>'+
-      '<td>'+(t.saldo>0.005 ? '<button class="primary btn-pagar" style="padding:6px 12px;font-size:12px">💳 Registrar pago</button>' : '')+'</td>'+
+      '<td style="white-space:nowrap">'+(t.saldo>0.005 ? '<button class="primary btn-pagar" style="padding:6px 12px;font-size:12px">💳 Registrar pago</button> <button class="ghost btn-cobro-pg" style="padding:6px 10px;font-size:12px" title="Cobrar solo una parte (nota de cobro)">🧾 Cobro parcial</button>' : '')+notaCobroTagHtml(nv)+'</td>'+
     '</tr>';
   }).join('') || '<tr><td colspan="8" class="empty">Sin notas de venta para mostrar</td></tr>';
   document.querySelectorAll('.btn-pagar').forEach(function(btn){
@@ -4987,6 +5030,12 @@ function renderPagosRows(){
       var id = Number(btn.closest('tr').dataset.id);
       var nv = notaVentaState.rows.find(function(x){return x.id===id;});
       if(nv) openPagoModal(nv);
+    });
+  });
+  document.querySelectorAll('.btn-cobro-pg').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var nv = notaVentaState.rows.find(function(x){return x.id===Number(btn.closest('tr').dataset.id);});
+      if(nv) openCobroParcialModal(nv);
     });
   });
 }
@@ -5041,8 +5090,10 @@ document.querySelectorAll('#view-cuentasxcobrar th.sortable').forEach(function(t
 });
 
 /* ---- Registrar pago (modal) ---- */
-function openPagoModal(nota){
+var pagoCobroSel = null;
+function openPagoModal(nota, cobroId){
   pagoModalState = nota;
+  pagoCobroSel = cobroId || null;
   pagoFile = null;
   renderPagoForm();
   document.getElementById('pagoModalOverlay').classList.add('active');
@@ -5063,7 +5114,8 @@ function renderPagoForm(){
   var t = notaTotales(nota);
   var esAdminPg = currentProfile && currentProfile.rol==='admin';
   var historial = t.pagos.slice().sort(function(a,b){ return (a.fecha_pago<b.fecha_pago)?1:-1; }).map(function(p){
-    return '<div class="line" data-pagoid="'+p.id+'"><span>'+(p.numero_recibo?'<b>'+escapeHtml(p.numero_recibo)+'</b> · ':'')+fmtFecha(p.fecha_pago)+' — Bs '+fmt(p.monto_bs,2)+(p.registrado_por_nombre?(' · '+escapeHtml(p.registrado_por_nombre)):'')+'</span><span>'+
+    var ncP = p.nota_cobro_id ? t.cobros.find(function(c){ return c.id===p.nota_cobro_id; }) : null;
+    return '<div class="line" data-pagoid="'+p.id+'"><span>'+(p.numero_recibo?'<b>'+escapeHtml(p.numero_recibo)+'</b> · ':'')+fmtFecha(p.fecha_pago)+' — Bs '+fmt(p.monto_bs,2)+(ncP?' · 🧾 '+escapeHtml(ncP.numero):'')+(p.registrado_por_nombre?(' · '+escapeHtml(p.registrado_por_nombre)):'')+'</span><span>'+
       '<button type="button" class="ghost btn-recibo-pago" data-id="'+p.id+'" style="padding:2px 8px;font-size:11px">🧾 Recibo</button> '+
       (p.comprobante_path ? '<button type="button" class="ghost btn-ver-comprobante-pago" data-path="'+escapeHtml(p.comprobante_path)+'" style="padding:2px 8px;font-size:11px">👁 Ver</button>' : '')+
       (esAdminPg ? ' <button type="button" class="ghost danger btn-eliminar-pago" data-id="'+p.id+'" style="padding:2px 8px;font-size:11px">🗑️</button>' : '')+
@@ -5081,6 +5133,15 @@ function renderPagoForm(){
     historial+
     (t.saldo>0.005 ?
       '<div class="section-title" style="margin-top:14px">Nuevo pago</div>'+
+      (function(){
+        var pend = t.cobros.filter(function(c){ return c._saldo>0.005; });
+        if(!pend.length) return '';
+        var sel = pagoCobroSel && pend.some(function(c){ return c.id===pagoCobroSel; }) ? pagoCobroSel : pend[0].id;
+        return '<div class="inline-field"><label>Aplicar el pago a</label><select id="pg_cobro" style="min-width:260px">'+
+          pend.map(function(c){ return '<option value="'+c.id+'" data-saldo="'+c._saldo+'"'+(c.id===sel?' selected':'')+'>🧾 '+escapeHtml(c.numero)+' — saldo Bs '+fmt(c._saldo,2)+' · vence '+fmtFecha(c.fecha_vencimiento)+'</option>'; }).join('')+
+          '<option value="" data-saldo="'+t.saldo+'">A cuenta de la nota de venta (general) — saldo Bs '+fmt(t.saldo,2)+'</option>'+
+        '</select></div>';
+      })()+
       '<div class="inline-field"><label>Fecha de pago</label><input type="date" id="pg_fecha" value="'+new Date().toISOString().slice(0,10)+'"></div>'+
       '<div class="inline-field"><label>Monto (Bs)</label><input type="number" step="0.01" min="0.01" id="pg_monto" class="pill-input" placeholder="'+t.saldo+'"></div>'+
       '<div class="section-title" style="margin-top:10px">Comprobante de pago</div>'+
@@ -5112,7 +5173,7 @@ function renderPagoForm(){
         toast('Pago eliminado');
         fetchNotasVenta(function(){
           pagoModalState = notaVentaState.rows.find(function(x){return x.id===pagoModalState.id;}) || pagoModalState;
-          renderPagoForm();
+          renderPagoForm(); refrescarCobroParcialSiAbierto();
           if(activeTab()==='pagos') renderPagosRows();
           if(activeTab()==='recibos') renderRecibosRows();
           if(activeTab()==='cuentasxcobrar') renderCuentasXCobrarRows(); if(activeTab()==='resumen') renderHomeCobros();
@@ -5124,6 +5185,11 @@ function renderPagoForm(){
   if(t.saldo>0.005){
     document.getElementById('btnCancelarPago2').addEventListener('click', closePagoModal);
     document.getElementById('btnRegistrarPago').addEventListener('click', submitPago);
+    var pgCob = document.getElementById('pg_cobro');
+    if(pgCob){
+      var syncCob = function(){ var o = pgCob.options[pgCob.selectedIndex]; document.getElementById('pg_monto').placeholder = o ? o.dataset.saldo : ''; };
+      pgCob.addEventListener('change', syncCob); syncCob();
+    }
     document.getElementById('pg_file').addEventListener('change', function(e){
       pagoFile = (e.target.files && e.target.files[0]) ? e.target.files[0] : null;
       document.getElementById('pg_preview').innerHTML = pagoFile ? '<img src="'+URL.createObjectURL(pagoFile)+'" style="max-width:220px;border-radius:8px;margin-top:6px">' : '';
@@ -5142,14 +5208,18 @@ function submitPago(){
   var btn = document.getElementById('btnRegistrarPago');
   btn.disabled = true;
   function conArchivo(path){
-    sb.rpc('registrar_pago_venta', { p_nota_venta_id: nota.id, p_monto_bs: monto, p_fecha_pago: fecha, p_comprobante_path: path }).then(function(res){
+    var cobEl = document.getElementById('pg_cobro');
+    var cobId = cobEl && cobEl.value ? Number(cobEl.value) : null;
+    var llamada = cobId ? sb.rpc('registrar_pago_cobro', { p_nota_cobro_id: cobId, p_monto_bs: monto, p_fecha_pago: fecha, p_comprobante_path: path })
+                        : sb.rpc('registrar_pago_venta', { p_nota_venta_id: nota.id, p_monto_bs: monto, p_fecha_pago: fecha, p_comprobante_path: path });
+    llamada.then(function(res){
       btn.disabled = false;
       if(res.error){ toast('No se pudo registrar el pago: '+errMsg(res.error)); return; }
       var pagoRow = Array.isArray(res.data) ? res.data[0] : res.data;
       toast('Pago registrado'+(pagoRow&&pagoRow.numero_recibo?' — recibo '+pagoRow.numero_recibo:''));
       fetchNotasVenta(function(){
         pagoModalState = notaVentaState.rows.find(function(x){return x.id===nota.id;}) || nota;
-        renderPagoForm();
+        renderPagoForm(); refrescarCobroParcialSiAbierto();
         if(activeTab()==='recibos') renderRecibosRows();
         /* el recibo se genera solo con cada pago */
         var pg = pagoRow && (pagoModalState.pagos_venta||[]).find(function(x){ return x.id===pagoRow.id; });
@@ -5632,6 +5702,297 @@ document.getElementById('btnDescargarNotaVentaPdf').addEventListener('click', fu
     doc.save('nota_venta_'+(nota.numero_nota||'nota')+'_'+slugFilename(nota.cliente||'cliente')+'.pdf');
     btn.disabled = false;
     toast('PDF descargado');
+  }).catch(function(err){ btn.disabled=false; toast('No se pudo generar el PDF: '+(err&&err.message?err.message:String(err))); });
+});
+
+/* ---- NOTAS DE COBRO PARCIALES: cobrar solo lo que el cliente recogió (ej. pedido 50 Tn, recoge 20 Tn → cobrar 20 y luego el saldo) ---- */
+var cobroParcialState = { nota:null, despachoPorProd:{} };
+var notaCobroDocState = null;
+function r2(n){ return Math.round((Number(n)||0)*100)/100; }
+function cobrosDeNota(nota, pagos){
+  var hoy = new Date().toISOString().slice(0,10);
+  var cobros = (nota.notas_cobro||[]).slice().sort(function(a,b){ return (a.secuencia||0)-(b.secuencia||0); });
+  var libres = 0;
+  (pagos||[]).forEach(function(p){ if(!p.nota_cobro_id) libres += Number(p.monto_bs)||0; });
+  cobros.forEach(function(c){
+    c._pagado = (pagos||[]).filter(function(p){ return p.nota_cobro_id===c.id; }).reduce(function(s,p){ return s+(Number(p.monto_bs)||0); },0);
+  });
+  /* los pagos hechos "a cuenta" (sin nota de cobro) se aplican a las notas de cobro más antiguas */
+  cobros.forEach(function(c){
+    var falta = (Number(c.monto_bs)||0) - c._pagado;
+    if(falta>0.005 && libres>0.005){ var a = Math.min(falta, libres); c._pagado += a; libres -= a; }
+    c._pagado = r2(c._pagado);
+    c._saldo = Math.max(0, r2((Number(c.monto_bs)||0) - c._pagado));
+    c._vencida = c._saldo>0.005 && !!c.fecha_vencimiento && c.fecha_vencimiento < hoy;
+    c._estado = c._saldo<=0.005 ? 'Pagada' : (c._vencida ? (c._pagado>0?'Vencida (parcial)':'Vencida') : (c._pagado>0?'Parcial':'Pendiente'));
+    c._estadoClass = c._saldo<=0.005 ? 'pagada' : (c._vencida ? 'vencida' : (c._pagado>0?'parcial':'pendiente'));
+    c._ton = (c.items||[]).reduce(function(s,it){ return s+(Number(it.toneladas)||0); },0);
+  });
+  var emitido = r2(cobros.reduce(function(s,c){ return s+(Number(c.monto_bs)||0); },0));
+  return { cobros:cobros, emitido:emitido, saldoCobros: r2(cobros.reduce(function(s,c){ return s+c._saldo; },0)) };
+}
+/* toneladas ya incluidas en notas de cobro, por línea del pedido */
+function tonCobradasPorItem(nota){
+  var m = {};
+  (nota.notas_cobro||[]).forEach(function(c){ (c.items||[]).forEach(function(it){ m[it.item_id] = (m[it.item_id]||0) + (Number(it.toneladas)||0); }); });
+  return m;
+}
+function notaCobroTagHtml(nv){
+  var n = (nv.notas_cobro||[]).length;
+  if(!n) return '';
+  var t = notaTotales(nv);
+  return '<div style="margin-top:3px"><span class="tag" style="background:#eaf1fb;color:#1f4f8a" title="Notas de cobro emitidas: Bs '+fmt(t.emitido,2)+' · saldo de lo cobrado Bs '+fmt(t.saldoCobros,2)+'">🧾 '+n+' cobro'+(n===1?'':'s')+(t.porEmitir>0.005?' · falta emitir Bs '+fmt(t.porEmitir,2):'')+'</span></div>';
+}
+function cobroParcialAbierto(){ return document.getElementById('cobroParcialModalOverlay').classList.contains('active'); }
+function refrescarCobroParcialSiAbierto(){
+  if(!cobroParcialAbierto() || !cobroParcialState.nota) return;
+  cobroParcialState.nota = notaVentaState.rows.find(function(x){ return x.id===cobroParcialState.nota.id; }) || cobroParcialState.nota;
+  renderCobroParcial();
+}
+function openCobroParcialModal(nota){
+  cobroParcialState = { nota: nota, despachoPorProd: {} };
+  document.getElementById('cobroParcialBody').innerHTML = '<p class="muted">Cargando…</p>';
+  document.getElementById('cobroParcialModalOverlay').classList.add('active');
+  sb.from('producciones').select('id, cantidad_toneladas, despachado_cantidad').eq('pedido_venta_id', nota.pedido_venta_id).then(function(r){
+    ((r && r.data) || []).forEach(function(p){ cobroParcialState.despachoPorProd[p.id] = Number(p.despachado_cantidad)||0; });
+    renderCobroParcial();
+  });
+}
+function closeCobroParcialModal(){ document.getElementById('cobroParcialModalOverlay').classList.remove('active'); }
+document.getElementById('btnCerrarCobroParcial').addEventListener('click', closeCobroParcialModal);
+function vencimientoSugeridoCobro(nota, fecha){
+  var pv = nota.pedidos_venta || {};
+  if(pv.condicion_pago==='contado' || !fecha) return fecha;
+  var cuotas = (nota.cuotas_venta||[]).slice().sort(function(a,b){ return (a.numero_cuota||0)-(b.numero_cuota||0); });
+  var c1 = cuotas[0]; if(!c1) return fecha;
+  var orig = c1.fecha_vencimiento_original || c1.fecha_vencimiento;
+  var base = pv.fecha_entrega || pv.fecha_pedido || nota.fecha;
+  if(!orig || !base) return fecha;
+  var dias = Math.max(0, Math.round((new Date(orig) - new Date(base))/86400000));
+  var d = new Date(fecha+'T12:00:00'); d.setDate(d.getDate()+dias);
+  return d.toISOString().slice(0,10);
+}
+function renderCobroParcial(){
+  var nota = cobroParcialState.nota;
+  var t = notaTotales(nota);
+  var pv = nota.pedidos_venta || {};
+  var esAdmin = currentProfile && currentProfile.rol==='admin';
+  var items = (pv.pedido_venta_items||[]).slice().sort(function(a,b){ return (a.orden||0)-(b.orden||0); });
+  var cobradas = tonCobradasPorItem(nota);
+  var fleteTotal = Number(pv.flete_bs)||0;
+  var fleteCobrado = (nota.notas_cobro||[]).reduce(function(s,c){ return s+(Number(c.flete_bs)||0); },0);
+  var fleteRest = Math.max(0, r2(fleteTotal - fleteCobrado));
+  var tonTotal = items.reduce(function(s,it){ return s+(Number(it.cantidad_toneladas)||0); },0);
+  var tonCob = Object.keys(cobradas).reduce(function(s,k){ return s+cobradas[k]; },0);
+  function meta(l,v){ return '<div class="doc-meta-item"><span class="l">'+l+'</span><span class="v">'+v+'</span></div>'; }
+  var lista = t.cobros.map(function(c){
+    return '<tr data-id="'+c.id+'">'+
+      '<td><b>'+escapeHtml(c.numero)+'</b></td><td>'+fmtFecha(c.fecha)+'</td><td>'+fmtFecha(c.fecha_vencimiento)+'</td>'+
+      '<td class="num">'+fmt(c._ton,2)+'</td><td class="num">'+fmt(c.monto_bs,2)+'</td><td class="num">'+fmt(c._pagado,2)+'</td><td class="num"><b>'+fmt(c._saldo,2)+'</b></td>'+
+      '<td><span class="pill-estado pill-'+c._estadoClass+'">'+c._estado+'</span></td>'+
+      '<td style="white-space:nowrap"><button type="button" class="ghost btn-nc-doc" title="Ver / descargar nota de cobro">📄</button>'+
+        (c._saldo>0.005 ? ' <button type="button" class="ghost btn-nc-pagar" title="Registrar pago de esta nota de cobro">💳</button>' : '')+
+        (esAdmin ? ' <button type="button" class="ghost btn-nc-del" title="Eliminar nota de cobro (sin pagos)" style="color:var(--danger)">🗑</button>' : '')+'</td></tr>';
+  }).join('');
+  var porEmitir = t.porEmitir;
+  var hoy = new Date().toISOString().slice(0,10);
+  var filas = items.map(function(it){
+    var tot = Number(it.cantidad_toneladas)||0;
+    var cob = cobradas[it.id]||0;
+    var rest = Math.max(0, Math.round((tot-cob)*10000)/10000);
+    var ent = (it.produccion_id && cobroParcialState.despachoPorProd[it.produccion_id]!=null) ? cobroParcialState.despachoPorProd[it.produccion_id] : null;
+    return '<tr data-item="'+it.id+'" data-precio="'+(Number(it.precio_pactado)||0)+'" data-rest="'+rest+'" data-ent="'+(ent==null?'':Math.max(0, Math.min(tot, ent) - cob))+'">'+
+      '<td>'+escapeHtml(it.producto_nombre)+'</td>'+
+      '<td class="num">'+fmt(tot,2)+'</td>'+
+      '<td class="num">'+(ent==null?'—':fmt(ent,2))+'</td>'+
+      '<td class="num">'+fmt(cob,2)+'</td>'+
+      '<td class="num">'+(rest>0.0004 ? '<input type="number" class="pill-input nc-ton" step="0.001" min="0" max="'+rest+'" value="" placeholder="0" style="width:90px">' : '<span class="muted">cobrado</span>')+'</td>'+
+      '<td class="num">'+fmt(it.precio_pactado,2)+'</td>'+
+      '<td class="num nc-sub">0,00</td></tr>';
+  }).join('');
+  document.getElementById('cobroParcialBody').innerHTML =
+    '<div class="doc-meta">'+
+      meta('N° Nota de venta', escapeHtml(nota.numero_nota))+
+      meta('Cliente', escapeHtml(nota.cliente||'—'))+
+      meta('Total del pedido', fmt(tonTotal,2)+' Ton · '+fmtBs(t.total))+
+      meta('Ya emitido en notas de cobro', fmt(tonCob,2)+' Ton · '+fmtBs(t.emitido))+
+      meta('Falta emitir', '<b>'+fmtBs(porEmitir)+'</b>')+
+      meta('Pagado', fmtBs(t.pagado))+
+      meta('Saldo total de la nota', '<b>'+fmtBs(t.saldo)+'</b>')+
+    '</div>'+
+    '<div class="section-title" style="margin-top:12px">Notas de cobro emitidas</div>'+
+    (lista ? '<div class="table-wrap"><table><thead><tr><th>N°</th><th>Fecha</th><th>Vence</th><th class="num">Ton</th><th class="num">Monto (Bs)</th><th class="num">Pagado</th><th class="num">Saldo</th><th>Estado</th><th></th></tr></thead><tbody>'+lista+'</tbody></table></div>'
+      : '<p class="muted" style="font-size:12px">Todavía no se emitió ninguna nota de cobro para esta nota de venta.</p>')+
+    (porEmitir>0.005 ?
+      '<div class="section-title" style="margin-top:16px">Nueva nota de cobro</div>'+
+      '<p class="footnote" style="margin-top:0">Poné las toneladas que vas a cobrar ahora (por ejemplo lo que el cliente ya recogió). Lo que no cobres queda como saldo para una próxima nota de cobro.</p>'+
+      '<div class="table-wrap"><table><thead><tr><th>Producto</th><th class="num">Pedido (Ton)</th><th class="num">Entregado (Ton)</th><th class="num">Ya cobrado (Ton)</th><th class="num">A cobrar (Ton)</th><th class="num">Precio (Bs/Ton)</th><th class="num">Subtotal (Bs)</th></tr></thead><tbody>'+filas+'</tbody></table></div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'+
+        '<button type="button" class="ghost" id="nc_btnEntregado">🚚 Cargar lo entregado sin cobrar</button>'+
+        '<button type="button" class="ghost" id="nc_btnTodo">Cargar todo el saldo</button>'+
+        '<button type="button" class="ghost" id="nc_btnLimpiar">Limpiar</button>'+
+      '</div>'+
+      (fleteRest>0.005 ? '<div class="inline-field" style="margin-top:10px"><label>Flete a cobrar en esta nota (Bs) — quedan '+fmtBs(fleteRest)+'</label><input type="number" step="0.01" min="0" max="'+fleteRest+'" id="nc_flete" class="pill-input" value="0"></div>' : '')+
+      '<div class="inline-field"><label>Fecha</label><input type="date" id="nc_fecha" value="'+hoy+'"></div>'+
+      '<div class="inline-field"><label>Vencimiento</label><input type="date" id="nc_venc" value="'+vencimientoSugeridoCobro(nota, hoy)+'"></div>'+
+      '<div class="inline-field"><label>Nota / referencia (opcional)</label><input type="text" id="nc_nota" style="min-width:240px" placeholder="Ej: 1er retiro, camión placa…"></div>'+
+      '<div class="doc-grand-total-box" style="margin-top:10px"><div class="doc-total-row" id="nc_total">A COBRAR: Bs 0,00</div><div class="doc-meta-item"><span class="l">Queda por emitir después de esta nota</span><span class="v" id="nc_queda">'+fmtBs(porEmitir)+'</span></div></div>'+
+      '<div style="margin-top:14px;display:flex;gap:10px"><button class="primary" id="btnCrearNotaCobro">🧾 Generar nota de cobro</button><button type="button" id="btnCancelarCobroParcial">Cerrar</button></div>'
+      : '<p class="footnote" style="margin-top:12px">Todo el pedido ya está incluido en notas de cobro.</p>');
+  var body = document.getElementById('cobroParcialBody');
+  function nc(id){ return t.cobros.find(function(c){ return c.id===id; }); }
+  body.querySelectorAll('.btn-nc-doc').forEach(function(b){ b.addEventListener('click', function(){ var c = nc(Number(b.closest('tr').dataset.id)); if(c) openNotaCobroDocModal(nota, c); }); });
+  body.querySelectorAll('.btn-nc-pagar').forEach(function(b){ b.addEventListener('click', function(){ openPagoModal(nota, Number(b.closest('tr').dataset.id)); }); });
+  body.querySelectorAll('.btn-nc-del').forEach(function(b){ b.addEventListener('click', function(){
+    var c = nc(Number(b.closest('tr').dataset.id)); if(!c) return;
+    if(!confirm('¿Eliminar la nota de cobro '+c.numero+' (Bs '+fmt(c.monto_bs,2)+')? Las toneladas vuelven a quedar por cobrar.')) return;
+    b.disabled = true;
+    sb.rpc('eliminar_nota_cobro', {p_id:c.id}).then(function(res){
+      if(res.error){ toast('No se pudo eliminar: '+errMsg(res.error)); b.disabled=false; return; }
+      toast('Nota de cobro '+c.numero+' eliminada');
+      fetchNotasVenta(function(){ refrescarCobroParcialSiAbierto(); refrescarListasCobranza(); });
+    });
+  }); });
+  if(porEmitir<=0.005) return;
+  function recalc(){
+    var sum = 0;
+    body.querySelectorAll('tr[data-item]').forEach(function(tr){
+      var inp = tr.querySelector('.nc-ton');
+      var ton = inp ? (parseFloat(inp.value)||0) : 0;
+      var sub = r2(ton * Number(tr.dataset.precio));
+      sum += sub;
+      tr.querySelector('.nc-sub').textContent = fmt(sub,2);
+      if(inp) inp.classList.toggle('k-warn', ton > Number(tr.dataset.rest)+0.0004);
+    });
+    var fl = document.getElementById('nc_flete');
+    sum += fl ? (parseFloat(fl.value)||0) : 0;
+    sum = r2(sum);
+    document.getElementById('nc_total').textContent = 'A COBRAR: '+fmtBs(sum);
+    document.getElementById('nc_queda').textContent = fmtBs(Math.max(0, r2(porEmitir - sum)));
+    return sum;
+  }
+  function llenar(fn){
+    var tonTot = 0, tonSel = 0;
+    body.querySelectorAll('tr[data-item]').forEach(function(tr){
+      var inp = tr.querySelector('.nc-ton'); if(!inp) return;
+      var v = fn(tr); inp.value = v>0.0004 ? Math.round(v*1000)/1000 : '';
+      tonTot += Number(tr.dataset.rest); tonSel += v>0 ? v : 0;
+    });
+    var fl = document.getElementById('nc_flete');
+    if(fl) fl.value = (tonTot>0 && tonSel>0) ? r2(fleteRest * Math.min(1, tonSel/tonTot)) : 0;
+    recalc();
+  }
+  body.querySelectorAll('.nc-ton').forEach(function(inp){ inp.addEventListener('input', recalc); });
+  var flEl = document.getElementById('nc_flete'); if(flEl) flEl.addEventListener('input', recalc);
+  document.getElementById('nc_btnEntregado').addEventListener('click', function(){
+    var hay = false;
+    llenar(function(tr){ var e = tr.dataset.ent==='' ? 0 : Number(tr.dataset.ent); var v = Math.max(0, Math.min(e, Number(tr.dataset.rest))); if(v>0.0004) hay = true; return v; });
+    if(!hay) toast('No hay producto entregado pendiente de cobrar — cargá las toneladas a mano.');
+  });
+  document.getElementById('nc_btnTodo').addEventListener('click', function(){ llenar(function(tr){ return Number(tr.dataset.rest); }); });
+  document.getElementById('nc_btnLimpiar').addEventListener('click', function(){ llenar(function(){ return 0; }); });
+  document.getElementById('nc_fecha').addEventListener('change', function(){ document.getElementById('nc_venc').value = vencimientoSugeridoCobro(nota, this.value); });
+  document.getElementById('btnCancelarCobroParcial').addEventListener('click', closeCobroParcialModal);
+  document.getElementById('btnCrearNotaCobro').addEventListener('click', function(){
+    var itemsSel = [], error = null;
+    body.querySelectorAll('tr[data-item]').forEach(function(tr){
+      var inp = tr.querySelector('.nc-ton'); if(!inp) return;
+      var ton = parseFloat(inp.value)||0;
+      if(ton<0) error = 'Las toneladas no pueden ser negativas';
+      if(ton > Number(tr.dataset.rest)+0.0004) error = 'Una de las cantidades supera lo que queda por cobrar de ese producto';
+      if(ton>0) itemsSel.push({item_id:Number(tr.dataset.item), toneladas: Math.round(ton*10000)/10000});
+    });
+    var fl = document.getElementById('nc_flete');
+    var flete = fl ? (parseFloat(fl.value)||0) : 0;
+    if(error){ toast(error); return; }
+    if(!itemsSel.length && flete<=0){ toast('Poné las toneladas que querés cobrar'); return; }
+    var total = recalc();
+    var fecha = document.getElementById('nc_fecha').value || hoy;
+    var venc = document.getElementById('nc_venc').value || fecha;
+    if(!confirm('¿Generar nota de cobro por '+fmtBs(total)+' para '+(nota.cliente||'')+'?')) return;
+    var btn = this; btn.disabled = true;
+    sb.rpc('crear_nota_cobro', { p_nota_venta_id: nota.id, p_items: itemsSel, p_flete_bs: flete, p_fecha: fecha, p_fecha_vencimiento: venc, p_nota: document.getElementById('nc_nota').value||null }).then(function(res){
+      btn.disabled = false;
+      if(res.error){ toast('No se pudo generar la nota de cobro: '+errMsg(res.error)); return; }
+      var row = Array.isArray(res.data) ? res.data[0] : res.data;
+      toast('Nota de cobro '+(row&&row.numero||'')+' generada');
+      fetchNotasVenta(function(){
+        refrescarCobroParcialSiAbierto(); refrescarListasCobranza();
+        var n2 = cobroParcialState.nota; var c2 = row && notaTotales(n2).cobros.find(function(c){ return c.id===row.id; });
+        if(c2) openNotaCobroDocModal(n2, c2);
+      });
+    });
+  });
+  recalc();
+}
+function refrescarListasCobranza(){
+  if(activeTab()==='notasventa') renderNotasVentaRows();
+  if(activeTab()==='pagos') renderPagosRows();
+  if(activeTab()==='cuentasxcobrar') renderCuentasXCobrarRows();
+  if(activeTab()==='resumen') renderHomeCobros();
+}
+function renderNotaCobroDocCard(nota, c){
+  var t = notaTotales(nota);
+  var pv = nota.pedidos_venta || {};
+  var items = (pv.pedido_venta_items||[]);
+  var tonTotal = items.reduce(function(s,it){ return s+(Number(it.cantidad_toneladas)||0); },0);
+  var anteriores = t.cobros.filter(function(x){ return x.secuencia < c.secuencia; });
+  var tonAnt = anteriores.reduce(function(s,x){ return s+x._ton; },0);
+  var montoAnt = r2(anteriores.reduce(function(s,x){ return s+(Number(x.monto_bs)||0); },0));
+  var tonPend = Math.max(0, tonTotal - tonAnt - c._ton);
+  var montoPend = Math.max(0, r2(t.total - montoAnt - (Number(c.monto_bs)||0)));
+  function metaItem(l,val){ return '<div class="doc-meta-item"><span class="l">'+l+'</span><span class="v">'+escapeHtml(String(val))+'</span></div>'; }
+  var filas = (c.items||[]).map(function(it){
+    return '<tr><td>'+escapeHtml(it.producto_nombre||'')+'</td><td class="num">'+fmt(it.toneladas,2)+'</td><td class="num">'+fmt(Number(it.toneladas)*1000,0)+'</td><td class="num">'+fmt(it.precio,2)+'</td><td class="num">'+fmt(it.subtotal,2)+'</td></tr>';
+  }).join('');
+  var flete = Number(c.flete_bs)||0;
+  document.getElementById('notaCobroDocCard').innerHTML =
+    '<div class="fi-head"><span class="fi-brand"><img src="'+LOGO_DATA_URI+'" class="fi-logo" alt="NOGALMAX"> Nota de Cobro</span><span class="fi-date">'+fmtFecha(c.fecha)+'</span></div>'+
+    '<div class="fi-nombre">'+escapeHtml(nota.cliente||'—')+'</div>'+
+    '<div class="doc-meta">'+
+      metaItem('N° Nota de cobro', c.numero)+
+      metaItem('N° Nota de venta', nota.numero_nota)+
+      metaItem('N° Pedido', nota.numero_pedido||'—')+
+      metaItem('Fecha', fmtFecha(c.fecha))+
+      metaItem('Vencimiento', fmtFecha(c.fecha_vencimiento))+
+      metaItem('Condición de pago', pv.condicion_pago ? (CONDICION_PAGO_LABEL[pv.condicion_pago]||pv.condicion_pago)+(pv.condicion_pago_nota?(' · '+pv.condicion_pago_nota):'') : '—')+
+      (c.nota ? metaItem('Referencia', c.nota) : '')+
+    '</div>'+
+    '<div class="fi-section">Productos que se cobran en esta nota</div>'+
+    '<table class="pf-table pf-6"><thead><tr><th>Producto</th><th class="num">Cant.<br>(Ton)</th><th class="num">Cant.<br>(Kg)</th><th class="num">Precio<br>(Bs/Ton)</th><th class="num">Subtotal<br>(Bs)</th></tr></thead><tbody>'+(filas||'<tr><td colspan="5">—</td></tr>')+'</tbody></table>'+
+    '<div class="doc-grand-total-box">'+
+      (flete>0 ? '<div class="doc-meta-item"><span class="l">Productos</span><span class="v">'+fmtBs(r2(c.monto_bs-flete))+'</span></div><div class="doc-meta-item"><span class="l">Flete</span><span class="v">'+fmtBs(flete)+'</span></div>' : '')+
+      '<div class="doc-total-row">TOTAL A COBRAR: '+fmtBs(c.monto_bs)+'</div>'+
+      (c._pagado>0.005 ? '<div class="doc-meta-item"><span class="l">Pagado</span><span class="v">'+fmtBs(c._pagado)+'</span></div><div class="doc-meta-item"><span class="l">Saldo de esta nota</span><span class="v"><b>'+fmtBs(c._saldo)+'</b></span></div>' : '')+
+    '</div>'+
+    '<div class="fi-section">Estado del pedido</div>'+
+    '<table class="pf-table"><thead><tr><th>Concepto</th><th class="num">Ton</th><th class="num">Bs</th></tr></thead><tbody>'+
+      '<tr><td>Total del pedido</td><td class="num">'+fmt(tonTotal,2)+'</td><td class="num">'+fmt(t.total,2)+'</td></tr>'+
+      (anteriores.length ? '<tr><td>Cobrado en notas anteriores ('+anteriores.map(function(x){return x.numero;}).join(', ')+')</td><td class="num">'+fmt(tonAnt,2)+'</td><td class="num">'+fmt(montoAnt,2)+'</td></tr>' : '')+
+      '<tr><td>Esta nota de cobro</td><td class="num">'+fmt(c._ton,2)+'</td><td class="num">'+fmt(c.monto_bs,2)+'</td></tr>'+
+      '<tr><td><b>Saldo del pedido por cobrar después de esta nota</b></td><td class="num"><b>'+fmt(tonPend,2)+'</b></td><td class="num"><b>'+fmt(montoPend,2)+'</b></td></tr>'+
+    '</tbody></table>'+
+    '<div class="fi-foot">Generado desde NOGALMAX — Precios y Fórmulas</div>';
+}
+function openNotaCobroDocModal(nota, c){
+  notaCobroDocState = {nota:nota, cobro:c};
+  renderNotaCobroDocCard(nota, c);
+  document.getElementById('notaCobroDocModalOverlay').classList.add('active');
+}
+document.getElementById('btnCerrarNotaCobroDoc').addEventListener('click', function(){ document.getElementById('notaCobroDocModalOverlay').classList.remove('active'); });
+document.getElementById('btnDescargarNotaCobroPdf').addEventListener('click', function(){
+  if(!notaCobroDocState) return;
+  if(typeof html2canvas === 'undefined'){ toast('No se pudo cargar el generador de documentos (revisá tu conexión a internet).'); return; }
+  var jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
+  if(!jsPDFCtor){ toast('No se pudo cargar el generador de PDF (revisá tu conexión a internet).'); return; }
+  var btn = this; btn.disabled = true;
+  var st = notaCobroDocState;
+  html2canvas(document.getElementById('notaCobroDocCard'), {backgroundColor:'#ffffff', scale:2}).then(function(canvas){
+    var img = canvas.toDataURL('image/jpeg', 0.85);
+    var doc = new jsPDFCtor({unit:'mm', format:'a4', compress:true});
+    addImageFitted(doc, img, canvas);
+    doc.save('nota_cobro_'+(st.cobro.numero||'cobro')+'_'+slugFilename(st.nota.cliente||'cliente')+'.pdf');
+    btn.disabled = false; toast('PDF descargado');
   }).catch(function(err){ btn.disabled=false; toast('No se pudo generar el PDF: '+(err&&err.message?err.message:String(err))); });
 });
 
