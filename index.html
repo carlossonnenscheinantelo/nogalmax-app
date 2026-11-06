@@ -636,7 +636,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
         <option value="completada">Completadas</option>
       </select>
       <div class="spacer"></div>
-      <button class="primary" id="btnNuevaProduccion">+ Nueva producción</button>
+      <button class="primary" id="btnNuevaProduccion" title="Las órdenes para clientes se crean desde Pedidos de Venta">+ Nueva producción para stock</button>
     </div>
     <div class="table-wrap">
       <table>
@@ -3184,6 +3184,66 @@ function renderOrdenes(forceReload){
   renderStockFabricaRows();
   renderEntregadosRows();
 }
+/* órdenes de cliente que quedaron sin pedido de venta (cargadas sueltas antes del bloqueo) */
+function ordSinPedido(o){ return o && !o.es_stock_fabrica && !o.pedido_venta_id && !o.desde_stock_existente && (o.cliente||'').trim()!==''; }
+function renderOrdSinPedidoBanner(puedeCrear){
+  var wrap = document.getElementById('ordSinPedidoBanner');
+  if(!wrap){
+    var tb = document.getElementById('ordenesBody');
+    var tabla = tb ? tb.closest('table') : null;
+    if(!tabla) return;
+    wrap = document.createElement('div'); wrap.id = 'ordSinPedidoBanner';
+    (tabla.closest('.table-wrap')||tabla).insertAdjacentElement('beforebegin', wrap);
+  }
+  var sin = ordenesState.rows.filter(ordSinPedido);
+  if(!sin.length){ wrap.innerHTML = ''; return; }
+  var porCliente = {};
+  sin.forEach(function(o){ var k=(o.cliente||'').trim().toUpperCase(); (porCliente[k]=porCliente[k]||[]).push(o); });
+  var kgTot = sin.reduce(function(t,o){ return t+(Number(o.cantidad_toneladas)||0); },0);
+  wrap.innerHTML = '<div style="background:#fdecea;border:1px solid #f3b7b0;border-radius:8px;padding:10px 12px;margin:0 0 12px">'+
+    '<b style="color:#b42318">⚠ '+sin.length+' orden'+(sin.length>1?'es':'')+' de clientes sin pedido de venta ni nota de venta ('+fmt(kgTot*1000,0)+' Kg).</b> '+
+    '<span class="muted">Creá el pedido para que salga su nota de venta y se pueda cobrar. Si una orden se cargó repetida, eliminala en vez de crearle pedido.</span>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">'+
+    Object.keys(porCliente).sort().map(function(k){
+      var lst = porCliente[k];
+      var kg = lst.reduce(function(t,o){ return t+(Number(o.cantidad_toneladas)||0); },0);
+      return puedeCrear
+        ? '<button class="ghost btn-pv-cliente-sin" data-cli="'+escapeHtml(k)+'" title="'+escapeHtml(lst.map(function(o){return o.numero_produccion+' '+o.producto_nombre;}).join(' · '))+'">🧾 '+escapeHtml(lst[0].cliente)+' — '+lst.length+' orden'+(lst.length>1?'es':'')+', '+fmt(kg*1000,0)+' Kg</button>'
+        : '<span class="tag">'+escapeHtml(lst[0].cliente)+' — '+lst.length+'</span>';
+    }).join('')+'</div></div>';
+  wrap.querySelectorAll('.btn-pv-cliente-sin').forEach(function(b){
+    b.addEventListener('click', function(){ abrirPedidoDesdeOrdenes(porCliente[b.dataset.cli]); });
+  });
+}
+var pvVinculando = null; // órdenes existentes que se están pasando a un pedido de venta
+function abrirPedidoDesdeOrdenes(ordenes){
+  if(!ordenes || !ordenes.length) return;
+  pvDesdeProforma = null;
+  document.getElementById('pedidoVentaModalOverlay').classList.add('active');
+  document.getElementById('pedidoVentaBody').innerHTML = '<p class="muted">Cargando…</p>';
+  fetchProducciones(function(){
+    var ids = ordenes.map(function(o){ return o.id; });
+    var frescas = ordenesState.rows.filter(function(o){ return ids.indexOf(o.id)!==-1 && ordSinPedido(o); });
+    renderPedidoVentaForm();
+    if(!frescas.length){ document.getElementById('pedidoVentaBody').insertAdjacentHTML('afterbegin','<p class="k-warn">Esas órdenes ya tienen pedido de venta.</p>'); return; }
+    pvVinculando = frescas;
+    var o0 = frescas[0];
+    document.getElementById('pv_cliente').value = o0.cliente || '';
+    var fe = document.getElementById('pv_fechaEntrega');
+    var fechas = frescas.map(function(o){ return o.fecha_entrega || o.fecha_pedido; }).filter(Boolean).sort();
+    if(fechas.length){ fe.value = fechas[fechas.length-1]; fe.dispatchEvent(new Event('change')); }
+    pvLineas = frescas.map(function(o){
+      var t = precioTablaFor(o.producto_hoja);
+      return { producto_hoja:o.producto_hoja, cantidad:Number(o.cantidad_toneladas)||0,
+        precio: t==null ? '' : Math.round(t*100)/100, descuentoPct:'', asig:{}, variante:'',
+        vincular:{ id:o.id, numero:o.numero_produccion, lote:o.lote, variante:o.variante||'', despachado:Number(o.despachado_cantidad)||0, estado:o.estado } };
+    });
+    renderPvLineas(); renderPedidoVentaPreview(); updatePvTotalBox();
+    document.getElementById('pedidoVentaBody').insertAdjacentHTML('afterbegin',
+      '<div style="background:#fdecea;border:1px solid #f3b7b0;border-radius:8px;padding:8px 12px;margin-bottom:12px">🧾 Creando el pedido de venta para '+frescas.length+' orden'+(frescas.length>1?'es':'')+' de producción que '+(frescas.length>1?'ya existen':'ya existe')+' de <b>'+escapeHtml(o0.cliente||'')+'</b>: <b>'+frescas.map(function(o){return escapeHtml(o.numero_produccion);}).join(', ')+'</b>. No se vuelven a producir ni se descuentan insumos: solo se les asigna este pedido y su nota de venta. Revisá el <b>precio</b> (viene el precio tabla), la <b>condición de pago</b> y el vendedor. Podés quitar con ✕ las que no correspondan.</div>');
+    document.getElementById('btnCrearPedidoVenta').textContent = '🧾 Crear pedido y nota de venta';
+  });
+}
 function renderOrdenesRows(){
   var q = (document.getElementById('ordSearch').value||'').toLowerCase();
   var estF = document.getElementById('ordEstadoFilter').value;
@@ -3204,8 +3264,11 @@ function renderOrdenesRows(){
   var puedeCompletar = currentProfile && (currentProfile.rol==='admin' || currentProfile.rol==='produccion');
   var esAdminOrd = currentProfile && currentProfile.rol==='admin';
   var puedeGestionOrd = esAdminOrd || esGestorVentas();
+  var puedeCrearPvOrd = currentProfile && (currentProfile.rol==='admin' || currentProfile.rol==='comercial');
+  renderOrdSinPedidoBanner(puedeCrearPvOrd);
   document.getElementById('ordenesBody').innerHTML = rows.map(function(o){
     var clienteLabel = o.es_stock_fabrica ? '<span class="tag">Stock fábrica</span>' : (escapeHtml(o.cliente||'—')+(o.desde_stock_existente?' <span class="tag" title="Esta producción salió de un lote que ya estaba en stock">📦 desde stock</span>':''));
+    if(ordSinPedido(o)) clienteLabel += ' <span class="tag" style="background:#fde3e3;color:#b91c1c" title="Esta orden no tiene pedido de venta ni nota de venta">⚠ sin pedido</span>'+(puedeCrearPvOrd?' <button class="ghost btn-crear-pv-ord" title="Crear el pedido y la nota de venta de esta orden">🧾 Crear pedido</button>':'');
     var estadoCell = puedeCompletar
       ? '<label class="ord-estado-chk"><input type="checkbox" class="ord-check" '+(o.estado==='completada'?'checked':'')+'> '+(o.estado==='completada'?'Completada':'Pendiente')+'</label>'
       : (o.estado==='completada' ? '<span class="tag">Completada</span>' : '<span class="despacho-pend">Pendiente</span>');
@@ -3275,6 +3338,13 @@ function renderOrdenesRows(){
         if(typeof ventaState!=='undefined' && ventaState.loaded) renderPedidosVenta(true);
         toast(o.numero_produccion+' — fórmula cambiada a '+((row&&row.variante)||etiqueta)+'. Se recalcularon los insumos.');
       });
+    });
+  });
+  document.querySelectorAll('.btn-crear-pv-ord').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var id = Number(btn.closest('tr').dataset.id);
+      var o = ordenesState.rows.find(function(x){return x.id===id;});
+      if(o) abrirPedidoDesdeOrdenes([o]);
     });
   });
   document.querySelectorAll('.btn-doc-ord').forEach(function(btn){
@@ -3828,6 +3898,7 @@ document.querySelectorAll('#view-pedidosventa th.sortable').forEach(function(th)
 
 /* ---- formulario: encabezado + líneas de producto dinámicas ---- */
 function renderPedidoVentaForm(){
+  pvVinculando = null;
   pvLineas = [{producto_hoja:'', cantidad:1, precio:'', asig:{}, descuentoPct:''}];
   document.getElementById('pedidoVentaBody').innerHTML =
     '<div class="inline-field"><label>Cliente</label><input type="text" id="pv_cliente" list="clientesDatalist" style="min-width:220px" placeholder="Nombre del cliente"></div>'+
@@ -4021,7 +4092,7 @@ function stockDisponiblePorHoja(hoja){
     .sort(function(a,b){ if(a.fecha_pedido!==b.fecha_pedido) return (a.fecha_pedido<b.fecha_pedido)?-1:1; return a.id-b.id; });
 }
 function pvAsignadoLinea(l){ var t=0; Object.keys(l.asig||{}).forEach(function(k){ t += Number(l.asig[k])||0; }); return Math.round(t*10000)/10000; }
-function pvAProducirLinea(l){ return Math.max(0, Math.round(((Number(l.cantidad)||0) - pvAsignadoLinea(l))*10000)/10000); }
+function pvAProducirLinea(l){ if(l && l.vincular) return 0; return Math.max(0, Math.round(((Number(l.cantidad)||0) - pvAsignadoLinea(l))*10000)/10000); }
 /* cuánto de un lote ya tomaron las OTRAS líneas de este mismo pedido */
 function pvUsadoEnOtrasLineas(stockId, idxExcluir){
   var t=0; pvLineas.forEach(function(l,i){ if(i!==idxExcluir && l.asig && l.asig[stockId]) t += Number(l.asig[stockId])||0; }); return t;
@@ -4076,15 +4147,15 @@ function renderPvLineas(){
     if(!l.asig) l.asig = {};
     var tabla = l.producto_hoja ? precioTablaFor(l.producto_hoja) : null;
     return '<div class="pv-linea-row" data-idx="'+idx+'">'+
-      '<div class="inline-field"><label>Producto</label><select class="pvl-producto" style="min-width:220px">'+buildProductoOptions(l.producto_hoja||null)+'</select></div>'+
-      (function(){ var pp = state.productos.find(function(x){return x.hoja===l.producto_hoja;}); return tieneVariantes(pp) ? '<div class="inline-field"><label>Fórmula</label><select class="pvl-formula">'+opcionesFormula(pp, l.variante||'')+'</select></div>' : ''; })()+
-      '<div class="inline-field"><label>Cantidad (Kg)</label><input type="number" step="1" min="1" class="pvl-cantidad pill-input" value="'+Math.round(l.cantidad*1000)+'"></div>'+
+      '<div class="inline-field"><label>Producto</label><select class="pvl-producto" style="min-width:220px"'+(l.vincular?' disabled':'')+'>'+buildProductoOptions(l.producto_hoja||null)+'</select></div>'+
+      (function(){ var pp = state.productos.find(function(x){return x.hoja===l.producto_hoja;}); if(l.vincular) return ''; return tieneVariantes(pp) ? '<div class="inline-field"><label>Fórmula</label><select class="pvl-formula">'+opcionesFormula(pp, l.variante||'')+'</select></div>' : ''; })()+
+      '<div class="inline-field"><label>Cantidad (Kg)</label><input type="number" step="1" min="1" class="pvl-cantidad pill-input" value="'+Math.round(l.cantidad*1000)+'"'+(l.vincular?' disabled':'')+'></div>'+
       '<div class="inline-field"><label>Descuento (%)</label><input type="number" step="0.1" min="0" max="100" class="pvl-descuento pill-input" style="max-width:90px" value="'+(l.descuentoPct===''||l.descuentoPct==null?'':l.descuentoPct)+'" placeholder="0"></div>'+
       '<div class="inline-field"><label>Precio final (Bs/Ton)</label><input type="number" step="0.01" min="0" class="pvl-precio pill-input" value="'+(l.precio===''?'':l.precio)+'">'+
         (tabla!=null ? '<div class="pv-preciotabla">Precio tabla: '+fmtBs(tabla)+'</div>' : '')+
       '</div>'+
       (pvLineas.length>1 ? '<button type="button" class="ghost pv-linea-remove" title="Quitar producto">✕</button>' : '')+
-      renderPvStockBox(l, idx)+
+      (l.vincular ? '<div class="footnote" style="flex-basis:100%;margin:2px 0 0">🔗 Orden ya existente <b>'+escapeHtml(l.vincular.numero)+'</b> · lote '+escapeHtml(l.vincular.lote||'')+(l.vincular.variante?' · fórmula '+escapeHtml(l.vincular.variante):'')+' · '+(l.vincular.estado==='completada'?'producida':'pendiente')+(l.vincular.despachado>0?' · despachados '+fmt(l.vincular.despachado*1000,0)+' Kg':'')+' — no se vuelve a producir</div>' : renderPvStockBox(l, idx))+
     '</div>';
   }).join('');
   wrap.querySelectorAll('.pv-linea-row').forEach(function(row){
@@ -4244,7 +4315,8 @@ function submitPedidoVenta(){
       precio_pactado: (l.precio===''||l.precio==null||isNaN(l.precio)) ? null : l.precio,
       precio_lista: (l.precioLista!=null ? l.precioLista : (function(){ var t = precioTablaFor(l.producto_hoja); return t==null ? null : Math.round(t*100)/100; })()),
       variante: l.variante || null,
-      stock_asignaciones: Object.keys(l.asig||{}).filter(function(k){ return Number(l.asig[k])>0; }).map(function(k){ return {produccion_id:Number(k), cantidad_toneladas:Number(l.asig[k])}; })
+      vincular_produccion_id: l.vincular ? l.vincular.id : null,
+      stock_asignaciones: l.vincular ? [] : Object.keys(l.asig||{}).filter(function(k){ return Number(l.asig[k])>0; }).map(function(k){ return {produccion_id:Number(k), cantidad_toneladas:Number(l.asig[k])}; })
     });
   }
   if(!items.length){ toast('Agregá al menos un producto'); return; }
@@ -4300,6 +4372,9 @@ function submitPedidoVenta(){
     var msg = ex ? ('Productos agregados al pedido '+row.numero_pedido+' — misma nota '+ex.numero_nota) : ('Pedido de venta '+row.numero_pedido+' creado');
     if(kgStock>0) msg += ' — '+fmt(kgStock*1000,0)+' Kg tomados de stock (ya a nombre de '+cliente+')';
     if(kgProd>0) msg += (kgStock>0?' y ':' — ')+fmt(kgProd*1000,0)+' Kg mandados a producir';
+    var nVinc = pvLineas.filter(function(l){ return l.vincular; }).length;
+    if(nVinc>0) msg += ' — '+nVinc+' orden'+(nVinc>1?'es':'')+' existente'+(nVinc>1?'s':'')+' asignada'+(nVinc>1?'s':'')+' al pedido';
+    pvVinculando = null;
     toast(msg);
     renderPedidosVenta(true);
     fetchProducciones(function(){ if(activeTab()==='ordenes') renderOrdenesRows(); if(activeTab()==='stockfabrica') renderStockFabricaRows(); });
@@ -5997,13 +6072,13 @@ document.getElementById('btnDescargarNotaCobroPdf').addEventListener('click', fu
 });
 
 function renderProdNuevaForm(){
-  var soloStock = currentProfile && currentProfile.rol==='produccion';
+  var soloStock = true; // las órdenes para clientes salen solo desde Pedidos de Venta
   document.getElementById('prodNuevaBody').innerHTML =
     '<div class="inline-field"><label>Producto</label><select id="pn_producto" style="min-width:260px">'+buildProductoOptions(null)+'</select></div>'+
     '<div class="inline-field" id="pn_formulaWrap" style="display:none"><label>Fórmula</label><select id="pn_formula"></select></div>'+
     '<div class="inline-field"><label>Cantidad a producir (Toneladas)</label><input type="number" step="0.01" min="0.01" id="pn_cantidad" class="pill-input" value="1"></div>'+
     '<div class="inline-field"><label>¿Es para stock de fábrica (sin cliente)?</label><input type="checkbox" id="pn_esStock"'+(soloStock?' checked disabled':'')+'></div>'+
-    (soloStock ? '<p class="footnote">Tu rol de Producción solo puede crear órdenes para stock de fábrica. Los pedidos con cliente los carga Comercial.</p>' : '')+
+    (soloStock ? '<p class="footnote">Acá solo se cargan órdenes para <b>Stock en Fábrica</b>. Las órdenes para un cliente se crean solas desde <b>💼 Pedidos de Venta</b>, así salen con su pedido y su nota de venta.</p>' : '')+
     '<div class="inline-field" id="pn_clienteWrap" style="'+(soloStock?'display:none':'')+'"><label>Cliente</label><input type="text" id="pn_cliente" style="min-width:220px" placeholder="Nombre del cliente"></div>'+
     '<div class="inline-field"><label>Fecha de entrega</label><input type="date" id="pn_fechaEntrega"></div>'+
     '<div id="pn_preview"></div>'+
