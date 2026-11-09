@@ -104,6 +104,7 @@ main{padding:22px;flex:1;min-width:0}
 .cat-PROTEICOS{background:#e6f4fb;color:#0b6a8f}
 .cat-OTROS{background:#f1f0fe;color:#4c3fae}
 .cat-MAQUILA{background:#fff4e5;color:#8a4b00}
+.cat-INSVENTA{background:#eaf6ff;color:#0b4f7a}
 .section-title{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;margin:22px 0 8px}
 /* modal */
 #modalOverlay{position:fixed;inset:0;background:rgba(15,22,19,.55);backdrop-filter:blur(2px);display:none;align-items:flex-start;justify-content:center;z-index:100;padding:26px 14px;overflow:auto}
@@ -1207,11 +1208,21 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
                 <div class="inline-field"><label>Fecha de entrega</label><input type="date" id="pf_maqFecha"></div>
                 <p class="footnote" style="margin:4px 0 0">Al guardar se abre el <b>Pedido de Venta</b> ya cargado (cliente, maquila, toneladas y precio). Elegís vendedor y condición de pago, y al crearlo se genera sola la orden de producción, la nota de venta y lo demás.</p>
               </div>
-              <div class="inline-field" style="display:block"><label>Fórmula del cliente (foto o PDF)</label>
+              <div style="border-top:1px dashed #f0c27a;margin-top:8px;padding-top:8px">
+                <div class="section-title" style="margin:0 0 4px">🧪 Núcleo NOGALMAX <span class="k-warn">(obligatorio)</span></div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end">
+                  <div class="inline-field"><label>Núcleo</label><select id="pf_maqNucSel" style="max-width:240px"></select></div>
+                  <div class="inline-field"><label>Kg por tonelada</label><input type="number" step="0.01" min="0" id="pf_maqNucKg" class="pill-input" style="max-width:90px" placeholder="Ej: 50"></div>
+                  <button type="button" class="ghost" id="pf_maqNucAdd">+ Agregar</button>
+                </div>
+                <div id="pf_maqNucLista" style="margin-top:6px;font-size:12px"></div>
+                <p class="footnote" style="margin:4px 0 0">El cliente <b>siempre</b> tiene que comprarnos el núcleo: no se puede guardar una maquila sin núcleo. Se cobra a su <b>precio de venta</b> y, al producir, se descuentan del stock los insumos de ese núcleo (sin bolsas). Insumos + núcleo deben sumar 1.000 Kg por tonelada.</p>
+              </div>
+              <div class="inline-field" style="display:block;margin-top:8px"><label>Fórmula del cliente (foto o PDF)</label>
                 <input type="file" id="pf_maqArchivos" accept="image/*,application/pdf" multiple style="margin-top:4px">
                 <div id="pf_maqArchivosLista" style="margin-top:6px;font-size:12px"></div>
               </div>
-              <p class="footnote" style="margin:6px 0 0">Se cobra: <b>precio de los insumos de la fórmula</b> (con el margen/comisión de abajo, podés dejar margen 0 para cobrarlos al costo) <b>+ el servicio de maquila por tonelada</b>. Para cargar las cantidades desde la foto usá 📷.</p>
+              <p class="footnote" style="margin:6px 0 0">Se cobra: <b>precio de los insumos de la fórmula</b> (con el margen/comisión de abajo, podés dejar margen 0 para cobrarlos al costo) <b>+ el núcleo NOGALMAX a precio de venta + el servicio de maquila por tonelada</b>. Para cargar las cantidades desde la foto usá 📷.</p>
             </div>
           </div>
           <div class="section-title">Márgen y comisión</div>
@@ -1631,14 +1642,14 @@ function reindexInsumos(){
   state.insumos.forEach(function(i){ insumoIndex[i.nombre] = i; });
 }
 
-var CAT_CLASS = {"MAQUILA":"cat-MAQUILA","SALES MINERALES":"cat-SALES","PROTEINADOS":"cat-PROTEINADOS","PROTEICOS ENERGETICOS":"cat-PROTEICOS","OTROS PRODUCTOS":"cat-OTROS"};
+var CAT_CLASS = {"MAQUILA":"cat-MAQUILA","INSUMOS PARA VENTA":"cat-INSVENTA","SALES MINERALES":"cat-SALES","PROTEINADOS":"cat-PROTEINADOS","PROTEICOS ENERGETICOS":"cat-PROTEICOS","OTROS PRODUCTOS":"cat-OTROS"};
 
 /* ---------- mapping DB rows <-> app objects ---------- */
 function rowToInsumo(r){
   return { id:r.id, nombre:r.nombre, unidad:r.unidad, precioIngresado:Number(r.precio_ingresado)||0, unidadPrecio:r.unidad_precio, tipo:r.tipo, stockActual:Number(r.stock_actual)||0 };
 }
 function rowToProducto(r){
-  return { id:r.id, hoja:r.hoja, nombre:r.nombre, categoria:r.categoria, formula: r.formula || {}, margen:Number(r.margen)||0, comision:Number(r.comision)||0, con_factura: r.con_factura!==false, formula_nombre: r.formula_nombre||'', variantes: Array.isArray(r.variantes) ? r.variantes : [], es_maquila: r.es_maquila===true, maquila_cliente: r.maquila_cliente||'', maquila_tarifa: Number(r.maquila_tarifa)||0, maquila_archivos: Array.isArray(r.maquila_archivos) ? r.maquila_archivos : [] };
+  return { id:r.id, hoja:r.hoja, nombre:r.nombre, categoria:r.categoria, formula: r.formula || {}, margen:Number(r.margen)||0, comision:Number(r.comision)||0, con_factura: r.con_factura!==false, formula_nombre: r.formula_nombre||'', variantes: Array.isArray(r.variantes) ? r.variantes : [], es_maquila: r.es_maquila===true, maquila_cliente: r.maquila_cliente||'', maquila_tarifa: Number(r.maquila_tarifa)||0, maquila_archivos: Array.isArray(r.maquila_archivos) ? r.maquila_archivos : [], maquila_productos: (r.maquila_productos && typeof r.maquila_productos==='object' && !Array.isArray(r.maquila_productos)) ? r.maquila_productos : {} };
 }
 
 /* ---------- calculation engine (mirrors the original Excel formulas — unchanged) ---------- */
@@ -1693,7 +1704,19 @@ function computeProducto(p){
     }
   });
   var totalBs = mpCosto + envCosto;
-  var costoMPTon = mpKg>0 ? (totalBs/mpKg*1000) : 0;
+  // MAQUILA con núcleo NOGALMAX: el núcleo se cobra a su precio de venta; el costo/Ton se reparte sobre el peso total (insumos + núcleo)
+  var nucKg = 0, nucBs = 0, nucRows = [];
+  if(p.es_maquila && p.maquila_productos){
+    Object.keys(p.maquila_productos).forEach(function(h){
+      var kg = Number(p.maquila_productos[h])||0; if(kg<=0 || h===p.hoja) return;
+      var np = state.productos.find(function(x){ return x.hoja===h && !x.es_maquila; }); if(!np) return;
+      var pv = computeProducto(np).precioVentaConCom;
+      nucKg += kg; nucBs += kg*pv/1000; nucRows.push({hoja:h, nombre:np.nombre, kg:kg, precioTon:pv, bs:kg*pv/1000});
+    });
+  }
+  var kgMezcla = mpKg + nucKg;
+  var costoMPTon = kgMezcla>0 ? (totalBs/kgMezcla*1000) : 0;
+  var nucBsTon = kgMezcla>0 ? (nucBs/kgMezcla*1000) : 0;
   // con factura: ÷0.87 (Ley 843). Sin factura (con_factura=false): el costo facturado es el mismo costo, igual que en la hoja del Excel
   var costoFacturadoTon = p.con_factura===false ? costoMPTon : costoMPTon/0.87;
   var margen = Number(p.margen)||0;
@@ -1706,6 +1729,7 @@ function computeProducto(p){
   // MAQUILA: al precio de los insumos se le suma el servicio de maquila (Bs/Ton), sin comisión sobre el servicio
   var maquilaTarifa = p.es_maquila ? (Number(p.maquila_tarifa)||0) : 0;
   var precioInsumosConCom = precioVentaConCom, precioInsumosSinCom = precioVentaSinCom;
+  if(nucBsTon){ precioVentaSinCom += nucBsTon; precioVentaConCom += nucBsTon; ingresoEmpresa += nucBsTon; }
   if(maquilaTarifa){ precioVentaSinCom += maquilaTarifa; precioVentaConCom += maquilaTarifa; ingresoEmpresa += maquilaTarifa; }
   var utilidadNetaPct = ingresoEmpresa!==0 ? (ingresoEmpresa-costoFacturadoTon)/ingresoEmpresa : 0;
   mpRows.forEach(function(r){ r.pct = mpCosto>0 ? r.costo/mpCosto : 0; });
@@ -1716,7 +1740,8 @@ function computeProducto(p){
     precioVentaConCom:precioVentaConCom, comisionBsTon:comisionBsTon,
     ingresoEmpresa:ingresoEmpresa, utilidadNetaPct:utilidadNetaPct,
     mpRows:mpRows, envRows:envRows,
-    maquilaTarifa:maquilaTarifa, precioInsumosConCom:precioInsumosConCom, precioInsumosSinCom:precioInsumosSinCom
+    maquilaTarifa:maquilaTarifa, precioInsumosConCom:precioInsumosConCom, precioInsumosSinCom:precioInsumosSinCom,
+    nucKg:nucKg, nucBsTon:nucBsTon, nucRows:nucRows, kgMezcla:kgMezcla
   };
 }
 
@@ -2061,7 +2086,7 @@ function renderProductos(){
   document.getElementById('productosBody').innerHTML = rows.map(function(r){
     var p=r.p, c=r.c;
     return '<tr data-hoja="'+escapeHtml(p.hoja)+'">'+
-      '<td><b>'+escapeHtml(p.nombre)+'</b><br><span class="muted" style="font-size:11px">'+(p.es_maquila ? '🏭 Maquila · '+escapeHtml(p.maquila_cliente||'sin cliente')+' · servicio Bs '+fmt(p.maquila_tarifa,2)+'/t'+((p.maquila_archivos||[]).length?' · 📎'+p.maquila_archivos.length:'') : escapeHtml(p.hoja))+'</span></td>'+
+      '<td><b>'+escapeHtml(p.nombre)+'</b><br><span class="muted" style="font-size:11px">'+(p.es_maquila ? '🏭 Maquila · '+escapeHtml(p.maquila_cliente||'sin cliente')+' · servicio Bs '+fmt(p.maquila_tarifa,2)+'/t'+(maqNucleosValidos(p).length?' · núcleo '+maqNucleosValidos(p).map(function(h){ var x=state.productos.find(function(y){return y.hoja===h;}); return escapeHtml(x?x.nombre:h); }).join(', '):' · ⚠ sin núcleo')+((p.maquila_archivos||[]).length?' · 📎'+p.maquila_archivos.length:'') : escapeHtml(p.hoja))+'</span></td>'+
       '<td><span class="badge-cat '+(CAT_CLASS[p.categoria]||'')+'">'+escapeHtml(p.categoria)+'</span></td>'+
       '<td class="num">'+fmtBs(c.costoMPTon)+'</td>'+
       '<td class="num">'+fmtBs(c.costoFacturadoTon)+'</td>'+
@@ -2292,6 +2317,9 @@ function openModal(hoja, opts){
   document.getElementById('pf_maqArchivos').value = '';
   document.getElementById('pf_maqTon').value = ''; document.getElementById('pf_maqFecha').value = '';
   document.getElementById('btnPedidoMaquila') && (document.getElementById('btnPedidoMaquila').style.display = (hoja && draft.es_maquila) ? '' : 'none');
+  draft.maquila_productos = Object.assign({}, draft.maquila_productos||{});
+  document.getElementById('pf_maqNucKg').value = '';
+  renderMaqNucleos();
   renderMaqArchivos();
   if(draft.es_maquila && sb && !clientesState.loaded) fetchClientes(populateClientesDatalist);
   document.getElementById('pf_margen').value = draft.margen;
@@ -2344,6 +2372,38 @@ document.getElementById('pf_maqArchivos').addEventListener('change', function(){
   this.value = ''; renderMaqArchivos();
 });
 document.getElementById('pf_maqTarifa').addEventListener('input', function(){ if(modalState) renderModalComputedLight(); });
+/* ---- núcleo NOGALMAX obligatorio en la maquila ---- */
+function nucleosDisponibles(){
+  return state.productos.filter(function(x){ return !x.es_maquila && x.categoria==='NUCLEOS Y PREMIX'; }).sort(function(a,b){ return a.nombre.localeCompare(b.nombre); });
+}
+function maqNucleosValidos(d){
+  var mp = (d && d.maquila_productos)||{};
+  return Object.keys(mp).filter(function(h){ return (Number(mp[h])||0)>0 && state.productos.some(function(x){ return x.hoja===h; }); });
+}
+function renderMaqNucleos(){
+  if(!modalState) return;
+  var d = modalState.draft, mp = d.maquila_productos = d.maquila_productos||{};
+  var sel = document.getElementById('pf_maqNucSel');
+  sel.innerHTML = '<option value="">— elegí el núcleo —</option>'+nucleosDisponibles().map(function(x){ return '<option value="'+escapeHtml(x.hoja)+'">'+escapeHtml(x.nombre)+' · '+fmtBs(computeProducto(x).precioVentaConCom)+'/t</option>'; }).join('');
+  var hs = maqNucleosValidos(d);
+  var lista = document.getElementById('pf_maqNucLista');
+  lista.innerHTML = hs.length ? hs.map(function(h){
+    var np = state.productos.find(function(x){ return x.hoja===h; });
+    return '<div style="display:flex;gap:8px;align-items:center;padding:3px 0">🧪 <b>'+escapeHtml(np.nombre)+'</b> · '+fmt(mp[h],2)+' Kg/t · '+fmtBs(computeProducto(np).precioVentaConCom)+'/t <a href="#" class="maq-nuc-del" data-h="'+escapeHtml(h)+'" style="color:#b42318">quitar</a></div>';
+  }).join('') : '<span class="k-warn">⚠ Todavía no elegiste el núcleo — es obligatorio.</span>';
+  lista.querySelectorAll('.maq-nuc-del').forEach(function(a){ a.addEventListener('click', function(e){ e.preventDefault(); delete mp[a.dataset.h]; renderMaqNucleos(); renderModalComputedLight(); }); });
+}
+document.getElementById('pf_maqNucAdd').addEventListener('click', function(){
+  if(!modalState) return;
+  var h = document.getElementById('pf_maqNucSel').value;
+  var kg = parseFloat(document.getElementById('pf_maqNucKg').value)||0;
+  if(!h){ toast('Elegí el núcleo'); return; }
+  if(!(kg>0)){ toast('Poné los Kg de núcleo por tonelada'); return; }
+  modalState.draft.maquila_productos = modalState.draft.maquila_productos||{};
+  modalState.draft.maquila_productos[h] = kg;
+  document.getElementById('pf_maqNucKg').value = '';
+  renderMaqNucleos(); renderModalComputedLight();
+});
 function closeModal(){
   document.getElementById('modalOverlay').classList.remove('active');
   modalState = null;
@@ -2436,9 +2496,10 @@ function pfSummaryHtml(draft, c){
     row('Peso total materias primas (Kg)', fmt(c.mpKg,1)) +
     row('Costo materia prima / Ton', fmtBs(c.costoMPTon)) +
     row(draft.con_factura===false ? 'Costo sin factura / Ton (sin ÷0.87)' : 'Costo facturado / Ton (÷0.87)', fmtBs(c.costoFacturadoTon)) +
-    (maq ? row('Precio de los insumos / Ton', fmtBs(c.precioInsumosConCom)) + row('+ Servicio de maquila / Ton', fmtBs(c.maquilaTarifa)) : '') +
-    row(maq ? 'Precio maquila SIN comisión (insumos + servicio)' : 'Precio de venta SIN comisión', fmtBs(c.precioVentaSinCom), true) +
-    row(maq ? 'PRECIO MAQUILA / Ton (insumos + servicio)' : 'Precio de venta CON comisión', fmtBs(c.precioVentaConCom), true) +
+    (maq ? row('+ Núcleo NOGALMAX (Kg por tonelada)', fmt(c.nucKg,1)) + row('= Peso total insumos + núcleo (Kg)'+(Math.abs(c.kgMezcla-1000)>0.5?' ⚠ debería ser 1.000':''), fmt(c.kgMezcla,1), true) : '') +
+    (maq ? row('Precio de los insumos / Ton', fmtBs(c.precioInsumosConCom)) + c.nucRows.map(function(r){ return row('+ Núcleo '+escapeHtml(r.nombre)+' ('+fmt(r.kg,1)+' Kg, a precio de venta) / Ton', fmtBs(c.kgMezcla>0 ? r.bs/c.kgMezcla*1000 : 0)); }).join('') + row('+ Servicio de maquila / Ton', fmtBs(c.maquilaTarifa)) : '') +
+    row(maq ? 'Precio maquila SIN comisión' : 'Precio de venta SIN comisión', fmtBs(c.precioVentaSinCom), true) +
+    row(maq ? 'PRECIO MAQUILA / Ton (insumos + núcleo + servicio)' : 'Precio de venta CON comisión', fmtBs(c.precioVentaConCom), true) +
     row('Comisión vendedor / Ton'+(maq?' (solo sobre insumos)':''), fmtBs(c.comisionBsTon)) +
     row('Ingreso empresa / Ton', fmtBs(c.ingresoEmpresa)) +
     row('Utilidad neta % (después comisión)', fmtPct(c.utilidadNetaPct));
@@ -2485,11 +2546,15 @@ document.getElementById('btnGuardarProducto').addEventListener('click', function
     if(!/^MAQUILA\b/i.test(draft.nombre)) draft.nombre = 'MAQUILA ' + draft.nombre;
     if(draft.nombre.trim().toUpperCase()==='MAQUILA'){ toast('Ponele un nombre a la maquila (ej: MAQUILA Juan Pérez Mineral)'); return; }
     if(!draft.maquila_cliente){ toast('Poné el cliente de la maquila'); return; }
+    if(!maqNucleosValidos(draft).length){ toast('Elegí el núcleo NOGALMAX: la maquila siempre lleva nuestro núcleo'); return; }
+    var kgMez = computeProducto(draft).kgMezcla;
+    if(Math.abs(kgMez-1000)>0.5 && !confirm('Insumos + núcleo suman '+fmt(kgMez,1)+' Kg por tonelada (debería ser 1.000). ¿Guardar igual?')) return;
     if(!(draft.maquila_tarifa>0) && !confirm('El servicio de maquila está en 0 Bs/Ton. ¿Guardar igual?')) return;
   }
   var btn = document.getElementById('btnGuardarProducto');
   btn.disabled = true;
   var maqCampos = {es_maquila: draft.es_maquila===true, maquila_cliente: draft.maquila_cliente||null, maquila_tarifa: Number(draft.maquila_tarifa)||0};
+  if(draft.es_maquila){ var mpLimpio = {}; maqNucleosValidos(draft).forEach(function(h){ mpLimpio[h] = Number(draft.maquila_productos[h]); }); draft.maquila_productos = mpLimpio; maqCampos.maquila_productos = mpLimpio; }
   if(draft.es_maquila && (modalState.nuevosArchivos.length || modalState.quitarArchivos.length)){
     var hojaArch = modalState.hoja || draft.nombre;
     var quitar = modalState.quitarArchivos.slice();
@@ -4141,6 +4206,17 @@ function renderPvStockBox(l, idx){
     '<div class="muted" style="font-size:11px;margin-top:4px">Lo que tomes del stock pasa a nombre de este cliente al crear el pedido (si tomás solo una parte de un lote, el lote se divide y el resto sigue en stock). Lo que falte se manda a producir automáticamente.</div>'+
   '</div>';
 }
+/* venta directa de insumos (categoría INSUMOS PARA VENTA): no se fabrica, sale del stock de insumos */
+function esInsumoVenta(p){ return !!p && p.categoria==='INSUMOS PARA VENTA'; }
+function insumoVentaHint(l){
+  var p = state.productos.find(function(x){return x.hoja===l.producto_hoja;});
+  if(!esInsumoVenta(p) || l.vincular) return '';
+  var nom = Object.keys(p.formula||{}).find(function(k){ return Number(p.formula[k])>0; });
+  var ins = nom ? insumoIndex[nom] : null;
+  var stock = ins ? Number(ins.stockActual)||0 : 0;
+  var pide = (Number(l.cantidad)||0)*1000;
+  return '<div class="footnote" style="flex-basis:100%;margin:2px 0 0">🌽 Venta directa de insumo <b>'+escapeHtml(nom||'')+'</b>: no se fabrica, se descuenta del stock de insumos y queda listo para despachar. Stock actual: <b'+(stock<pide?' class="k-warn"':'')+'>'+fmt(stock,0)+' Kg</b>'+(stock<pide?' — no alcanza para '+fmt(pide,0)+' Kg':'')+'.</div>';
+}
 function renderPvLineas(){
   var wrap = document.getElementById('pv_lineasWrap');
   wrap.innerHTML = pvLineas.map(function(l, idx){
@@ -4154,6 +4230,7 @@ function renderPvLineas(){
       '<div class="inline-field"><label>Precio final (Bs/Ton)</label><input type="number" step="0.01" min="0" class="pvl-precio pill-input" value="'+(l.precio===''?'':l.precio)+'">'+
         (tabla!=null ? '<div class="pv-preciotabla">Precio tabla: '+fmtBs(tabla)+'</div>' : '')+
       '</div>'+
+      insumoVentaHint(l)+
       (pvLineas.length>1 ? '<button type="button" class="ghost pv-linea-remove" title="Quitar producto">✕</button>' : '')+
       (l.vincular ? '<div class="footnote" style="flex-basis:100%;margin:2px 0 0">🔗 Orden ya existente <b>'+escapeHtml(l.vincular.numero)+'</b> · lote '+escapeHtml(l.vincular.lote||'')+(l.vincular.variante?' · fórmula '+escapeHtml(l.vincular.variante):'')+' · '+(l.vincular.estado==='completada'?'producida':'pendiente')+(l.vincular.despachado>0?' · despachados '+fmt(l.vincular.despachado*1000,0)+' Kg':'')+' — no se vuelve a producir</div>' : renderPvStockBox(l, idx))+
     '</div>';
