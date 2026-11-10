@@ -3458,7 +3458,8 @@ function renderOrdenesRows(){
     var solOrd = !esAdminOrd && solicitudPendiente('orden', o.id);
     var eliminarCell = !puedeGestionOrd ? '' : solOrd ? '<button class="ghost" disabled title="Ya tiene un cambio esperando aprobación">🗑️</button>' : (puedeEliminarOrd
       ? '<button class="ghost danger btn-eliminar-ord" title="Eliminar esta producción">🗑️</button>'
-      : '<button class="ghost" disabled title="Ya está completada, despachada o con despacho parcial — no se puede eliminar">🗑️</button>');
+      : (esAdminOrd ? '<button class="ghost danger btn-eliminar-ord-admin" title="Eliminar (solo administrador): orden ya producida o con despachos — para duplicados o errores">🗑️</button>'
+                    : '<button class="ghost" disabled title="Ya está completada, despachada o con despacho parcial — no se puede eliminar">🗑️</button>'));
     var editarCell = !puedeGestionOrd ? '' : solOrd ? '<button class="ghost" disabled title="Ya tiene un cambio esperando aprobación">✏️</button>' : (puedeEliminarOrd
       ? '<button class="ghost btn-editar-ord" title="Editar esta producción">✏️</button>'
       : '<button class="ghost" disabled title="Ya está completada, despachada o con despacho parcial — no se puede editar">✏️</button>');
@@ -3547,6 +3548,12 @@ function renderOrdenesRows(){
       var id = Number(btn.closest('tr').dataset.id);
       var o = ordenesState.rows.find(function(x){return x.id===id;});
       if(o) openEditarOrdModal(o);
+    });
+  });
+  document.querySelectorAll('.btn-eliminar-ord-admin').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var o = ordenesState.rows.find(function(x){return x.id===Number(btn.closest('tr').dataset.id);});
+      if(o) eliminarOrdenAdmin(o, btn);
     });
   });
   document.querySelectorAll('.btn-eliminar-ord').forEach(function(btn){
@@ -7012,6 +7019,47 @@ function verBoletaEn(el, path){
     }).join('');
   });
 }
+/* ---- ELIMINAR (solo administrador): despachos y órdenes ya producidas — para duplicados o errores ---- */
+function esAdminUsr2(){ return !!(currentProfile && currentProfile.rol==='admin'); }
+function eliminarOrdenAdmin(o, btn){
+  if(!esAdminUsr2()){ toast('Solo el administrador puede eliminar esta orden'); return; }
+  var desp = Number(o.despachado_cantidad)||0;
+  var msg = '¿ELIMINAR la orden «'+o.numero_produccion+'» ('+o.producto_nombre+', '+fmt((Number(o.cantidad_toneladas)||0)*1000,0)+' Kg'+(o.cliente?', '+o.cliente:'')+')?\n\n'+
+    (o.estado==='completada'?'• Figura como PRODUCIDA.\n':'')+
+    (desp>0?'• Tiene '+fmt(desp*1000,0)+' Kg despachados: esos despachos también se borran.\n':'')+
+    (o.pedido_venta_numero?'• Sale del pedido '+o.pedido_venta_numero+' y se recalcula su nota de venta (la versión anterior queda guardada como «Modificada»).\n':'')+
+    '\nQueda registrado en el historial. ¿Seguir?';
+  if(!confirm(msg)) return;
+  var devolver = confirm(o.desde_stock_existente
+    ? '¿Devolver estos '+fmt((Number(o.cantidad_toneladas)||0)*1000,0)+' Kg al lote de stock del que salieron?\n\nAceptar = sí (era un duplicado o un error).\nCancelar = no, se dan por usados.'
+    : '¿Devolver los insumos de esta orden al stock de insumos?\n\nAceptar = SÍ: era un duplicado o nunca se produjo de verdad.\nCancelar = NO: se produjo de verdad y los insumos ya se usaron.');
+  var escrito = prompt('Para confirmar, escribí el número de la orden: '+o.numero_produccion);
+  if(escrito===null) return;
+  if(escrito.trim().toUpperCase()!==String(o.numero_produccion).toUpperCase()){ toast('El número no coincide — no se eliminó nada'); return; }
+  if(btn) btn.disabled = true;
+  sb.rpc('eliminar_produccion_admin', {p_id:o.id, p_devolver_insumos:devolver}).then(function(res){
+    if(btn) btn.disabled = false;
+    if(res.error){ toast('No se pudo eliminar: '+errMsg(res.error)); return; }
+    toast('Orden '+o.numero_produccion+' eliminada'+(devolver?' — '+(o.desde_stock_existente?'volvió al lote de stock':'insumos devueltos al stock'):''));
+    fetchProducciones(function(){ renderOrdenesRows(); renderStockFabricaRows(); if(typeof renderEntregadosRows==='function') renderEntregadosRows(); cargarSinBoleta(); });
+    if(ventaState.loaded) renderPedidosVenta(true);
+    if(notaVentaState.loaded) fetchNotasVenta(function(){ if(activeTab()==='notasventa') renderNotasVentaRows(); });
+  });
+}
+function eliminarDespachosAdmin(ids, texto, cb){
+  if(!esAdminUsr2()){ toast('Solo el administrador puede eliminar despachos'); return; }
+  if(!confirm('¿ELIMINAR '+texto+'?\n\nSe restan esos Kg de lo despachado y se recalcula la entrega de la nota. Queda registrado en el historial.')) return;
+  var i = 0, ultima = null;
+  (function sig(){
+    if(i>=ids.length){ toast(ids.length>1?'Despachos eliminados':'Despacho eliminado'); if(cb) cb(ultima); return; }
+    sb.rpc('eliminar_despacho_evento', {p_evento_id: ids[i]}).then(function(res){
+      if(res.error){ toast('No se pudo eliminar el despacho: '+errMsg(res.error)); if(cb && i>0) cb(ultima); return; }
+      ultima = Array.isArray(res.data) ? res.data[0] : res.data;
+      if(ultima) { var idx = ordenesState.rows.findIndex(function(x){return x.id===ultima.id;}); if(idx!==-1) ordenesState.rows[idx] = ultima; }
+      i++; sig();
+    });
+  })();
+}
 /* ---- despacho de UNA orden de producción: varios despachos, contando Kg ---- */
 function renderDespachoModalBody(){
   var o = despachoState;
@@ -7045,7 +7093,8 @@ function renderDespachoModalBodyCon(o, eventos){
         '<td>'+(function(){ var ps = pathsDeEvento(e);
           return ps.length
             ? '<button type="button" class="ghost desp-ver-boleta" data-path="'+escapeHtml(ps.join('|'))+'">🧾 Ver'+(ps.length>1?' ('+ps.length+')':'')+'</button><br><button type="button" class="ghost desp-subir-nota" style="margin-top:4px;font-size:12px" data-ids="'+e.id+'" title="Agregar otra nota de entrega a este despacho (por ej. otro envío)">➕ Otra nota</button>'
-            : sinNotaTag()+'<br><button type="button" class="ghost desp-subir-nota" style="margin-top:4px" data-ids="'+e.id+'">📤 Subir nota</button>'; })()+'</td></tr>';
+            : sinNotaTag()+'<br><button type="button" class="ghost desp-subir-nota" style="margin-top:4px" data-ids="'+e.id+'">📤 Subir nota</button>'; })()+
+          (esAdminUsr2() ? ' <button type="button" class="ghost desp-elim-ev" data-id="'+e.id+'" data-kg="'+(Number(e.cantidad)||0)+'" title="Eliminar este despacho (solo administrador)" style="color:var(--danger)">🗑</button>' : '')+'</td></tr>';
     }).join('')+'</table><div id="despachoImgWrap"></div>') : '';
   var nuevo = saldo>0.0005 ? (
       '<div class="desp-sec">Nuevo despacho (N° '+(eventos.length+1)+')</div>'+
@@ -7068,6 +7117,15 @@ function renderDespachoModalBodyCon(o, eventos){
   document.getElementById('btnCerrarDespacho2').addEventListener('click', closeDespachoModal);
   body.querySelectorAll('.desp-ver-boleta').forEach(function(btn){
     btn.addEventListener('click', function(){ verBoletaEn(document.getElementById('despachoImgWrap'), btn.dataset.path); });
+  });
+  body.querySelectorAll('.desp-elim-ev').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      eliminarDespachosAdmin([Number(btn.dataset.id)], 'el despacho de '+kgFmt(Number(btn.dataset.kg))+' de '+o.numero_produccion, function(row){
+        if(row){ despachoState = row; refreshDespachoRow(row); }
+        renderDespachoModalBody();
+        if(ventaState.loaded) renderPedidosVenta(true);
+      });
+    });
   });
   body.querySelectorAll('.desp-subir-nota').forEach(function(btn){
     btn.addEventListener('click', function(){
@@ -7246,7 +7304,8 @@ function renderDespachoPvBody(){
           var falta = vj.lineas.some(function(e){ return !e.boleta_path; });
           return (ps.length ? '<button type="button" class="ghost dpv-ver-boleta" data-path="'+escapeHtml(ps.join('|'))+'">🧾 Ver'+(ps.length>1?' ('+ps.length+')':'')+'</button><br>' : '')+
             (falta ? sinNotaTag()+'<br><button type="button" class="ghost dpv-subir-nota" style="margin-top:4px" data-ids="'+ids+'">📤 Subir nota</button>'
-                   : '<button type="button" class="ghost dpv-subir-nota" style="margin-top:4px;font-size:12px" data-ids="'+ids+'" title="Agregar otra nota de entrega a este despacho (por ej. otro envío)">➕ Otra nota</button>');
+                   : '<button type="button" class="ghost dpv-subir-nota" style="margin-top:4px;font-size:12px" data-ids="'+ids+'" title="Agregar otra nota de entrega a este despacho (por ej. otro envío)">➕ Otra nota</button>')+
+            (esAdminUsr2() ? ' <button type="button" class="ghost dpv-elim-viaje" data-ids="'+ids+'" data-n="'+(i+1)+'" data-kg="'+vj.total+'" title="Eliminar este despacho (solo administrador)" style="color:var(--danger)">🗑</button>' : '');
         })()+'</td></tr>';
     }).join('')+'</table></div><div id="dpvImgWrap"></div>') : '<p class="muted" style="margin-top:10px">Todavía no hay despachos registrados para este pedido.</p>';
   body.innerHTML = kpis + nuevo + hist +
@@ -7258,6 +7317,16 @@ function renderDespachoPvBody(){
   document.getElementById('btnCerrarDespachoPv2').addEventListener('click', closeDespachoPvModal);
   body.querySelectorAll('.dpv-ver-boleta').forEach(function(btn){
     btn.addEventListener('click', function(){ verBoletaEn(document.getElementById('dpvImgWrap'), btn.dataset.path); });
+  });
+  body.querySelectorAll('.dpv-elim-viaje').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var ids = btn.dataset.ids.split(',').map(Number);
+      eliminarDespachosAdmin(ids, 'el despacho N° '+btn.dataset.n+' ('+kgFmt(Number(btn.dataset.kg))+') del pedido '+(st.v.numero_pedido||''), function(){
+        cargarDespachoPv();
+        fetchProducciones(function(){ renderOrdenesRows(); renderStockFabricaRows(); if(typeof renderEntregadosRows==='function') renderEntregadosRows(); });
+        if(ventaState.loaded) renderPedidosVenta(true);
+      });
+    });
   });
   body.querySelectorAll('.dpv-subir-nota').forEach(function(btn){
     btn.addEventListener('click', function(){
