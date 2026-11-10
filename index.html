@@ -747,6 +747,8 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
   <section id="view-notasventa" class="view">
     <div class="toolbar">
       <input type="search" id="nvSearch" placeholder="Buscar por cliente, N° nota o N° pedido…">
+      <button type="button" class="ghost" id="btnNvAnuladas">🚫 Ver anuladas</button>
+      <button type="button" class="ghost" id="btnNvOrdSinNota" style="display:none">🔗 Órdenes sin nota</button>
     </div>
     <div class="table-wrap">
       <table>
@@ -881,6 +883,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
   <section id="view-entregados" class="view">
     <div class="toolbar">
       <input type="search" id="entSearch" placeholder="Buscar por producto, cliente o N°…">
+      <button type="button" class="ghost" id="btnEntSinNota">⚠ Solo sin nota de entrega</button>
       <div class="spacer"></div>
       <button id="btnCsvEntregados">⬇ Exportar CSV</button>
     </div>
@@ -1225,9 +1228,11 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
               <p class="footnote" style="margin:6px 0 0">Se cobra: <b>precio de los insumos de la fórmula</b> (con el margen/comisión de abajo, podés dejar margen 0 para cobrarlos al costo) <b>+ el núcleo NOGALMAX a precio de venta + el servicio de maquila por tonelada</b>. Para cargar las cantidades desde la foto usá 📷.</p>
             </div>
           </div>
-          <div class="section-title">Márgen y comisión</div>
+          <div class="section-title">Precio, rentabilidad y comisión</div>
           <div class="card" style="padding:14px">
-            <div class="inline-field"><label>% Utilidad / margen</label><input type="number" step="0.01" min="0" max="0.95" id="pf_margen" class="pill-input"></div>
+            <div class="inline-field" id="pf_precioFijoWrap"><label>📌 Precio de venta FIJO (Bs/Ton, con comisión)</label><input type="number" step="0.01" min="0" id="pf_precioFijo" class="pill-input" placeholder="vacío = se calcula con el margen"></div>
+            <div class="inline-field"><label id="pf_margenLbl">% Utilidad / margen</label><input type="number" step="0.01" min="0" max="0.95" id="pf_margen" class="pill-input"></div>
+            <p class="footnote" id="pf_precioFijoNota" style="margin:4px 0 8px"></p>
             <div class="inline-field"><label>% Comisión vendedor</label><input type="number" step="0.01" min="0" max="0.95" id="pf_comision" class="pill-input"></div>
             <div class="inline-field"><label>Facturación</label><select id="pf_factura" class="pill-input"><option value="1">Con factura (costo ÷ 0.87)</option><option value="0">Sin factura (costo directo)</option></select></div>
           </div>
@@ -1538,6 +1543,26 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
 <datalist id="clientesDatalist"></datalist>
 <datalist id="proveedoresDatalist"></datalist>
 
+<div id="vincModalOverlay" class="overlay2">
+  <div class="ocr-box" style="max-width:760px">
+    <div class="ocr-head">
+      <h3 id="vincTitulo">Vincular orden y nota de venta</h3>
+      <button class="close-x" id="btnCerrarVinc">✕</button>
+    </div>
+    <div id="vincBody" class="ocr-body"></div>
+  </div>
+</div>
+
+<div id="nvArchivoModalOverlay" class="overlay2">
+  <div class="ocr-box" style="max-width:820px">
+    <div class="ocr-head">
+      <h3 id="nvArchivoTitulo">Nota de venta</h3>
+      <button class="close-x" id="btnCerrarNvArchivo">✕</button>
+    </div>
+    <div id="nvArchivoBody" class="ocr-body"></div>
+  </div>
+</div>
+
 <div id="despachoModalOverlay" class="overlay2">
   <div class="ocr-box" style="max-width:640px">
     <div class="ocr-head">
@@ -1610,13 +1635,16 @@ var ordSort = { k:'fecha_pedido', dir:-1 };
 var pendientesCount = 0;
 var despachoState = null;
 var despachoFile = null;
+var sinBoletaPorProd = {}; // produccion_id -> [ids de despacho_eventos sin nota de entrega]
+var entSoloSinNota = false;
 var ventaState = { loaded:false, rows: [] };
 var pvSort = { k:'fecha_pedido', dir:-1 };
 var proformaState = { loaded:false, rows: [] };
 var pfSort = { k:'creado_en', dir:-1 };
 var pfLineas = [];
 var pfEditId = null;
-var notaVentaState = { loaded:false, rows: [] };
+var notaVentaState = { loaded:false, rows: [], archivo: [] };
+var nvVerAnuladas = false;
 var nvSort = { k:'fecha', dir:-1 };
 var cxcSort = { k:'cliente', dir:1 };
 var pvCuotas = []; // [{fecha, monto}]
@@ -1649,7 +1677,7 @@ function rowToInsumo(r){
   return { id:r.id, nombre:r.nombre, unidad:r.unidad, precioIngresado:Number(r.precio_ingresado)||0, unidadPrecio:r.unidad_precio, tipo:r.tipo, stockActual:Number(r.stock_actual)||0 };
 }
 function rowToProducto(r){
-  return { id:r.id, hoja:r.hoja, nombre:r.nombre, categoria:r.categoria, formula: r.formula || {}, margen:Number(r.margen)||0, comision:Number(r.comision)||0, con_factura: r.con_factura!==false, formula_nombre: r.formula_nombre||'', variantes: Array.isArray(r.variantes) ? r.variantes : [], es_maquila: r.es_maquila===true, maquila_cliente: r.maquila_cliente||'', maquila_tarifa: Number(r.maquila_tarifa)||0, maquila_archivos: Array.isArray(r.maquila_archivos) ? r.maquila_archivos : [], maquila_productos: (r.maquila_productos && typeof r.maquila_productos==='object' && !Array.isArray(r.maquila_productos)) ? r.maquila_productos : {} };
+  return { id:r.id, hoja:r.hoja, nombre:r.nombre, categoria:r.categoria, formula: r.formula || {}, margen:Number(r.margen)||0, precio_fijo:(r.precio_fijo!=null && Number(r.precio_fijo)>0)?Number(r.precio_fijo):null, comision:Number(r.comision)||0, con_factura: r.con_factura!==false, formula_nombre: r.formula_nombre||'', variantes: Array.isArray(r.variantes) ? r.variantes : [], es_maquila: r.es_maquila===true, maquila_cliente: r.maquila_cliente||'', maquila_tarifa: Number(r.maquila_tarifa)||0, maquila_archivos: Array.isArray(r.maquila_archivos) ? r.maquila_archivos : [], maquila_productos: (r.maquila_productos && typeof r.maquila_productos==='object' && !Array.isArray(r.maquila_productos)) ? r.maquila_productos : {} };
 }
 
 /* ---------- calculation engine (mirrors the original Excel formulas — unchanged) ---------- */
@@ -1724,6 +1752,14 @@ function computeProducto(p){
   var precioVentaSinCom = margen<1 ? costoFacturadoTon/(1-margen) : 0;
   var costoComisionado = comision<1 ? costoFacturadoTon/(1-comision) : 0;
   var precioVentaConCom = margen<1 ? costoComisionado/(1-margen) : 0;
+  // PRECIO FIJO: el precio de venta no se mueve con el costo de los insumos; lo que varía es la rentabilidad
+  var precioFijo = !p.es_maquila && Number(p.precio_fijo)>0;
+  var margenEfectivo = margen;
+  if(precioFijo){
+    precioVentaConCom = Number(p.precio_fijo);
+    precioVentaSinCom = precioVentaConCom*(1-comision);
+    margenEfectivo = (precioVentaConCom*(1-comision))>0 ? 1 - costoFacturadoTon/(precioVentaConCom*(1-comision)) : 0;
+  }
   var comisionBsTon = precioVentaConCom*comision;
   var ingresoEmpresa = precioVentaConCom - comisionBsTon;
   // MAQUILA: al precio de los insumos se le suma el servicio de maquila (Bs/Ton), sin comisión sobre el servicio
@@ -1741,7 +1777,8 @@ function computeProducto(p){
     ingresoEmpresa:ingresoEmpresa, utilidadNetaPct:utilidadNetaPct,
     mpRows:mpRows, envRows:envRows,
     maquilaTarifa:maquilaTarifa, precioInsumosConCom:precioInsumosConCom, precioInsumosSinCom:precioInsumosSinCom,
-    nucKg:nucKg, nucBsTon:nucBsTon, nucRows:nucRows, kgMezcla:kgMezcla
+    nucKg:nucKg, nucBsTon:nucBsTon, nucRows:nucRows, kgMezcla:kgMezcla,
+    precioFijo:precioFijo, margenEfectivo:margenEfectivo
   };
 }
 
@@ -2079,7 +2116,7 @@ function renderProductos(){
   rows.sort(function(a,b){
     if(sortBy==='costo') return b.c.costoFacturadoTon - a.c.costoFacturadoTon;
     if(sortBy==='precio') return b.c.precioVentaConCom - a.c.precioVentaConCom;
-    if(sortBy==='margen') return b.p.margen - a.p.margen;
+    if(sortBy==='margen') return b.c.margenEfectivo - a.c.margenEfectivo;
     return a.p.nombre.localeCompare(b.p.nombre);
   });
   document.getElementById('prodCount').textContent = rows.length + ' producto(s)';
@@ -2091,8 +2128,8 @@ function renderProductos(){
       '<td class="num">'+fmtBs(c.costoMPTon)+'</td>'+
       '<td class="num">'+fmtBs(c.costoFacturadoTon)+'</td>'+
       '<td class="num">'+fmtBs(c.precioVentaSinCom)+'</td>'+
-      '<td class="num"><b>'+fmtBs(c.precioVentaConCom)+'</b></td>'+
-      '<td class="num">'+fmtPct(p.margen)+'</td>'+
+      '<td class="num"><b>'+fmtBs(c.precioVentaConCom)+'</b>'+(c.precioFijo?' <span title="Precio fijo: no cambia con el costo de los insumos">📌</span>':'')+'</td>'+
+      '<td class="num"'+(c.margenEfectivo<0.05?' style="color:#b91c1c;font-weight:700" title="Rentabilidad baja"':'')+'>'+fmtPct(c.margenEfectivo)+'</td>'+
       '<td class="num">'+fmtPct(p.comision)+'</td>'+
       '<td><button class="btn-edit-prod">Editar</button> <button class="ghost btn-img-prod" title="Imagen para producción">🖼️</button></td>'+
     '</tr>';
@@ -2124,7 +2161,7 @@ function renderVentas(){
     var c = computeProducto(p);
     return {numero:idx+1, nombre:p.nombre, categoria:p.categoria, hoja:p.hoja,
       costoFacturadoTon:c.costoFacturadoTon, precioVentaSinCom:c.precioVentaSinCom,
-      precioVentaConCom:c.precioVentaConCom, margen:p.margen};
+      precioVentaConCom:c.precioVentaConCom, margen:c.margenEfectivo};
   }).filter(function(r){ return !q || r.nombre.toLowerCase().indexOf(q)!==-1; });
   rows.sort(function(a,b){
     var k=ventaSort.k, d=ventaSort.dir;
@@ -2152,7 +2189,7 @@ document.getElementById('btnCsvVentas').addEventListener('click', function(){
   var lines = [['N°','Producto','Categoría','Costo facturado Bs/Ton','Precio venta sin comisión','Precio venta con comisión','Margen %'].join(';')];
   state.productos.forEach(function(p,idx){
     var c = computeProducto(p);
-    lines.push([idx+1, p.nombre, p.categoria, c.costoFacturadoTon.toFixed(2), c.precioVentaSinCom.toFixed(2), c.precioVentaConCom.toFixed(2), (p.margen*100).toFixed(1)+'%'].join(';'));
+    lines.push([idx+1, p.nombre, p.categoria, c.costoFacturadoTon.toFixed(2), c.precioVentaSinCom.toFixed(2), c.precioVentaConCom.toFixed(2), (c.margenEfectivo*100).toFixed(1)+'%'].join(';'));
   });
   downloadBlob('precios_de_venta_nogalmax.csv', new Blob(["﻿"+lines.join('\n')], {type:'text/csv;charset=utf-8'}));
 });
@@ -2181,7 +2218,7 @@ document.getElementById('idxSearch').addEventListener('input', renderIndice);
 /* ================= HISTORIAL ================= */
 var histState = { rows: [], offset: 0, pageSize: 60, loading:false };
 function campoLabel(campo){
-  var map = {precio_ingresado:'Precio ingresado', unidad_precio:'Precio en (unidad)', nombre:'Nombre', creado:'Creado', categoria:'Categoría', margen:'Margen', comision:'Comisión', eliminado:'Eliminado'};
+  var map = {precio_ingresado:'Precio ingresado', unidad_precio:'Precio en (unidad)', nombre:'Nombre', creado:'Creado', categoria:'Categoría', margen:'Margen', precio_fijo:'Precio fijo', comision:'Comisión', eliminado:'Eliminado'};
   if(map[campo]) return map[campo];
   if(campo && campo.indexOf('fórmula: ')===0) return 'Fórmula — '+campo.slice(9);
   return campo||'';
@@ -2189,6 +2226,7 @@ function campoLabel(campo){
 function valDisplay(campo, v){
   if(v===null || v===undefined) return '—';
   if(campo==='margen' || campo==='comision'){ var n=Number(v); return isNaN(n)?v:fmtPct(n); }
+  if(campo==='precio_fijo'){ if(v==null||v==='') return '—'; var n2=Number(v); return isNaN(n2)?v:fmtBs(n2); }
   if(campo==='precio_ingresado' || (campo&&campo.indexOf('fórmula: ')===0)){ var n2=Number(v); return isNaN(n2)?v:fmt(n2,3); }
   return v;
 }
@@ -2323,6 +2361,8 @@ function openModal(hoja, opts){
   renderMaqArchivos();
   if(draft.es_maquila && sb && !clientesState.loaded) fetchClientes(populateClientesDatalist);
   document.getElementById('pf_margen').value = draft.margen;
+  document.getElementById('pf_precioFijo').value = (!draft.es_maquila && draft.precio_fijo>0) ? draft.precio_fijo : '';
+  document.getElementById('pf_precioFijoWrap').style.display = draft.es_maquila ? 'none' : '';
   document.getElementById('pf_comision').value = draft.comision;
   document.getElementById('pf_factura').value = draft.con_factura===false ? '0' : '1';
   document.getElementById('pf_search').value = '';
@@ -2424,11 +2464,12 @@ document.getElementById('pf_categoria').addEventListener('change', function(){
 
 function renderModalComputed(){
   var draft = modalState.draft;
-  draft.margen = parseFloat(document.getElementById('pf_margen').value)||0;
+  pfLeerPrecioMargen(draft);
   draft.comision = parseFloat(document.getElementById('pf_comision').value)||0;
   draft.con_factura = document.getElementById('pf_factura').value !== '0';
   if(draft.es_maquila) draft.maquila_tarifa = parseFloat(document.getElementById('pf_maqTarifa').value)||0;
   var c = computeProducto(draft);
+  pfMostrarRentabilidad(draft, c);
   var searchQ = (document.getElementById('pf_search').value||'').toLowerCase();
   var onlyUsed = document.getElementById('pf_onlyUsed').checked;
 
@@ -2466,11 +2507,12 @@ function renderModalComputed(){
 /* lighter recompute that doesn't rebuild the ingredient table rows (keeps focus) */
 function renderModalComputedLight(){
   var draft = modalState.draft;
-  draft.margen = parseFloat(document.getElementById('pf_margen').value)||0;
+  pfLeerPrecioMargen(draft);
   draft.comision = parseFloat(document.getElementById('pf_comision').value)||0;
   draft.con_factura = document.getElementById('pf_factura').value !== '0';
   if(draft.es_maquila) draft.maquila_tarifa = parseFloat(document.getElementById('pf_maqTarifa').value)||0;
   var c = computeProducto(draft);
+  pfMostrarRentabilidad(draft, c);
   document.querySelectorAll('#pf_mpBody tr').forEach(function(tr){
     var name = tr.dataset.name;
     var r = c.mpRows.find(function(x){return x.nombre===name;});
@@ -2488,6 +2530,24 @@ function renderModalComputedLight(){
   });
   document.getElementById('pf_summary').innerHTML = pfSummaryHtml(draft, c);
 }
+function pfLeerPrecioMargen(draft){
+  var pf = parseFloat(document.getElementById('pf_precioFijo').value);
+  draft.precio_fijo = (!draft.es_maquila && pf>0) ? pf : null;
+  // con precio fijo el margen que se ve es el resultado: no se pisa el margen guardado
+  if(!draft.precio_fijo) draft.margen = parseFloat(document.getElementById('pf_margen').value)||0;
+}
+function pfMostrarRentabilidad(draft, c){
+  var mEl = document.getElementById('pf_margen'), lbl = document.getElementById('pf_margenLbl'), nota = document.getElementById('pf_precioFijoNota');
+  if(c.precioFijo){
+    mEl.disabled = true; mEl.value = (Math.round(c.margenEfectivo*10000)/10000);
+    lbl.textContent = '% Rentabilidad actual (resulta del precio fijo y el costo de hoy)';
+    nota.innerHTML = 'El precio queda fijo aunque cambie el costo de los insumos — lo que varía es la rentabilidad. Para cambiar el precio, escribí el nuevo arriba.'+(c.margenEfectivo<0.05?' <b style="color:#b91c1c">⚠ Rentabilidad baja.</b>':'');
+  } else {
+    if(mEl.disabled){ mEl.disabled = false; mEl.value = draft.margen; }
+    lbl.textContent = '% Utilidad / margen';
+    nota.textContent = draft.es_maquila ? '' : 'Sin precio fijo: el precio se calcula con el margen. Al guardar, ese precio queda fijo.';
+  }
+}
 function pfSummaryHtml(draft, c){
   var maq = draft.es_maquila;
   return row('Subtotal materias primas', fmtBs(c.mpCosto)) +
@@ -2502,11 +2562,13 @@ function pfSummaryHtml(draft, c){
     row(maq ? 'PRECIO MAQUILA / Ton (insumos + núcleo + servicio)' : 'Precio de venta CON comisión', fmtBs(c.precioVentaConCom), true) +
     row('Comisión vendedor / Ton'+(maq?' (solo sobre insumos)':''), fmtBs(c.comisionBsTon)) +
     row('Ingreso empresa / Ton', fmtBs(c.ingresoEmpresa)) +
-    row('Utilidad neta % (después comisión)', fmtPct(c.utilidadNetaPct));
+    row('Utilidad neta % (después comisión)', fmtPct(c.utilidadNetaPct)) +
+    (c.precioFijo ? row('📌 Rentabilidad sobre precio fijo', fmtPct(c.margenEfectivo), true) : '');
 }
 function row(l,v,total){ return '<div class="row'+(total?' total':'')+'"><span>'+l+'</span><span>'+v+'</span></div>'; }
 
 document.getElementById('pf_margen').addEventListener('input', renderModalComputedLight);
+document.getElementById('pf_precioFijo').addEventListener('input', renderModalComputedLight);
 document.getElementById('pf_comision').addEventListener('input', renderModalComputedLight);
 document.getElementById('pf_factura').addEventListener('change', renderModalComputedLight);
 document.getElementById('pf_search').addEventListener('input', renderModalComputed);
@@ -2536,10 +2598,13 @@ document.getElementById('btnGuardarProducto').addEventListener('click', function
   }
   draft.nombre = document.getElementById('pf_nombre').value.trim();
   draft.categoria = document.getElementById('pf_categoria').value || 'OTROS PRODUCTOS';
-  draft.margen = parseFloat(document.getElementById('pf_margen').value)||0;
+  pfLeerPrecioMargen(draft);
   draft.comision = parseFloat(document.getElementById('pf_comision').value)||0;
   draft.con_factura = document.getElementById('pf_factura').value !== '0';
   if(!draft.nombre){ toast('Ponele un nombre al producto'); return; }
+  // al guardar, si el producto no tiene precio fijo, se fija el precio calculado con el margen
+  if(!draft.es_maquila && !(draft.precio_fijo>0)){ var cFix = computeProducto(draft); if(cFix.precioVentaConCom>0) draft.precio_fijo = Math.round(cFix.precioVentaConCom*100)/100; }
+  if(draft.es_maquila) draft.precio_fijo = null;
   if(draft.es_maquila){
     draft.maquila_cliente = document.getElementById('pf_maqCliente').value.trim();
     draft.maquila_tarifa = parseFloat(document.getElementById('pf_maqTarifa').value)||0;
@@ -2597,7 +2662,7 @@ function guardarProductoDraft(draft, btn, maqCampos){
   if(modalState.hoja){
     var idx = state.productos.findIndex(function(p){return p.hoja===modalState.hoja;});
     draft.hoja = modalState.hoja;
-    sb.from('productos').update(conMaq({nombre:draft.nombre, categoria:draft.categoria, margen:draft.margen, comision:draft.comision, con_factura:draft.con_factura!==false, formula:draft.formula, formula_nombre:draft.formula_nombre||null, variantes:draft.variantes||[]})).eq('id', draft.id).then(function(res){
+    sb.from('productos').update(conMaq({nombre:draft.nombre, categoria:draft.categoria, margen:draft.margen, precio_fijo:draft.precio_fijo||null, comision:draft.comision, con_factura:draft.con_factura!==false, formula:draft.formula, formula_nombre:draft.formula_nombre||null, variantes:draft.variantes||[]})).eq('id', draft.id).then(function(res){
       btn.disabled = false;
       if(res.error){ toast('No se pudo guardar: '+errMsg(res.error)); return; }
       state.productos[idx] = draft;
@@ -2609,7 +2674,7 @@ function guardarProductoDraft(draft, btn, maqCampos){
     });
   } else {
     draft.hoja = slugHoja(draft.nombre);
-    sb.from('productos').insert(conMaq({hoja:draft.hoja, nombre:draft.nombre, categoria:draft.categoria, margen:draft.margen, comision:draft.comision, con_factura:draft.con_factura!==false, formula:draft.formula, formula_nombre:draft.formula_nombre||null, variantes:draft.variantes||[]})).select().single().then(function(res){
+    sb.from('productos').insert(conMaq({hoja:draft.hoja, nombre:draft.nombre, categoria:draft.categoria, margen:draft.margen, precio_fijo:draft.precio_fijo||null, comision:draft.comision, con_factura:draft.con_factura!==false, formula:draft.formula, formula_nombre:draft.formula_nombre||null, variantes:draft.variantes||[]})).select().single().then(function(res){
       btn.disabled = false;
       if(res.error){ toast('No se pudo crear la fórmula: '+errMsg(res.error)); return; }
       draft.id = res.data.id;
@@ -3237,8 +3302,53 @@ function fetchProducciones(cb){
     if(res.error){ toast('No se pudieron cargar las producciones: '+errMsg(res.error)); cb(); return; }
     ordenesState.rows = res.data || [];
     ordenesState.loaded = true;
-    cb();
+    cargarSinBoleta(cb);
   });
+}
+function cargarSinBoleta(cb){
+  sb.from('despacho_eventos').select('id, produccion_id').is('boleta_path', null).then(function(r){
+    var m = {};
+    (r.data||[]).forEach(function(e){ (m[e.produccion_id] = m[e.produccion_id] || []).push(e.id); });
+    sinBoletaPorProd = m;
+    if(cb) cb();
+  });
+}
+function sinNotaTag(){ return '<span class="tag" style="background:#fde3e3;color:#b91c1c" title="Falta subir la foto de la nota de entrega de este despacho">⚠ Sin nota de entrega subida</span>'; }
+/* Sube la foto de la nota de entrega a despachos ya registrados que no la tienen */
+function subirNotaEntrega(eventoIds, carpeta, onDone){
+  var inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true;
+  inp.addEventListener('change', function(){
+    var files = Array.prototype.slice.call(inp.files||[]);
+    if(!files.length) return;
+    var hechas = 0, path = null;
+    function siguiente(){
+      if(hechas>=files.length){ terminar(); return; }
+      var f = files[hechas];
+      toast('Subiendo nota de entrega '+(hechas+1)+' de '+files.length+'…');
+      var pth = (carpeta||'despacho')+'/'+Date.now()+'-'+hechas+'.'+extArchivo(f);
+      sb.storage.from('boletas-despacho').upload(pth, f, {upsert:false}).then(function(res){
+        if(res.error){ toast('No se pudo subir la imagen '+(hechas+1)+': '+errMsg(res.error)); if(hechas>0) terminar(); return; }
+        sb.rpc('adjuntar_boleta_despacho', {p_evento_ids: eventoIds, p_boleta_path: pth}).then(function(r2){
+          if(r2.error){ toast('No se pudo guardar la nota de entrega: '+errMsg(r2.error)); if(hechas>0) terminar(); return; }
+          path = path || pth; hechas++; siguiente();
+        });
+      });
+    }
+    function terminar(){
+        toast(hechas>1 ? hechas+' notas de entrega subidas' : 'Nota de entrega subida');
+        ordenesState.rows.forEach(function(o){
+          if(sinBoletaPorProd[o.id] && sinBoletaPorProd[o.id].some(function(id){ return eventoIds.indexOf(id)!==-1; }) && !o.boleta_despacho_path) o.boleta_despacho_path = path;
+        });
+        cargarSinBoleta(function(){
+          renderOrdenesRows(); renderStockFabricaRows();
+          if(typeof renderEntregadosRows==='function') renderEntregadosRows();
+          if(onDone) onDone(path);
+        });
+    }
+    siguiente();
+  });
+  inp.click();
 }
 function renderOrdenes(forceReload){
   if(forceReload){
@@ -3333,16 +3443,16 @@ function renderOrdenesRows(){
   renderOrdSinPedidoBanner(puedeCrearPvOrd);
   document.getElementById('ordenesBody').innerHTML = rows.map(function(o){
     var clienteLabel = o.es_stock_fabrica ? '<span class="tag">Stock fábrica</span>' : (escapeHtml(o.cliente||'—')+(o.desde_stock_existente?' <span class="tag" title="Esta producción salió de un lote que ya estaba en stock">📦 desde stock</span>':''));
-    if(ordSinPedido(o)) clienteLabel += ' <span class="tag" style="background:#fde3e3;color:#b91c1c" title="Esta orden no tiene pedido de venta ni nota de venta">⚠ sin pedido</span>'+(puedeCrearPvOrd?' <button class="ghost btn-crear-pv-ord" title="Crear el pedido y la nota de venta de esta orden">🧾 Crear pedido</button>':'');
+    if(ordSinPedido(o)) clienteLabel += ' <span class="tag" style="background:#fde3e3;color:#b91c1c" title="Esta orden no tiene pedido de venta ni nota de venta">⚠ sin pedido</span>'+(puedeCrearPvOrd?' <button class="ghost btn-crear-pv-ord" title="Crear el pedido y la nota de venta de esta orden">🧾 Crear pedido</button> <button class="ghost btn-vinc-ord" title="Vincular esta orden a una nota de venta que ya existe">🔗 Vincular a nota</button>':'');
     var estadoCell = puedeCompletar
       ? '<label class="ord-estado-chk"><input type="checkbox" class="ord-check" '+(o.estado==='completada'?'checked':'')+'> '+(o.estado==='completada'?'Completada':'Pendiente')+'</label>'
       : (o.estado==='completada' ? '<span class="tag">Completada</span>' : '<span class="despacho-pend">Pendiente</span>');
     var despCant = Number(o.despachado_cantidad)||0;
     var saldoDesp = Math.max(0, (Number(o.cantidad_toneladas)||0) - despCant);
     var despachoCell = o.despachado
-      ? '<button class="ghost btn-ver-despacho" title="Ver boleta de despacho">✅ Despachado</button>'
+      ? '<button class="ghost btn-ver-despacho" title="Ver boleta de despacho">✅ Despachado</button>'+(sinBoletaPorProd[o.id]?'<br>'+sinNotaTag():'')
       : (despCant>0
-        ? '<button class="ghost btn-despachar" title="Despachado parcialmente — saldo por despachar: '+fmt(saldoDesp*1000,0)+' Kg">🚚 <span class="despacho-parcial">Llevan '+fmt(despCant*1000,0)+' de '+fmt((Number(o.cantidad_toneladas)||0)*1000,0)+' Kg</span></button>'
+        ? '<button class="ghost btn-despachar" title="Despachado parcialmente — saldo por despachar: '+fmt(saldoDesp*1000,0)+' Kg">🚚 <span class="despacho-parcial">Llevan '+fmt(despCant*1000,0)+' de '+fmt((Number(o.cantidad_toneladas)||0)*1000,0)+' Kg</span></button>'+(sinBoletaPorProd[o.id]?'<br>'+sinNotaTag():'')
         : '<button class="ghost btn-despachar" title="Marcar despachado y subir boleta">🚚 Marcar</button>');
     var puedeEliminarOrd = o.estado!=='completada' && !o.despachado && despCant===0;
     var solOrd = !esAdminOrd && solicitudPendiente('orden', o.id);
@@ -3403,6 +3513,12 @@ function renderOrdenesRows(){
         if(typeof ventaState!=='undefined' && ventaState.loaded) renderPedidosVenta(true);
         toast(o.numero_produccion+' — fórmula cambiada a '+((row&&row.variante)||etiqueta)+'. Se recalcularon los insumos.');
       });
+    });
+  });
+  document.querySelectorAll('.btn-vinc-ord').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var o = ordenesState.rows.find(function(x){return x.id===Number(btn.closest('tr').dataset.id);});
+      if(o) openVincular({orden:o});
     });
   });
   document.querySelectorAll('.btn-crear-pv-ord').forEach(function(btn){
@@ -3499,9 +3615,9 @@ function renderStockFabricaRows(){
     var despCantSf = Number(o.despachado_cantidad)||0;
     var saldoDespSf = Math.max(0, (Number(o.cantidad_toneladas)||0) - despCantSf);
     var despachoCell = o.despachado
-      ? '<button class="ghost btn-ver-despacho-sf" title="Ver boleta de despacho">✅ Despachado</button>'
+      ? '<button class="ghost btn-ver-despacho-sf" title="Ver boleta de despacho">✅ Despachado</button>'+(sinBoletaPorProd[o.id]?'<br>'+sinNotaTag():'')
       : (despCantSf>0
-        ? '<button class="ghost btn-despachar-sf" title="Despachado parcialmente — saldo por despachar: '+fmt(saldoDespSf*1000,0)+' Kg">🚚 <span class="despacho-parcial">Llevan '+fmt(despCantSf*1000,0)+' de '+fmt((Number(o.cantidad_toneladas)||0)*1000,0)+' Kg</span></button>'
+        ? '<button class="ghost btn-despachar-sf" title="Despachado parcialmente — saldo por despachar: '+fmt(saldoDespSf*1000,0)+' Kg">🚚 <span class="despacho-parcial">Llevan '+fmt(despCantSf*1000,0)+' de '+fmt((Number(o.cantidad_toneladas)||0)*1000,0)+' Kg</span></button>'+(sinBoletaPorProd[o.id]?'<br>'+sinNotaTag():'')
         : '<button class="ghost btn-despachar-sf" title="Marcar despachado y subir boleta">🚚 Marcar</button>');
     var rowClass = o.despachado ? 'ord-row-despachado' : (despCantSf>0 ? 'ord-row-parcial' : (o.estado==='completada' ? 'ord-row-completada' : ''));
     return '<tr data-id="'+o.id+'"'+(rowClass?' class="'+rowClass+'"':'')+'>'+
@@ -3541,8 +3657,12 @@ function renderEntregadosRows(){
   if(!body) return;
   var qEl = document.getElementById('entSearch');
   var q = qEl ? (qEl.value||'').toLowerCase() : '';
-  var entregados = ordenesState.rows.filter(function(o){ return o.despachado; });
+  var entregados = ordenesState.rows.filter(function(o){ return o.despachado || (sinBoletaPorProd[o.id] && Number(o.despachado_cantidad)>0); });
+  var nSinNota = entregados.filter(function(o){ return sinBoletaPorProd[o.id]; }).length;
+  var btnSN = document.getElementById('btnEntSinNota');
+  if(btnSN){ btnSN.textContent = (entSoloSinNota?'✖ Ver todos':'⚠ Solo sin nota de entrega')+' ('+nSinNota+')'; btnSN.classList.toggle('primary', entSoloSinNota); }
   var filtrado = entregados.filter(function(o){
+    if(entSoloSinNota && !sinBoletaPorProd[o.id]) return false;
     if(!q) return true;
     var hay = (o.producto_nombre+' '+(o.cliente||'')+' '+o.numero_produccion+' '+(o.pedido_venta_numero||'')+' '+(o.despachado_por_nombre||'')).toLowerCase();
     return hay.indexOf(q)!==-1;
@@ -3564,7 +3684,9 @@ function renderEntregadosRows(){
       '<td class="num">'+fmt(o.cantidad_toneladas,2)+'</td>'+
       '<td>'+clienteLabel+'</td>'+
       '<td>'+escapeHtml(o.despachado_por_nombre||'—')+'</td>'+
-      '<td><button class="ghost btn-ver-despacho-ent" title="Ver boleta de despacho">🧾 Boleta</button></td>'+
+      '<td>'+(sinBoletaPorProd[o.id]
+        ? sinNotaTag()+'<br><button class="ghost btn-subir-nota-ent" style="margin-top:4px" title="Subir la foto de la nota de entrega">📤 Subir nota de entrega</button>'
+        : '<button class="ghost btn-ver-despacho-ent" title="Ver boleta de despacho">🧾 Boleta</button>')+'</td>'+
       '<td><button class="ghost btn-doc-ord-ent" title="Ver / descargar documento">📄</button></td>'+
     '</tr>';
   }).join('') || '<tr><td colspan="9" class="empty">Todavía no hay entregas registradas</td></tr>';
@@ -3572,6 +3694,16 @@ function renderEntregadosRows(){
   if(foot){
     foot.innerHTML = filtrado.length ? ('<tr><td colspan="4" style="text-align:right;font-weight:700">Total entregado</td><td class="num" style="font-weight:700">'+fmt(totalTon,2)+'</td><td colspan="4"></td></tr>') : '';
   }
+  body.querySelectorAll('.btn-subir-nota-ent').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var id = Number(btn.closest('tr').dataset.id);
+      var o = ordenesState.rows.find(function(x){return x.id===id;});
+      var ids = sinBoletaPorProd[id];
+      if(!o || !ids) return;
+      if(ids.length>1){ openDespachoModal(o); toast('Esta producción tiene '+ids.length+' despachos sin nota — subí cada una en el historial'); return; }
+      subirNotaEntrega(ids, o.numero_produccion);
+    });
+  });
   body.querySelectorAll('.btn-ver-despacho-ent').forEach(function(btn){
     btn.addEventListener('click', function(){
       var id = Number(btn.closest('tr').dataset.id);
@@ -3589,6 +3721,8 @@ function renderEntregadosRows(){
 }
 var entSearchEl = document.getElementById('entSearch');
 if(entSearchEl) entSearchEl.addEventListener('input', renderEntregadosRows);
+var btnEntSinNotaEl = document.getElementById('btnEntSinNota');
+if(btnEntSinNotaEl) btnEntSinNotaEl.addEventListener('click', function(){ entSoloSinNota = !entSoloSinNota; renderEntregadosRows(); });
 document.querySelectorAll('#view-entregados th.sortable').forEach(function(th){
   th.addEventListener('click', function(){
     var k = th.dataset.k;
@@ -4972,7 +5106,10 @@ function fetchNotasVenta(cb){
     if(res.error){ toast('No se pudieron cargar las notas de venta: '+errMsg(res.error)); return; }
     notaVentaState.rows = res.data || [];
     notaVentaState.loaded = true;
-    if(cb) cb();
+    sb.from('notas_archivo').select('*').order('creado_en',{ascending:false}).then(function(r2){
+      notaVentaState.archivo = (r2 && r2.data) || [];
+      if(cb) cb();
+    });
   });
 }
 function notaTotales(nota){
@@ -5055,11 +5192,35 @@ function renderNotasVentaRows(){
     if(typeof av==='string') return av.localeCompare(bv)*d;
     return (av-bv)*d;
   });
+  var archivo = notaVentaState.archivo || [];
+  var anuladas = archivo.filter(function(a){ return a.tipo==='anulada'; });
+  var btnAn = document.getElementById('btnNvAnuladas');
+  if(btnAn){ btnAn.textContent = (nvVerAnuladas ? '✖ Ocultar anuladas' : '🚫 Ver anuladas')+' ('+anuladas.length+')'; btnAn.classList.toggle('primary', nvVerAnuladas); }
+  var filasAnuladas = !nvVerAnuladas ? '' : anuladas.filter(function(a){
+    if(!q) return true;
+    return ((a.cliente||'')+' '+(a.numero_nota||'')+' '+(a.numero_pedido||'')).toLowerCase().indexOf(q)!==-1;
+  }).map(function(a){
+    var sn = a.snapshot||{}, n = sn.nota||{};
+    var pagado = (sn.pagos||[]).reduce(function(s2,pg){ return s2+(Number(pg.monto_bs)||0); },0);
+    return '<tr class="nv-anulada" data-arch="'+a.id+'" style="background:#fdf1f1;color:#7a7f87">'+
+      '<td>'+fmtFecha(n.fecha || (sn.pedido&&sn.pedido.fecha_pedido) || a.creado_en)+'</td>'+
+      '<td><b style="text-decoration:line-through">'+escapeHtml(a.numero_nota||'—')+'</b> <span class="tag" style="background:#fde3e3;color:#b91c1c">🚫 ANULADA</span></td>'+
+      '<td>'+escapeHtml(a.numero_pedido||'—')+'</td>'+
+      '<td>'+escapeHtml(a.cliente||'—')+'</td>'+
+      '<td class="num" style="text-decoration:line-through">'+fmt(a.total_bs,2)+'</td>'+
+      '<td>—</td>'+
+      '<td class="num">'+fmt(pagado,2)+'</td>'+
+      '<td class="num">—</td>'+
+      '<td colspan="2"><span style="font-size:12px">Anulada el '+fmtFecha(a.creado_en)+(a.usuario_nombre?' por '+escapeHtml(a.usuario_nombre):'')+'</span></td>'+
+      '<td><button class="ghost btn-ver-arch" title="Ver cómo era la nota">📄</button></td>'+
+    '</tr>';
+  }).join('');
   document.getElementById('notasVentaBody').innerHTML = rows.map(function(nv){
     var t = notaTotales(nv);
+    var mods = archivo.filter(function(a){ return a.tipo==='modificada' && a.pedido_venta_id===nv.pedido_venta_id; });
     return '<tr data-id="'+nv.id+'">'+
       '<td>'+fmtFecha(nv.fecha)+'</td>'+
-      '<td><b>'+escapeHtml(nv.numero_nota)+'</b></td>'+
+      '<td><b>'+escapeHtml(nv.numero_nota)+'</b>'+(mods.length?' <button type="button" class="tag btn-nv-mods" style="background:#fff3dc;color:#8a5a12;border:0;cursor:pointer" title="Esta nota fue modificada — ver versiones anteriores">✏️ Modificada ('+mods.length+')</button>':'')+'</td>'+
       '<td>'+escapeHtml(nv.numero_pedido||'—')+'</td>'+
       '<td>'+escapeHtml(nv.cliente||'—')+'</td>'+
       '<td class="num">'+fmt(t.total,2)+'</td>'+
@@ -5070,9 +5231,37 @@ function renderNotasVentaRows(){
       '<td>'+notaEntregaHtml(nv)+'</td>'+
       '<td style="white-space:nowrap"><button class="ghost btn-doc-nv" title="Ver / descargar nota de venta">📄</button>'+
         ' <button class="ghost btn-cobro-nv" title="Notas de cobro: cobrar solo una parte (lo que recogió el cliente)">🧾</button>'+
+        (puedeVincular() ? ' <button class="ghost btn-vinc-nv" title="Vincular a esta nota una orden de producción que no tiene nota">🔗</button>' : '')+
         (esAdminNv ? ' <button class="ghost btn-eliminar-nv" title="Eliminar nota de venta y todo lo relacionado (solo administrador)" style="color:var(--danger)">🗑</button>' : '')+'</td>'+
     '</tr>';
-  }).join('') || '<tr><td colspan="11" class="empty">Sin notas de venta registradas</td></tr>';
+  }).join('') + filasAnuladas || '<tr><td colspan="11" class="empty">Sin notas de venta registradas</td></tr>';
+  var bOsn = document.getElementById('btnNvOrdSinNota');
+  if(bOsn){
+    var nOsn = ordenesState.loaded ? ordenesState.rows.filter(ordSinPedido).length : 0;
+    bOsn.style.display = (puedeVincular() && nOsn) ? '' : 'none';
+    bOsn.textContent = '🔗 Órdenes sin nota ('+nOsn+')';
+    if(!ordenesState.loaded && puedeVincular() && !renderNotasVentaRows._cargando){ renderNotasVentaRows._cargando = true; fetchProducciones(function(){ renderNotasVentaRows._cargando = false; renderNotasVentaRows(); }); }
+  }
+  document.querySelectorAll('#notasVentaBody .btn-vinc-nv').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var nv = notaVentaState.rows.find(function(x){return x.id===Number(btn.closest('tr').dataset.id);});
+      if(nv) openVincular({nota:nv});
+    });
+  });
+  document.querySelectorAll('#notasVentaBody .btn-ver-arch').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var a = (notaVentaState.archivo||[]).find(function(x){ return x.id===Number(btn.closest('tr').dataset.arch); });
+      if(a) openNvArchivo([a], 0);
+    });
+  });
+  document.querySelectorAll('#notasVentaBody .btn-nv-mods').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var nv = notaVentaState.rows.find(function(x){return x.id===Number(btn.closest('tr').dataset.id);});
+      if(!nv) return;
+      var mods = (notaVentaState.archivo||[]).filter(function(a){ return a.tipo==='modificada' && a.pedido_venta_id===nv.pedido_venta_id; });
+      openNvArchivo(mods, 0, nv);
+    });
+  });
   document.querySelectorAll('.btn-eliminar-nv').forEach(function(btn){
     btn.addEventListener('click', function(){
       var id = Number(btn.closest('tr').dataset.id);
@@ -5094,6 +5283,174 @@ function renderNotasVentaRows(){
     });
   });
 }
+/* ---- Vincular órdenes de producción sin nota con notas de venta (y al revés) ---- */
+var vincState = null;
+function puedeVincular(){ return !!(currentProfile && (currentProfile.rol==='admin' || currentProfile.rol==='comercial')); }
+function normCli(x){ return String(x||'').trim().toLowerCase().replace(/\s+/g,' '); }
+function openVincular(st){
+  if(!puedeVincular()){ toast('Solo Comercial o Admin pueden vincular'); return; }
+  vincState = {orden: st.orden||null, nota: st.nota||null, q:'', sel:null};
+  document.getElementById('vincModalOverlay').classList.add('active');
+  document.getElementById('vincBody').innerHTML = '<p class="muted">Cargando…</p>';
+  var pend = 2;
+  function listo(){ if(--pend===0) renderVincular(); }
+  fetchProducciones(listo);
+  fetchNotasVenta(listo);
+}
+function closeVincular(){ document.getElementById('vincModalOverlay').classList.remove('active'); vincState = null; }
+function renderVincular(){
+  var st = vincState; if(!st) return;
+  var body = document.getElementById('vincBody');
+  var eligiendoNota = !!st.orden;
+  document.getElementById('vincTitulo').textContent = eligiendoNota ? 'Vincular '+st.orden.numero_produccion+' a una nota de venta' : 'Vincular una orden a la nota '+st.nota.numero_nota;
+  var cab, lista;
+  if(eligiendoNota){
+    var o = st.orden;
+    cab = '<div class="doc-meta-item"><span class="l">Orden</span><span class="v">'+escapeHtml(o.numero_produccion)+' · '+escapeHtml(o.producto_nombre)+' · '+fmt((Number(o.cantidad_toneladas)||0)*1000,0)+' Kg</span></div>'+
+      '<div class="doc-meta-item"><span class="l">Cliente de la orden</span><span class="v">'+escapeHtml(o.cliente||'—')+'</span></div>';
+    var c0 = normCli(o.cliente);
+    lista = notaVentaState.rows.slice().sort(function(a,b){
+      var am = normCli(a.cliente)===c0 ? 0 : 1, bm = normCli(b.cliente)===c0 ? 0 : 1;
+      if(am!==bm) return am-bm;
+      return String(b.fecha||'').localeCompare(String(a.fecha||''));
+    }).filter(function(nv){
+      if(!st.q) return true;
+      return ((nv.cliente||'')+' '+(nv.numero_nota||'')+' '+(nv.numero_pedido||'')).toLowerCase().indexOf(st.q)!==-1;
+    }).map(function(nv){
+      var mismo = normCli(nv.cliente)===c0;
+      return '<tr class="vinc-row'+(st.sel===nv.id?' sel':'')+'" data-id="'+nv.id+'" style="cursor:pointer'+(st.sel===nv.id?';background:#e3f5ea':'')+'">'+
+        '<td><input type="radio" name="vincSel" '+(st.sel===nv.id?'checked':'')+'></td><td><b>'+escapeHtml(nv.numero_nota)+'</b><br><span class="muted" style="font-size:11px">'+escapeHtml(nv.numero_pedido||'')+'</span></td>'+
+        '<td>'+escapeHtml(nv.cliente||'—')+(mismo?' <span class="tag">mismo cliente</span>':'')+'</td><td>'+fmtFecha(nv.fecha)+'</td><td class="num">'+fmt(nv.total_bs,2)+'</td></tr>';
+    });
+    lista = '<table class="desp-hist"><tr><th></th><th>Nota</th><th>Cliente</th><th>Fecha</th><th class="num">Total (Bs)</th></tr>'+(lista.join('')||'<tr><td colspan="5" class="empty">Sin notas</td></tr>')+'</table>';
+  } else {
+    var nv = st.nota, c1 = normCli(nv.cliente);
+    cab = '<div class="doc-meta-item"><span class="l">Nota</span><span class="v">'+escapeHtml(nv.numero_nota)+' · '+escapeHtml(nv.numero_pedido||'')+' · Bs '+fmt(nv.total_bs,2)+'</span></div>'+
+      '<div class="doc-meta-item"><span class="l">Cliente</span><span class="v">'+escapeHtml(nv.cliente||'—')+'</span></div>';
+    var ords = ordenesState.rows.filter(ordSinPedido).sort(function(a,b){
+      var am = normCli(a.cliente)===c1 ? 0 : 1, bm = normCli(b.cliente)===c1 ? 0 : 1;
+      if(am!==bm) return am-bm;
+      return String(b.fecha_pedido||'').localeCompare(String(a.fecha_pedido||''));
+    }).filter(function(o){
+      if(!st.q) return true;
+      return ((o.cliente||'')+' '+o.numero_produccion+' '+o.producto_nombre).toLowerCase().indexOf(st.q)!==-1;
+    });
+    lista = '<table class="desp-hist"><tr><th></th><th>Orden</th><th>Producto</th><th>Cliente</th><th class="num">Kg</th></tr>'+(ords.map(function(o){
+      var mismo = normCli(o.cliente)===c1;
+      return '<tr class="vinc-row" data-id="'+o.id+'" style="cursor:pointer'+(st.sel===o.id?';background:#e3f5ea':'')+'">'+
+        '<td><input type="radio" name="vincSel" '+(st.sel===o.id?'checked':'')+'></td><td><b>'+escapeHtml(o.numero_produccion)+'</b><br><span class="muted" style="font-size:11px">'+fmtFecha(o.fecha_pedido)+' · '+escapeHtml(o.estado||'')+'</span></td>'+
+        '<td>'+escapeHtml(o.producto_nombre)+'</td><td>'+escapeHtml(o.cliente||'—')+(mismo?' <span class="tag">mismo cliente</span>':'')+'</td><td class="num">'+fmt((Number(o.cantidad_toneladas)||0)*1000,0)+'</td></tr>';
+    }).join('')||'<tr><td colspan="5" class="empty">No hay órdenes sin nota de venta</td></tr>')+'</table>';
+  }
+  var orden = eligiendoNota ? st.orden : ordenesState.rows.find(function(x){ return x.id===st.sel; });
+  var nota = eligiendoNota ? notaVentaState.rows.find(function(x){ return x.id===st.sel; }) : st.nota;
+  var precioLista = orden ? precioTablaFor(orden.producto_hoja) : null;
+  if(orden && (st.precio==null || st.precioDe!==orden.id)){ st.precio = precioLista==null ? '' : Math.round(precioLista*100)/100; st.precioDe = orden.id; }
+  var resumen = '';
+  if(orden && nota){
+    var ton = Number(orden.cantidad_toneladas)||0, pr = Number(st.precio)||0;
+    var aviso = normCli(orden.cliente)!==normCli(nota.cliente) ? '<p class="k-warn">⚠ El cliente de la orden ('+escapeHtml(orden.cliente||'—')+') no es el de la nota ('+escapeHtml(nota.cliente||'—')+'): la orden pasa a nombre de '+escapeHtml(nota.cliente||'—')+'.</p>' : '';
+    var pagos = (nota.pagos_venta||[]).length ? '<p class="footnote">La nota ya tiene pagos: el saldo sube por lo que se agrega.</p>' : '';
+    resumen = '<div class="desp-sec">Se agrega a la nota '+escapeHtml(nota.numero_nota)+'</div>'+
+      '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">'+
+        '<div class="inline-field"><label>Precio por tonelada (Bs)</label><input type="number" step="0.01" min="0" id="vinc_precio" class="pill-input" value="'+escapeHtml(String(st.precio))+'"></div>'+
+        '<div class="footnote">'+escapeHtml(orden.producto_nombre)+' · '+fmt(ton,3)+' Ton × Bs '+fmt(pr,2)+' = <b>Bs '+fmt(ton*pr,2)+'</b><br>Total de la nota: Bs '+fmt(nota.total_bs,2)+' → <b>Bs '+fmt((Number(nota.total_bs)||0)+ton*pr,2)+'</b>'+(precioLista!=null?'<br><span class="muted">Precio de lista: Bs '+fmt(precioLista,2)+'</span>':'')+'</div>'+
+      '</div>'+aviso+pagos;
+  }
+  body.innerHTML = cab +
+    '<div class="desp-sec">'+(eligiendoNota?'Elegí la nota de venta':'Elegí la orden de producción')+'</div>'+
+    '<input type="search" id="vinc_q" placeholder="Buscar…" value="'+escapeHtml(st.q)+'" style="margin-bottom:8px;width:100%">'+
+    '<div class="table-wrap" style="max-height:320px;overflow:auto">'+lista+'</div>'+ resumen +
+    '<div style="margin-top:14px;display:flex;gap:10px"><button class="primary" id="btnVincConfirmar"'+(orden&&nota?'':' disabled')+'>🔗 Vincular</button><button id="btnVincCancelar">Cancelar</button></div>';
+  var qEl = document.getElementById('vinc_q');
+  qEl.addEventListener('input', function(){ st.q = qEl.value.toLowerCase(); var pos = qEl.selectionStart; renderVincular(); var n = document.getElementById('vinc_q'); n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} });
+  body.querySelectorAll('.vinc-row').forEach(function(tr){ tr.addEventListener('click', function(){ st.sel = Number(tr.dataset.id); renderVincular(); }); });
+  var pEl = document.getElementById('vinc_precio');
+  if(pEl) pEl.addEventListener('change', function(){ st.precio = pEl.value; renderVincular(); });
+  document.getElementById('btnVincCancelar').addEventListener('click', closeVincular);
+  document.getElementById('btnVincConfirmar').addEventListener('click', function(){
+    if(!(orden && nota)) return;
+    var pr2 = parseFloat((document.getElementById('vinc_precio')||{}).value);
+    if(!(pr2>0)){ toast('Poné el precio por tonelada'); return; }
+    if(!confirm('¿Vincular la orden '+orden.numero_produccion+' ('+orden.producto_nombre+', '+fmt((Number(orden.cantidad_toneladas)||0)*1000,0)+' Kg) a la nota '+nota.numero_nota+' de '+(nota.cliente||'')+' a Bs '+fmt(pr2,2)+'/Ton?')) return;
+    var btn = this; btn.disabled = true;
+    sb.rpc('vincular_orden_nota', {p_produccion_id: orden.id, p_nota_venta_id: nota.id, p_precio: pr2, p_precio_lista: precioLista}).then(function(res){
+      btn.disabled = false;
+      if(res.error){ toast('No se pudo vincular: '+errMsg(res.error)); return; }
+      toast('Listo: '+orden.numero_produccion+' quedó en la nota '+nota.numero_nota);
+      closeVincular();
+      fetchProducciones(function(){ renderOrdenesRows(); renderStockFabricaRows(); if(typeof renderEntregadosRows==='function') renderEntregadosRows(); });
+      fetchNotasVenta(function(){ if(activeTab()==='notasventa') renderNotasVentaRows(); });
+      if(typeof ventaState!=='undefined' && ventaState.loaded && typeof renderPedidosVenta==='function') renderPedidosVenta(true);
+    });
+  });
+}
+document.getElementById('btnCerrarVinc').addEventListener('click', closeVincular);
+var btnNvOrdSinNotaEl = document.getElementById('btnNvOrdSinNota');
+if(btnNvOrdSinNotaEl) btnNvOrdSinNotaEl.addEventListener('click', function(){
+  var ords = ordenesState.rows.filter(ordSinPedido);
+  if(!ords.length){ toast('No hay órdenes sin nota'); return; }
+  document.getElementById('vincModalOverlay').classList.add('active');
+  document.getElementById('vincTitulo').textContent = 'Órdenes de producción sin nota de venta';
+  var body = document.getElementById('vincBody');
+  body.innerHTML = '<table class="desp-hist"><tr><th>Orden</th><th>Producto</th><th>Cliente</th><th class="num">Kg</th><th></th></tr>'+ords.map(function(o){
+    return '<tr data-id="'+o.id+'"><td><b>'+escapeHtml(o.numero_produccion)+'</b><br><span class="muted" style="font-size:11px">'+fmtFecha(o.fecha_pedido)+'</span></td><td>'+escapeHtml(o.producto_nombre)+'</td><td>'+escapeHtml(o.cliente||'—')+'</td><td class="num">'+fmt((Number(o.cantidad_toneladas)||0)*1000,0)+'</td>'+
+      '<td><button class="ghost osn-vinc">🔗 Vincular a nota</button></td></tr>';
+  }).join('')+'</table><p class="footnote">Si no corresponde a ninguna nota existente, creale su pedido desde «Órdenes de Producción» con «🧾 Crear pedido».</p>';
+  body.querySelectorAll('.osn-vinc').forEach(function(b){ b.addEventListener('click', function(){
+    var o = ordenesState.rows.find(function(x){ return x.id===Number(b.closest('tr').dataset.id); });
+    if(o) openVincular({orden:o});
+  }); });
+});
+
+/* ---- Notas anuladas / versiones anteriores (copia guardada automáticamente antes de cada cambio o eliminación) ---- */
+function nvArchivoDetalleHtml(a){
+  var sn = a.snapshot||{}, pv = sn.pedido||{}, n = sn.nota||{};
+  var items = sn.items||[];
+  var flete = Number(pv.flete_bs)||0;
+  var pagos = sn.pagos||[], cuotas = sn.cuotas||[];
+  var aviso = a.tipo==='anulada'
+    ? '<div style="background:#fde3e3;color:#b91c1c;border-radius:8px;padding:10px 12px;font-weight:700;margin-bottom:10px">🚫 NOTA ANULADA el '+fmtFecha(a.creado_en)+(a.usuario_nombre?' por '+escapeHtml(a.usuario_nombre):'')+(a.motivo?'<br><span style="font-weight:400">Motivo: '+escapeHtml(a.motivo)+'</span>':'')+'</div>'
+    : '<div style="background:#fff3dc;color:#8a5a12;border-radius:8px;padding:10px 12px;font-weight:700;margin-bottom:10px">✏️ Así era la nota ANTES del cambio del '+fmtFecha(a.creado_en)+(a.usuario_nombre?' (cambio hecho por '+escapeHtml(a.usuario_nombre)+')':'')+'</div>';
+  var meta = '<div class="doc-meta-item"><span class="l">N° Nota</span><span class="v">'+escapeHtml(a.numero_nota||'—')+'</span></div>'+
+    '<div class="doc-meta-item"><span class="l">N° Pedido</span><span class="v">'+escapeHtml(a.numero_pedido||'—')+'</span></div>'+
+    '<div class="doc-meta-item"><span class="l">Cliente</span><span class="v">'+escapeHtml(a.cliente||'—')+'</span></div>'+
+    '<div class="doc-meta-item"><span class="l">Fecha</span><span class="v">'+fmtFecha(n.fecha||pv.fecha_pedido)+'</span></div>'+
+    '<div class="doc-meta-item"><span class="l">Condición de pago</span><span class="v">'+escapeHtml(pv.condicion_pago||'—')+(pv.condicion_pago_nota?' · '+escapeHtml(pv.condicion_pago_nota):'')+'</span></div>'+
+    (pv.vendedor?'<div class="doc-meta-item"><span class="l">Vendedor</span><span class="v">'+escapeHtml(pv.vendedor)+'</span></div>':'');
+  var tabla = '<div class="desp-sec">Productos</div><div class="table-wrap"><table class="desp-hist"><tr><th>Producto</th><th>Fórmula</th><th class="num">Ton</th><th class="num">Precio pactado (Bs/Ton)</th><th class="num">Subtotal (Bs)</th></tr>'+
+    items.map(function(it){
+      return '<tr><td>'+escapeHtml(it.producto_nombre||it.producto_hoja||'—')+(it.numero_produccion?'<br><span class="muted" style="font-size:11px">'+escapeHtml(it.numero_produccion)+'</span>':'')+'</td><td>'+escapeHtml(it.variante||'—')+'</td>'+
+        '<td class="num">'+fmt(it.cantidad_toneladas,3)+'</td><td class="num">'+fmt(it.precio_pactado,2)+'</td><td class="num">'+fmt(it.total_pactado,2)+'</td></tr>';
+    }).join('')+
+    (flete?'<tr><td colspan="4">Flete</td><td class="num">'+fmt(flete,2)+'</td></tr>':'')+
+    '<tr><td colspan="4"><b>TOTAL</b></td><td class="num"><b>'+fmt(a.total_bs,2)+'</b></td></tr></table></div>';
+  var pg = pagos.length ? '<div class="desp-sec">Pagos que tenía registrados</div><table class="desp-hist"><tr><th>Fecha</th><th class="num">Monto (Bs)</th></tr>'+pagos.map(function(x){ return '<tr><td>'+fmtFecha(x.fecha_pago||x.creado_en)+'</td><td class="num">'+fmt(x.monto_bs,2)+'</td></tr>'; }).join('')+'</table>' : '';
+  var cu = cuotas.length ? '<p class="footnote">Plan de pagos: '+cuotas.map(function(c){ return 'cuota '+c.numero_cuota+': Bs '+fmt(c.monto_bs,2)+(c.fecha_vencimiento?' (vence '+fmtFecha(c.fecha_vencimiento)+')':''); }).join(' · ')+'</p>' : '';
+  var rec = sn.recuperado ? '<p class="footnote">⚠ Esta nota se recuperó de la solicitud de eliminación: no se guardaron sus cuotas ni sus pagos.</p>' : '';
+  return aviso + meta + tabla + cu + pg + rec;
+}
+function openNvArchivo(lista, idx, nvActual){
+  var a = lista[idx]; if(!a) return;
+  document.getElementById('nvArchivoTitulo').textContent = a.tipo==='anulada' ? 'Nota anulada '+(a.numero_nota||'') : 'Versiones anteriores de '+(a.numero_nota||'');
+  var nav = '';
+  if(lista.length>1){
+    nav = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'+lista.map(function(x,i){
+      return '<button type="button" class="'+(i===idx?'primary':'ghost')+' nv-arch-nav" data-i="'+i+'">Antes del cambio del '+fmtFecha(x.creado_en)+'</button>';
+    }).join('')+'</div>';
+  }
+  var actual = nvActual ? '<p class="footnote" style="margin-top:12px">Total actual de la nota: <b>'+fmtBs(Number(nvActual.total_bs)||0)+'</b> — antes: '+fmtBs(Number(a.total_bs)||0)+'</p>' : '';
+  var body = document.getElementById('nvArchivoBody');
+  body.innerHTML = nav + nvArchivoDetalleHtml(a) + actual + '<div style="margin-top:14px"><button id="btnCerrarNvArchivo2">Cerrar</button></div>';
+  body.querySelectorAll('.nv-arch-nav').forEach(function(b){ b.addEventListener('click', function(){ openNvArchivo(lista, Number(b.dataset.i), nvActual); }); });
+  document.getElementById('btnCerrarNvArchivo2').addEventListener('click', closeNvArchivo);
+  document.getElementById('nvArchivoModalOverlay').classList.add('active');
+}
+function closeNvArchivo(){ document.getElementById('nvArchivoModalOverlay').classList.remove('active'); }
+document.getElementById('btnCerrarNvArchivo').addEventListener('click', closeNvArchivo);
+var btnNvAnuladasEl = document.getElementById('btnNvAnuladas');
+if(btnNvAnuladasEl) btnNvAnuladasEl.addEventListener('click', function(){ nvVerAnuladas = !nvVerAnuladas; renderNotasVentaRows(); });
+
 function eliminarNotaVenta(nv, btn){
   if(!(currentProfile && currentProfile.rol==='admin')){ toast('Solo el administrador puede eliminar notas de venta'); return; }
   var t = notaTotales(nv);
@@ -6624,6 +6981,7 @@ function refreshDespachoRow(row){
   renderOrdenesRows();
   renderStockFabricaRows();
   if(typeof renderEntregadosRows==='function') renderEntregadosRows();
+  cargarSinBoleta(function(){ renderOrdenesRows(); renderStockFabricaRows(); if(typeof renderEntregadosRows==='function') renderEntregadosRows(); });
 }
 function deshacerUltimoDespacho(o, cb){
   if(!confirm('¿Deshacer el último despacho registrado para «'+o.numero_produccion+'»?')) return;
@@ -6641,12 +6999,17 @@ function despProgHtml(desp, tot){
   return '<div class="desp-prog'+(pct>0&&pct<99.99?' parcial':'')+'"><span style="width:'+pct.toFixed(1)+'%"></span></div>';
 }
 function extArchivo(f){ return ((f && f.name || '').split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg'; }
+function pathsDeEvento(e){ return [e.boleta_path].concat(e.boletas_extra||[]).filter(function(x){ return x; }); }
 function verBoletaEn(el, path){
   if(!el || !path) return;
-  el.innerHTML = '<span class="muted">Cargando boleta…</span>';
-  sb.storage.from('boletas-despacho').createSignedUrl(path, 3600).then(function(res){
-    if(res.error || !res.data){ el.textContent = 'No se pudo cargar la imagen de la boleta.'; return; }
-    el.innerHTML = '<img src="'+res.data.signedUrl+'" style="max-width:100%;border-radius:8px;border:1px solid var(--line);margin-top:8px">';
+  var paths = String(path).split('|').filter(function(x){ return x; });
+  el.innerHTML = '<span class="muted">Cargando '+(paths.length>1?paths.length+' notas de entrega':'boleta')+'…</span>';
+  Promise.all(paths.map(function(pth){ return sb.storage.from('boletas-despacho').createSignedUrl(pth, 3600); })).then(function(rs){
+    el.innerHTML = rs.map(function(res, i){
+      if(res.error || !res.data) return '<p class="k-warn">No se pudo cargar la nota '+(i+1)+'.</p>';
+      return (paths.length>1?'<div class="muted" style="margin-top:10px;font-size:12px">Nota de entrega '+(i+1)+' de '+paths.length+'</div>':'')+
+        '<img src="'+res.data.signedUrl+'" style="max-width:100%;border-radius:8px;border:1px solid var(--line);margin-top:6px">';
+    }).join('');
   });
 }
 /* ---- despacho de UNA orden de producción: varios despachos, contando Kg ---- */
@@ -6679,7 +7042,10 @@ function renderDespachoModalBodyCon(o, eventos){
     eventos.map(function(e, i){
       acum += Number(e.cantidad)||0;
       return '<tr><td>'+(i+1)+'</td><td>'+fmtFecha(e.fecha)+'</td><td class="num">'+kgFmt(e.cantidad)+'</td><td class="num">'+kgFmt(acum)+'</td><td>'+escapeHtml(e.actor_nombre||'—')+(e.nota?'<br><span class="muted" style="font-size:11px">'+escapeHtml(e.nota)+'</span>':'')+'</td>'+
-        '<td>'+(e.boleta_path?'<button type="button" class="ghost desp-ver-boleta" data-path="'+escapeHtml(e.boleta_path)+'">🧾 Ver</button>':'—')+'</td></tr>';
+        '<td>'+(function(){ var ps = pathsDeEvento(e);
+          return ps.length
+            ? '<button type="button" class="ghost desp-ver-boleta" data-path="'+escapeHtml(ps.join('|'))+'">🧾 Ver'+(ps.length>1?' ('+ps.length+')':'')+'</button><br><button type="button" class="ghost desp-subir-nota" style="margin-top:4px;font-size:12px" data-ids="'+e.id+'" title="Agregar otra nota de entrega a este despacho (por ej. otro envío)">➕ Otra nota</button>'
+            : sinNotaTag()+'<br><button type="button" class="ghost desp-subir-nota" style="margin-top:4px" data-ids="'+e.id+'">📤 Subir nota</button>'; })()+'</td></tr>';
     }).join('')+'</table><div id="despachoImgWrap"></div>') : '';
   var nuevo = saldo>0.0005 ? (
       '<div class="desp-sec">Nuevo despacho (N° '+(eventos.length+1)+')</div>'+
@@ -6702,6 +7068,11 @@ function renderDespachoModalBodyCon(o, eventos){
   document.getElementById('btnCerrarDespacho2').addEventListener('click', closeDespachoModal);
   body.querySelectorAll('.desp-ver-boleta').forEach(function(btn){
     btn.addEventListener('click', function(){ verBoletaEn(document.getElementById('despachoImgWrap'), btn.dataset.path); });
+  });
+  body.querySelectorAll('.desp-subir-nota').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      subirNotaEntrega([Number(btn.dataset.ids)], o.numero_produccion, function(){ if(despachoState && despachoState.id===o.id) renderDespachoModalBody(); });
+    });
   });
   if(ventaPv) document.getElementById('btnIrDespachoPv').addEventListener('click', function(){ closeDespachoModal(); openDespachoPvModal(ventaPv); });
   if(eventos.length){
@@ -6869,7 +7240,14 @@ function renderDespachoPvBody(){
         '<td>'+vj.lineas.map(function(e){ var p=e.producciones||{}; return escapeHtml(p.producto_nombre||'—')+' <span class="muted">('+escapeHtml(p.lote||'')+')</span>: '+kgFmt(e.cantidad); }).join('<br>')+(vj.nota?'<br><span class="muted" style="font-size:11px">📝 '+escapeHtml(vj.nota)+'</span>':'')+'</td>'+
         '<td class="num"><b>'+kgFmt(vj.total)+'</b></td><td class="num">'+kgFmt(acum)+' <span class="muted" style="font-size:11px">('+(tot>0?Math.round(acum/tot*100):0)+'%)</span></td>'+
         '<td>'+escapeHtml(vj.actor||'—')+'</td>'+
-        '<td>'+(vj.boleta?'<button type="button" class="ghost dpv-ver-boleta" data-path="'+escapeHtml(vj.boleta)+'">🧾 Ver</button>':'—')+'</td></tr>';
+        '<td>'+(function(){
+          var ps = []; vj.lineas.forEach(function(e){ pathsDeEvento(e).forEach(function(x){ if(ps.indexOf(x)===-1) ps.push(x); }); });
+          var ids = vj.lineas.map(function(e){ return e.id; }).join(',');
+          var falta = vj.lineas.some(function(e){ return !e.boleta_path; });
+          return (ps.length ? '<button type="button" class="ghost dpv-ver-boleta" data-path="'+escapeHtml(ps.join('|'))+'">🧾 Ver'+(ps.length>1?' ('+ps.length+')':'')+'</button><br>' : '')+
+            (falta ? sinNotaTag()+'<br><button type="button" class="ghost dpv-subir-nota" style="margin-top:4px" data-ids="'+ids+'">📤 Subir nota</button>'
+                   : '<button type="button" class="ghost dpv-subir-nota" style="margin-top:4px;font-size:12px" data-ids="'+ids+'" title="Agregar otra nota de entrega a este despacho (por ej. otro envío)">➕ Otra nota</button>');
+        })()+'</td></tr>';
     }).join('')+'</table></div><div id="dpvImgWrap"></div>') : '<p class="muted" style="margin-top:10px">Todavía no hay despachos registrados para este pedido.</p>';
   body.innerHTML = kpis + nuevo + hist +
     '<div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">'+
@@ -6880,6 +7258,12 @@ function renderDespachoPvBody(){
   document.getElementById('btnCerrarDespachoPv2').addEventListener('click', closeDespachoPvModal);
   body.querySelectorAll('.dpv-ver-boleta').forEach(function(btn){
     btn.addEventListener('click', function(){ verBoletaEn(document.getElementById('dpvImgWrap'), btn.dataset.path); });
+  });
+  body.querySelectorAll('.dpv-subir-nota').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var ids = btn.dataset.ids.split(',').map(Number);
+      subirNotaEntrega(ids, 'pedido-'+(st.v.numero_pedido||st.v.id), function(){ cargarDespachoPv(); });
+    });
   });
   if(viajes.length){
     document.getElementById('btnDeshacerDespachoPv').addEventListener('click', function(){
@@ -9301,7 +9685,7 @@ document.getElementById('btnExcel').addEventListener('click', function(){
       ['N°','PRODUCTO','CATEGORÍA','COSTO MP/TON','COSTO FACTURADO/TON','PRECIO VENTA SIN COMISIÓN','PRECIO VENTA CON COMISIÓN','MARGEN %','COMISIÓN %']
     ].concat(state.productos.map(function(p,idx){
       var c = computeProducto(p);
-      return [idx+1, p.nombre, p.categoria, Number(c.costoMPTon.toFixed(2)), Number(c.costoFacturadoTon.toFixed(2)), Number(c.precioVentaSinCom.toFixed(2)), Number(c.precioVentaConCom.toFixed(2)), p.margen, p.comision];
+      return [idx+1, p.nombre, p.categoria, Number(c.costoMPTon.toFixed(2)), Number(c.costoFacturadoTon.toFixed(2)), Number(c.precioVentaSinCom.toFixed(2)), Number(c.precioVentaConCom.toFixed(2)), c.margenEfectivo, p.comision];
     })));
     XLSX.utils.book_append_sheet(wb, wsVentas, 'PRECIOS DE VENTA');
 
