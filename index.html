@@ -469,6 +469,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
       <div class="home-card" data-tab="pedidosventa"><div class="hc-icon">📈</div><div class="hc-title">Ventas</div><div class="hc-sub">Pedidos de venta de clientes</div></div>
       <div class="home-card" data-tab="ordenes"><div class="hc-icon">🏭</div><div class="hc-title">Producción</div><div class="hc-sub">Órdenes, completado y despacho</div></div>
       <div class="home-card" data-tab="compras"><div class="hc-icon">🛒</div><div class="hc-title">Compras</div><div class="hc-sub">Compras de insumos y comprobantes</div></div>
+      <div class="home-card" data-tab="informes" id="homeCardInformes"><div class="hc-icon">📑</div><div class="hc-title">Informes</div><div class="hc-sub">Control de pedidos, despachos, pagos y duplicados</div></div>
     </div>
     <div class="grid-cards" id="statCards"></div>
     <div id="homeCobros"></div>
@@ -1049,6 +1050,45 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
     <p class="footnote">Inventario valorizado al momento, siempre con los datos actuales: <b>insumos</b> = stock actual × costo del insumo (sin IVA, el mismo que usan las fórmulas; se actualiza con cada compra por costo promedio). <b>Producto terminado</b> = Kg producidos y todavía no despachados × costo de producción por tonelada (fórmula usada en esa orden, a precios actuales de insumos). Los insumos con stock negativo no suman. El producto de clientes por despachar ya está vendido: se muestra aparte.</p>
   </section>
 
+  <!-- INFORMES -->
+  <section id="view-informes" class="view">
+    <div class="toolbar" id="informesTipos" style="flex-wrap:wrap">
+      <button class="primary" data-inf="control" type="button">✅ Control de pedidos de venta</button>
+      <button class="ghost" data-inf="duplicados" type="button">🔁 Duplicados y registros sueltos</button>
+      <button class="ghost" data-inf="comisiones" type="button" id="infBtnComisiones" style="display:none">💼 Extracto de comisiones</button>
+      <div class="spacer"></div>
+      <button class="ghost" id="btnInfRecargar" type="button">🔄 Actualizar</button>
+      <button class="primary" id="btnInfExcel" type="button">⬇ Excel</button>
+    </div>
+    <div class="toolbar" id="infFiltrosControl" style="flex-wrap:wrap">
+      <select id="infEstado">
+        <option value="">Todos los pedidos</option>
+        <option value="completos">✅ Solo completos</option>
+        <option value="incompletos">❌ Solo con algo faltante</option>
+        <option value="falta-nota">Falta nota de venta</option>
+        <option value="falta-op">Falta / sin completar orden de producción</option>
+        <option value="falta-desp">Falta despacho (o parcial)</option>
+        <option value="falta-foto">Despacho sin foto</option>
+        <option value="falta-pago">Falta pago (o parcial)</option>
+        <option value="alertas">⚠️ Con alertas</option>
+      </select>
+      <select id="infMes"><option value="">Todos los meses</option></select>
+      <input type="search" id="infSearch" placeholder="Buscar cliente, pedido, nota, orden o producto…">
+      <div class="spacer"></div>
+      <span id="infResumen" class="muted" style="font-size:13px"></span>
+    </div>
+    <div class="toolbar" id="infFiltrosCom" style="flex-wrap:wrap;display:none">
+      <select id="infComVend"><option value="">Todos los vendedores</option></select>
+      <label class="inline-field" style="flex-direction:row;align-items:center;gap:4px">Desde <input type="date" id="infComDesde"></label>
+      <label class="inline-field" style="flex-direction:row;align-items:center;gap:4px">Hasta <input type="date" id="infComHasta"></label>
+      <label class="inline-field" style="flex-direction:row;align-items:center;gap:4px">% sugerido <input type="number" id="infComPctDef" step="0.1" min="0" max="100" style="max-width:70px" placeholder="—"></label>
+      <label class="inline-field" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="infComCobradas"> Solo ventas cobradas al 100%</label>
+      <button class="ghost" id="btnInfComPrint" type="button">🖨 Imprimir / PDF</button>
+    </div>
+    <div id="informesWrap"></div>
+    <p class="footnote">Cada pedido de venta con todo lo que tiene ligado: <b>nota de venta</b>, <b>órdenes de producción</b> (completadas), <b>despachos</b> (toneladas despachadas vs. pedidas), <b>foto/nota de entrega de cada despacho</b> y <b>pagos</b> (pagado vs. total de la nota, con comprobante). «Completo» = todo cargado. Tocá 📷 o 🧾 para ver la foto. «💼 Extracto de comisiones» (solo administrador): ventas de cada vendedor en el período con base sin flete × % de comisión asignado en «Comisiones», y la comisión proporcional a lo ya cobrado; se exporta a Excel (una hoja por vendedor) o se imprime. El informe «Duplicados y registros sueltos» marca pedidos repetidos, órdenes o despachos sin pedido, pagos repetidos o mayores que la nota, y despachos de más.</p>
+  </section>
+
   <!-- COMISIONES (solo administración) -->
   <section id="view-comisiones" class="view">
     <div class="toolbar">
@@ -1155,6 +1195,12 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
       <button data-tab="inventariovalor" class="nav-item">📦 Inventario valorizado</button>
       <button data-tab="rentabilidad" class="nav-item">📊 Rentabilidad real</button>
       <button data-tab="comisiones" class="nav-item" id="navComisiones">💼 Comisiones</button>
+    </div>
+  </div>
+  <div class="nav-group open" data-group="informesgrp" id="navGrupoInformes">
+    <button class="nav-group-head" type="button">📑 Informes <span class="chev">▾</span></button>
+    <div class="nav-group-items">
+      <button data-tab="informes" class="nav-item">📑 Control, duplicados y comisiones</button>
     </div>
   </div>
 </nav>
@@ -1844,6 +1890,7 @@ document.querySelectorAll('.nav-item').forEach(function(btn){
     if(btn.dataset.tab==='proveedorescardex') renderProveedoresCardex(!proveedoresState.loaded || !comprasState.loaded);
     if(btn.dataset.tab==='rentabilidad') renderRentabilidad(!ventaState.loaded);
     if(btn.dataset.tab==='comisiones') renderComisiones();
+    if(btn.dataset.tab==='informes') renderInformes(true);
     if(btn.dataset.tab==='inventariovalor') renderInventarioValorizado();
   });
 });
@@ -3852,6 +3899,356 @@ function vendedorPorNombre(nombre){
   var n = (nombre||'').toUpperCase().trim();
   return VENDEDORES.find(function(v){ return n && (v===n || v.indexOf(n)===0 || n.indexOf(v)===0); }) || '';
 }
+/* ---- Informe: extracto de ventas para comisiones ---- */
+function infEsAdmin(){ return !!(currentProfile && currentProfile.rol==='admin'); }
+function infFilasComision(){
+  var vSel = document.getElementById('infComVend').value;
+  var desde = document.getElementById('infComDesde').value, hasta = document.getElementById('infComHasta').value;
+  var soloCobradas = document.getElementById('infComCobradas').checked;
+  var pctDef = parseFloat(document.getElementById('infComPctDef').value);
+  var out = [];
+  informesState.filas.forEach(function(f){
+    var v = f.v, vend = (v.vendedor||'').toUpperCase() || '(SIN VENDEDOR)';
+    if(vSel && vSel!==vend) return;
+    var fe = v.fecha_pedido||'';
+    if(desde && fe<desde) return;
+    if(hasta && fe>hasta) return;
+    var base = Math.round(f.items.reduce(function(s,it){ return s+(Number(it.total_pactado)||0); },0)*100)/100;
+    var pctReal = v.comision_pct!=null ? Number(v.comision_pct) : null;
+    var pct = pctReal!=null ? pctReal : (!isNaN(pctDef) ? pctDef : null);
+    var com = pct!=null ? Math.round(base*pct)/100 : 0;
+    var fracCobro = f.totalNv>0 ? Math.min(1, f.pagado/f.totalNv) : 0;
+    if(f.totalNv>0 && f.pagado >= f.totalNv-1) fracCobro = 1;
+    if(soloCobradas && fracCobro<1) return;
+    var ultPago = f.pagos.reduce(function(m,p){ return (p.fecha_pago||'')>m ? p.fecha_pago : m; }, '');
+    out.push({ f:f, vend:vend, base:base, flete:Number(v.flete_bs)||0, pct:pct, pctSugerido: pctReal==null && pct!=null, com:com,
+      fracCobro:fracCobro, comCobrada: Math.round(com*fracCobro*100)/100, ultPago:ultPago });
+  });
+  out.sort(function(a,b){ return a.vend<b.vend?-1:a.vend>b.vend?1:((a.f.v.fecha_pedido||'')<(b.f.v.fecha_pedido||'')?-1:1); });
+  return out;
+}
+function renderInformeComisiones(wrap){
+  if(!infEsAdmin()){ wrap.innerHTML = '<p class="empty">Este informe solo lo ve el administrador.</p>'; return; }
+  var vendSel = document.getElementById('infComVend');
+  if(vendSel.options.length<=1){
+    var lista = (typeof VENDEDORES!=='undefined' ? VENDEDORES.slice() : []);
+    informesState.pedidos.forEach(function(v){ var x=(v.vendedor||'').toUpperCase(); if(x && lista.indexOf(x)===-1) lista.push(x); });
+    vendSel.innerHTML = '<option value="">Todos los vendedores</option>'+lista.map(function(x){ return '<option>'+escapeHtml(x)+'</option>'; }).join('')+'<option value="(SIN VENDEDOR)">Sin vendedor asignado</option>';
+  }
+  var rows = infFilasComision();
+  var grupos = {}; rows.forEach(function(r){ (grupos[r.vend] = grupos[r.vend]||[]).push(r); });
+  var gB=0, gC=0, gCC=0, gSin=0;
+  var html = Object.keys(grupos).map(function(vend){
+    var g = grupos[vend], tB=0, tC=0, tCC=0, sinPct=0;
+    var trs = g.map(function(r){
+      var v = r.f.v; tB+=r.base; tC+=r.com; tCC+=r.comCobrada; if(r.pct==null) sinPct++;
+      var prods = r.f.items.map(function(it){ return fmt(it.cantidad_toneladas,3)+' t '+escapeHtml(it.producto_nombre||'')+' <span class="muted">@ '+fmt(it.precio_pactado,2)+'</span>'; }).join('<br>');
+      var cobro = r.f.totalNv>0 ? (r.fracCobro>=1 ? '<span class="pill-estado pill-pagada">Cobrada</span>' : (r.f.pagado>0 ? '<span class="pill-estado pill-parcial">'+fmt(r.fracCobro*100,0)+'% cobrado</span>' : '<span class="pill-estado pill-pendiente">Por cobrar</span>')) : '<span class="k-warn">Sin nota</span>';
+      return '<tr><td>'+fmtFecha(v.fecha_pedido)+'</td><td><b>'+escapeHtml(v.numero_pedido)+'</b><br><span class="muted" style="font-size:11px">'+escapeHtml(r.f.nvs.map(function(n){return n.numero_nota;}).join(', '))+'</span></td>'+
+        '<td>'+escapeHtml(v.cliente||'')+'</td><td style="font-size:12px">'+prods+'</td>'+
+        '<td class="num">'+fmt(r.base,2)+(r.flete?'<br><span class="muted" style="font-size:11px">+ flete '+fmt(r.flete,2)+' (no comisiona)</span>':'')+'</td>'+
+        '<td class="num">'+(r.pct==null?'<span class="k-warn">sin %</span>':fmt(r.pct,2)+'%'+(r.pctSugerido?'<br><span class="muted" style="font-size:10px">sugerido</span>':''))+'</td>'+
+        '<td class="num"><b>'+(r.pct==null?'—':fmt(r.com,2))+'</b></td>'+
+        '<td>'+cobro+(r.ultPago?'<br><span class="muted" style="font-size:11px">últ. pago '+fmtFecha(r.ultPago)+'</span>':'')+'</td>'+
+        '<td class="num">'+(r.pct==null?'—':fmt(r.comCobrada,2))+'</td></tr>';
+    }).join('');
+    gB+=tB; gC+=tC; gCC+=tCC; gSin+=sinPct;
+    return '<div class="card" style="margin-bottom:16px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel,#fff)">'+
+      '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:baseline"><h3 style="margin:0">'+(vend==='(SIN VENDEDOR)'?'⚠️ Ventas sin vendedor asignado':'👤 '+escapeHtml(vend))+'</h3>'+
+      '<span>'+g.length+' ventas · Base Bs <b>'+fmt(tB,2)+'</b> · Comisión Bs <b>'+fmt(tC,2)+'</b> · Comisión sobre lo cobrado Bs <b style="color:var(--brand-dark)">'+fmt(tCC,2)+'</b>'+(sinPct?' · <span class="k-warn">'+sinPct+' sin %</span>':'')+'</span></div>'+
+      '<div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Pedido / Nota</th><th>Cliente</th><th>Productos</th><th class="num">Base sin flete (Bs)</th><th class="num">%</th><th class="num">Comisión (Bs)</th><th>Cobro</th><th class="num">Comisión s/ cobrado (Bs)</th></tr></thead><tbody>'+trs+'</tbody>'+
+      '<tfoot><tr><td colspan="4" style="text-align:right;font-weight:700">Total '+escapeHtml(vend)+'</td><td class="num"><b>'+fmt(tB,2)+'</b></td><td></td><td class="num"><b>'+fmt(tC,2)+'</b></td><td></td><td class="num"><b>'+fmt(tCC,2)+'</b></td></tr></tfoot></table></div></div>';
+  }).join('') || '<p class="empty">No hay ventas en ese período.</p>';
+  document.getElementById('infResumen').innerHTML = rows.length+' ventas · Comisión Bs <b>'+fmt(gC,2)+'</b> · s/ cobrado Bs <b>'+fmt(gCC,2)+'</b>';
+  wrap.innerHTML = (gSin?'<p class="card" style="background:#fff8e6;border-color:#f0d585;padding:8px 12px;margin-bottom:12px;font-size:13px">⚠️ '+gSin+' venta(s) no tienen % de comisión asignado. Asignalo en <a href="#" id="infIrComisiones">💼 Comisiones</a> (queda guardado) o poné un «% sugerido» arriba para calcular un estimado.</p>':'')+html;
+  var lk = document.getElementById('infIrComisiones'); if(lk) lk.addEventListener('click', function(e){ e.preventDefault(); var b=document.querySelector('.nav-item[data-tab="comisiones"]'); if(b) b.click(); });
+}
+function infComPeriodoTxt(){
+  var d = document.getElementById('infComDesde').value, h = document.getElementById('infComHasta').value;
+  return (d?fmtFecha(d):'inicio')+' al '+(h?fmtFecha(h):'hoy');
+}
+function exportarComisionesExcel(){
+  var rows = infFilasComision();
+  var wb = XLSX.utils.book_new();
+  var porV = {}; rows.forEach(function(r){ (porV[r.vend] = porV[r.vend]||[]).push(r); });
+  var res = [['EXTRACTO DE VENTAS PARA COMISIONES — NOGALMAX'],['Período: '+infComPeriodoTxt()],[],['Vendedor','N° ventas','Base sin flete Bs','Comisión Bs','Comisión sobre lo cobrado Bs','Ventas sin %']];
+  Object.keys(porV).forEach(function(vend){ var g = porV[vend];
+    res.push([vend, g.length, g.reduce(function(s,r){return s+r.base;},0), g.reduce(function(s,r){return s+r.com;},0), g.reduce(function(s,r){return s+r.comCobrada;},0), g.filter(function(r){return r.pct==null;}).length]);
+  });
+  var wsR = XLSX.utils.aoa_to_sheet(res); wsR['!cols']=[{wch:26},{wch:10},{wch:18},{wch:14},{wch:24},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, wsR, 'Resumen');
+  Object.keys(porV).forEach(function(vend){
+    var aoa = [['Extracto de ventas — '+vend],['Período: '+infComPeriodoTxt()],[],['Fecha','Pedido','Nota de venta','Cliente','Productos','Ton','Base sin flete Bs','Flete Bs','% comisión','Comisión Bs','Total nota Bs','Pagado Bs','% cobrado','Último pago','Comisión s/ cobrado Bs']];
+    porV[vend].forEach(function(r){ var v=r.f.v;
+      aoa.push([v.fecha_pedido, v.numero_pedido, r.f.nvs.map(function(n){return n.numero_nota;}).join(', '), v.cliente,
+        r.f.items.map(function(it){ return it.cantidad_toneladas+' t '+it.producto_nombre+' @ '+it.precio_pactado; }).join(' | '), r.f.ton,
+        r.base, r.flete, r.pct==null?'SIN %':(r.pct+(r.pctSugerido?' (sugerido)':'')), r.com, r.f.totalNv, r.f.pagado, Math.round(r.fracCobro*100), r.ultPago||'', r.comCobrada]);
+    });
+    var n = aoa.length;
+    aoa.push(['TOTAL','','','','','', porV[vend].reduce(function(s,r){return s+r.base;},0),'','', porV[vend].reduce(function(s,r){return s+r.com;},0),'','','','', porV[vend].reduce(function(s,r){return s+r.comCobrada;},0)]);
+    var ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:11},{wch:13},{wch:13},{wch:24},{wch:50},{wch:7},{wch:14},{wch:9},{wch:12},{wch:12},{wch:13},{wch:12},{wch:9},{wch:11},{wch:16}];
+    XLSX.utils.book_append_sheet(wb, ws, vend.replace(/[\\\/\?\*\[\]:]/g,'').slice(0,31));
+  });
+  XLSX.writeFile(wb, 'extracto_comisiones_'+(document.getElementById('infComVend').value||'todos').replace(/\s+/g,'_')+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+function imprimirComisiones(){
+  var wrap = document.getElementById('informesWrap');
+  var w = window.open('', '_blank'); if(!w){ toast('Permití las ventanas emergentes para imprimir'); return; }
+  w.document.write('<html><head><title>Extracto de comisiones</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:18px}table{width:100%;border-collapse:collapse;margin:6px 0 14px}th,td{border:1px solid #ccc;padding:4px;vertical-align:top}th{background:#eef3ee}.num{text-align:right}.muted{color:#777}h1{font-size:16px;margin:0}h3{margin:10px 0 2px}a{color:inherit;text-decoration:none}.card{page-break-inside:avoid}</style></head><body>'+
+    '<h1>NOGALMAX — Extracto de ventas para comisiones</h1><div>Período: '+escapeHtml(infComPeriodoTxt())+(document.getElementById('infComVend').value?' · Vendedor: '+escapeHtml(document.getElementById('infComVend').value):'')+'</div>'+wrap.innerHTML+'</body></html>');
+  w.document.close(); setTimeout(function(){ w.print(); }, 400);
+}
+/* ================= INFORMES ================= */
+var informesState = { loaded:false, cargando:false, tipo:'control', pedidos:[], ops:[], notas:[], desp:[], filas:[], dups:[] };
+function renderInformes(forzar){
+  var wrap = document.getElementById('informesWrap'); if(!wrap) return;
+  if(informesState.loaded && !forzar){ renderInformesRows(); return; }
+  if(informesState.cargando) return;
+  informesState.cargando = true;
+  wrap.innerHTML = '<p class="muted">Cargando datos del sistema…</p>';
+  var pend = 4, fallo = false;
+  function listo(){ pend--; if(pend>0) return; informesState.cargando = false; if(fallo) return; informesState.loaded = true; infCalcular(); renderInformesRows(); }
+  function err(t, e){ fallo = true; wrap.innerHTML = '<p class="empty">No se pudieron cargar '+t+': '+escapeHtml(errMsg(e))+'</p>'; }
+  sb.from('pedidos_venta').select('*, pedido_venta_items(*)').order('fecha_pedido',{ascending:false}).order('id',{ascending:false}).then(function(r){ if(r.error) err('los pedidos', r.error); else informesState.pedidos = r.data||[]; listo(); });
+  sb.from('producciones').select('id, numero_produccion, lote, producto_nombre, cantidad_toneladas, cliente, es_stock_fabrica, estado, despachado, despachado_cantidad, pedido_venta_id, pedido_venta_numero, desde_stock_existente, origen_stock_id, fecha_pedido, creado_en').then(function(r){ if(r.error) err('las órdenes', r.error); else informesState.ops = r.data||[]; listo(); });
+  sb.from('notas_venta').select('id, numero_nota, pedido_venta_id, numero_pedido, cliente, fecha, total_bs, estado_entrega, pagos_venta(id, monto_bs, fecha_pago, comprobante_path, numero_recibo, registrado_por_nombre)').then(function(r){ if(r.error) err('las notas de venta', r.error); else informesState.notas = r.data||[]; listo(); });
+  sb.from('despacho_eventos').select('id, produccion_id, pedido_venta_id, tipo, cantidad, fecha, actor_nombre, boleta_path, boletas_extra').then(function(r){ if(r.error) err('los despachos', r.error); else informesState.desp = r.data||[]; listo(); });
+}
+function infNorm(s){ return String(s||'').toUpperCase().replace(/\s+/g,' ').trim(); }
+function infR(n){ return Math.round((Number(n)||0)*1000)/1000; }
+function infTieneFoto(d){ return !!(d.boleta_path || (d.boletas_extra && d.boletas_extra.length)); }
+function infCalcular(){
+  var S = informesState;
+  var opsPorPv = {}, opPorId = {}, nvPorPv = {}, despPorOp = {}, despPorPv = {};
+  S.ops.forEach(function(o){ opPorId[o.id] = o; if(o.pedido_venta_id){ (opsPorPv[o.pedido_venta_id] = opsPorPv[o.pedido_venta_id]||[]).push(o); } });
+  S.notas.forEach(function(n){ if(n.pedido_venta_id) (nvPorPv[n.pedido_venta_id] = nvPorPv[n.pedido_venta_id]||[]).push(n); });
+  S.desp.forEach(function(d){
+    if(d.produccion_id) (despPorOp[d.produccion_id] = despPorOp[d.produccion_id]||[]).push(d);
+    var pv = d.pedido_venta_id || (opPorId[d.produccion_id] && opPorId[d.produccion_id].pedido_venta_id);
+    if(pv) (despPorPv[pv] = despPorPv[pv]||[]).push(d);
+  });
+  S.filas = S.pedidos.map(function(v){
+    var items = (v.pedido_venta_items||[]).slice().sort(function(a,b){ return (a.orden||0)-(b.orden||0); });
+    var ton = infR(items.reduce(function(s,it){ return s+(Number(it.cantidad_toneladas)||0); },0));
+    var totalPv = Math.round(items.reduce(function(s,it){ return s+(Number(it.total_pactado)||0); },0)*100)/100 + (Number(v.flete_bs)||0);
+    /* órdenes: las vinculadas al pedido + las que figuran en las líneas */
+    var ops = (opsPorPv[v.id]||[]).slice();
+    items.forEach(function(it){ if(it.produccion_id && opPorId[it.produccion_id] && ops.indexOf(opPorId[it.produccion_id])===-1) ops.push(opPorId[it.produccion_id]); });
+    var itemsSinOp = items.filter(function(it){ return !it.produccion_id; }).length;
+    var opsCompl = ops.filter(function(o){ return o.estado==='completada'; }).length;
+    var nvs = nvPorPv[v.id]||[];
+    var totalNv = Math.round(nvs.reduce(function(s,n){ return s+(Number(n.total_bs)||0); },0)*100)/100;
+    var pagos = []; nvs.forEach(function(n){ (n.pagos_venta||[]).forEach(function(p){ p._nota = n.numero_nota; pagos.push(p); }); });
+    var pagado = Math.round(pagos.reduce(function(s,p){ return s+(Number(p.monto_bs)||0); },0)*100)/100;
+    var pagosSinFoto = pagos.filter(function(p){ return !p.comprobante_path; }).length;
+    var desp = (despPorPv[v.id]||[]).slice();
+    ops.forEach(function(o){ (despPorOp[o.id]||[]).forEach(function(d){ if(desp.indexOf(d)===-1) desp.push(d); }); });
+    desp.sort(function(a,b){ return (a.fecha||'')<(b.fecha||'')?-1:1; });
+    var tonDesp = infR(desp.reduce(function(s,d){ return s+(Number(d.cantidad)||0); },0));
+    var despConFoto = desp.filter(infTieneFoto).length;
+    var ok = {
+      nota: nvs.length>0,
+      op: ops.length>0 && itemsSinOp===0 && opsCompl===ops.length,
+      desp: desp.length>0 && tonDesp >= ton-0.001,
+      foto: desp.length>0 && despConFoto===desp.length,
+      pago: nvs.length>0 && totalNv>0 && pagado >= totalNv-1
+    };
+    var falta = [];
+    if(!ok.nota) falta.push('Nota de venta');
+    if(!ok.op) falta.push(ops.length? 'Orden sin completar':'Orden de producción');
+    if(!ok.desp) falta.push(desp.length? 'Despacho parcial':'Despacho');
+    if(!ok.foto) falta.push('Foto despacho');
+    if(!ok.pago) falta.push(pagado>0? 'Pago parcial':'Pago');
+    var alertas = [];
+    if(nvs.length>1) alertas.push(nvs.length+' notas de venta para el mismo pedido');
+    if(nvs.length && pagado > totalNv+1) alertas.push('Pagado Bs '+fmt(pagado,2)+' es mayor que la nota (Bs '+fmt(totalNv,2)+')');
+    if(tonDesp > ton+0.001) alertas.push('Despachado ('+fmt(tonDesp,3)+' t) mayor que lo pedido ('+fmt(ton,3)+' t)');
+    if(pagosSinFoto) alertas.push(pagosSinFoto+' pago(s) sin comprobante');
+    return { v:v, items:items, ton:ton, totalPv:totalPv, ops:ops, opsCompl:opsCompl, itemsSinOp:itemsSinOp, nvs:nvs, totalNv:totalNv, pagos:pagos, pagado:pagado, pagosSinFoto:pagosSinFoto, desp:desp, tonDesp:tonDesp, despConFoto:despConFoto, ok:ok, falta:falta, alertas:alertas, completo: falta.length===0 };
+  });
+  /* ---- duplicados y registros sueltos ---- */
+  var dups = [];
+  function add(tipo, gravedad, detalle, refs){ dups.push({tipo:tipo, gravedad:gravedad, detalle:detalle, refs:refs||''}); }
+  /* pedidos con mismo cliente y mismos productos/cantidades (sumando líneas) */
+  var firma = {};
+  S.filas.forEach(function(f){
+    var agg = {}; f.items.forEach(function(it){ var k = infNorm(it.producto_nombre).replace(/\s/g,''); agg[k] = infR((agg[k]||0)+(Number(it.cantidad_toneladas)||0)); });
+    var k = infNorm(f.v.cliente)+'|'+Object.keys(agg).sort().map(function(p){ return p+':'+agg[p]; }).join(',');
+    (firma[k] = firma[k]||[]).push(f);
+  });
+  Object.keys(firma).forEach(function(k){
+    var g = firma[k]; if(g.length<2) return;
+    add('Pedidos posiblemente duplicados', 'alta', 'Cliente <b>'+escapeHtml(g[0].v.cliente||'')+'</b> con los mismos productos y cantidades: '+g.map(function(f){ return '<b>'+escapeHtml(f.v.numero_pedido)+'</b> ('+fmtFecha(f.v.fecha_pedido)+', Bs '+fmt(f.totalPv,2)+(f.nvs.length?', '+escapeHtml(f.nvs.map(function(n){return n.numero_nota;}).join('/')):'')+')'; }).join(' · ')+'. Revisá si es una compra repetida real o se cargó dos veces.', g.map(function(f){ return f.v.numero_pedido; }).join(', '));
+  });
+  /* órdenes para cliente sin pedido de venta */
+  S.ops.forEach(function(o){
+    if(o.pedido_venta_id || o.es_stock_fabrica) return;
+    var parecido = S.filas.filter(function(f){ return infNorm(f.v.cliente)===infNorm(o.cliente) && f.items.some(function(it){ return infNorm(it.producto_nombre)===infNorm(o.producto_nombre) && Math.abs((Number(it.cantidad_toneladas)||0)-(Number(o.cantidad_toneladas)||0))<0.001; }); });
+    add('Orden de producción sin pedido de venta', parecido.length?'alta':'media', '<b>'+escapeHtml(o.numero_produccion)+'</b> — '+escapeHtml(o.cliente||'')+' · '+fmt(o.cantidad_toneladas,3)+' t '+escapeHtml(o.producto_nombre||'')+' · '+escapeHtml(o.estado||'')+(o.despachado?' · <b>despachada</b>':' · sin despachar')+(parecido.length?'. <b>Posible duplicado</b> de '+parecido.map(function(f){ return escapeHtml(f.v.numero_pedido)+' ('+f.ops.map(function(x){return escapeHtml(x.numero_produccion);}).join(', ')+')'; }).join(', '):''), o.numero_produccion);
+  });
+  /* órdenes repetidas dentro del mismo pedido */
+  S.filas.forEach(function(f){
+    var vistos = {};
+    f.ops.forEach(function(o){ var k = infNorm(o.producto_nombre)+'|'+infR(o.cantidad_toneladas); (vistos[k] = vistos[k]||[]).push(o); });
+    Object.keys(vistos).forEach(function(k){ var g = vistos[k]; if(g.length<2) return;
+      add('Órdenes repetidas en un pedido', 'media', '<b>'+escapeHtml(f.v.numero_pedido)+'</b> ('+escapeHtml(f.v.cliente||'')+') tiene '+g.length+' órdenes iguales: '+g.map(function(o){ return escapeHtml(o.numero_produccion)+' '+fmt(o.cantidad_toneladas,3)+' t '+escapeHtml(o.producto_nombre||''); }).join(' · ')+'. Puede ser correcto si el pedido tiene dos líneas del mismo producto.', f.v.numero_pedido);
+    });
+  });
+  /* despachos repetidos (misma orden, misma cantidad, mismo día) */
+  var dk = {};
+  S.desp.forEach(function(d){ var k = d.produccion_id+'|'+infR(d.cantidad)+'|'+String(d.fecha||'').slice(0,10); (dk[k] = dk[k]||[]).push(d); });
+  Object.keys(dk).forEach(function(k){ var g = dk[k]; if(g.length<2) return; var o = opPorId[g[0].produccion_id]||{};
+    add('Despacho registrado dos veces', 'alta', 'Orden <b>'+escapeHtml(o.numero_produccion||'?')+'</b>: '+g.length+' despachos de '+fmt(g[0].cantidad,3)+' t el '+fmtFecha(String(g[0].fecha).slice(0,10)), o.numero_produccion);
+  });
+  /* despachos de órdenes de cliente sin pedido */
+  S.desp.forEach(function(d){ var o = opPorId[d.produccion_id]; if(d.pedido_venta_id || !o || o.pedido_venta_id || o.es_stock_fabrica) return;
+    add('Despacho sin pedido de venta', 'media', 'Despacho de '+fmt(d.cantidad,3)+' t de la orden <b>'+escapeHtml(o.numero_produccion)+'</b> ('+escapeHtml(o.cliente||'')+') el '+fmtFecha(String(d.fecha).slice(0,10))+' no está ligado a ningún pedido de venta.', o.numero_produccion);
+  });
+  /* pagos repetidos (misma nota, monto y fecha) */
+  var pk = {};
+  S.notas.forEach(function(n){ (n.pagos_venta||[]).forEach(function(p){ var k = n.id+'|'+Number(p.monto_bs).toFixed(2)+'|'+p.fecha_pago; (pk[k] = pk[k]||[]).push({p:p,n:n}); }); });
+  Object.keys(pk).forEach(function(k){ var g = pk[k]; if(g.length<2) return;
+    add('Pago cargado dos veces', 'alta', 'Nota <b>'+escapeHtml(g[0].n.numero_nota)+'</b>: '+g.length+' pagos de Bs '+fmt(g[0].p.monto_bs,2)+' del '+fmtFecha(g[0].p.fecha_pago)+' (recibos '+g.map(function(x){ return escapeHtml(x.p.numero_recibo||'s/n'); }).join(', ')+')', g[0].n.numero_nota);
+  });
+  /* sobrepagos y varias notas */
+  S.filas.forEach(function(f){
+    if(f.nvs.length && f.pagado > f.totalNv+1) add('Pago mayor que la nota de venta', 'alta', '<b>'+escapeHtml(f.v.numero_pedido)+'</b> / '+escapeHtml(f.nvs.map(function(n){return n.numero_nota;}).join(', '))+' ('+escapeHtml(f.v.cliente||'')+'): nota Bs '+fmt(f.totalNv,2)+', pagado Bs '+fmt(f.pagado,2)+' → sobra Bs '+fmt(f.pagado-f.totalNv,2)+'. Puede ser un pago que corresponde a otra nota.', f.v.numero_pedido);
+    if(f.nvs.length>1) add('Pedido con más de una nota de venta', 'media', '<b>'+escapeHtml(f.v.numero_pedido)+'</b>: '+escapeHtml(f.nvs.map(function(n){return n.numero_nota;}).join(', ')), f.v.numero_pedido);
+    if(f.tonDesp > f.ton+0.001) add('Despachado más de lo pedido', 'alta', '<b>'+escapeHtml(f.v.numero_pedido)+'</b>: pedido '+fmt(f.ton,3)+' t, despachado '+fmt(f.tonDesp,3)+' t', f.v.numero_pedido);
+  });
+  /* notas sin pedido */
+  var pvIds = {}; S.pedidos.forEach(function(v){ pvIds[v.id]=true; });
+  S.notas.forEach(function(n){ if(!n.pedido_venta_id || !pvIds[n.pedido_venta_id]) add('Nota de venta sin pedido', 'media', 'Nota <b>'+escapeHtml(n.numero_nota)+'</b> ('+escapeHtml(n.cliente||'')+', Bs '+fmt(n.total_bs,2)+') no tiene pedido de venta.', n.numero_nota); });
+  var orden = {alta:0, media:1};
+  dups.sort(function(a,b){ return (orden[a.gravedad]-orden[b.gravedad]) || (a.tipo<b.tipo?-1:1); });
+  S.dups = dups;
+}
+function infChk(ok, txt, parcial){
+  var color = ok ? '#1a7a3d' : (parcial ? '#b5560a' : '#b91c1c');
+  var ico = ok ? '✅' : (parcial ? '🟠' : '❌');
+  return '<span style="color:'+color+';white-space:nowrap">'+ico+' '+txt+'</span>';
+}
+function infVer(bucket, path){
+  if(!path) return;
+  sb.storage.from(bucket).createSignedUrl(path, 3600).then(function(res){
+    if(res.error || !res.data){ toast('No se pudo abrir el archivo: '+errMsg(res.error)); return; }
+    window.open(res.data.signedUrl, '_blank');
+  });
+}
+function renderInformesRows(){
+  var wrap = document.getElementById('informesWrap'); if(!wrap || !informesState.loaded) return;
+  var tipo = informesState.tipo;
+  document.querySelectorAll('#informesTipos button').forEach(function(b){ b.classList.toggle('primary', b.dataset.inf===tipo); b.classList.toggle('ghost', b.dataset.inf!==tipo); });
+  var bCom = document.getElementById('infBtnComisiones'); if(bCom) bCom.style.display = infEsAdmin() ? '' : 'none';
+  if(tipo==='comisiones' && !infEsAdmin()){ tipo = informesState.tipo = 'control'; }
+  document.getElementById('infFiltrosControl').style.display = tipo==='control' ? '' : 'none';
+  document.getElementById('infFiltrosCom').style.display = tipo==='comisiones' ? '' : 'none';
+  if(tipo==='duplicados'){ renderInformeDuplicados(wrap); return; }
+  if(tipo==='comisiones'){ renderInformeComisiones(wrap); return; }
+  var fEst = document.getElementById('infEstado').value;
+  var fMes = document.getElementById('infMes').value;
+  var q = (document.getElementById('infSearch').value||'').toLowerCase();
+  var meses = {}; informesState.filas.forEach(function(f){ var k=(f.v.fecha_pedido||'').slice(0,7); if(k) meses[k]=true; });
+  var mesSel = document.getElementById('infMes'), actual = mesSel.value;
+  mesSel.innerHTML = '<option value="">Todos los meses</option>'+Object.keys(meses).sort().reverse().map(function(k){ return '<option value="'+k+'"'+(k===actual?' selected':'')+'>'+mesLabel(k)+'</option>'; }).join('');
+  var filas = informesState.filas.filter(function(f){
+    if(fMes && (f.v.fecha_pedido||'').slice(0,7)!==fMes) return false;
+    if(q){ var txt = (f.v.numero_pedido+' '+(f.v.cliente||'')+' '+f.nvs.map(function(n){return n.numero_nota;}).join(' ')+' '+f.ops.map(function(o){return o.numero_produccion;}).join(' ')+' '+f.items.map(function(it){return it.producto_nombre;}).join(' ')).toLowerCase(); if(txt.indexOf(q)===-1) return false; }
+    if(fEst==='completos') return f.completo;
+    if(fEst==='incompletos') return !f.completo;
+    if(fEst==='alertas') return f.alertas.length>0;
+    if(fEst && fEst.indexOf('falta-')===0) return !f.ok[fEst.slice(6)];
+    return true;
+  });
+  var todas = informesState.filas, nTot = todas.length;
+  function cnt(k){ return todas.filter(function(f){ return !f.ok[k]; }).length; }
+  var nCompl = todas.filter(function(f){ return f.completo; }).length;
+  var tarjetas = [
+    ['Pedidos de venta', nTot, ''], ['Completos (todo cargado)', nCompl, '#1a7a3d'],
+    ['Sin nota de venta', cnt('nota'), cnt('nota')?'#b91c1c':''], ['Orden sin completar / sin orden', cnt('op'), cnt('op')?'#b91c1c':''],
+    ['Despacho pendiente o parcial', cnt('desp'), cnt('desp')?'#b91c1c':''], ['Despacho sin foto', cnt('foto'), cnt('foto')?'#b91c1c':''],
+    ['Pago pendiente o parcial', cnt('pago'), cnt('pago')?'#b91c1c':''], ['Posibles duplicados / errores', informesState.dups.length, informesState.dups.length?'#b5560a':'']
+  ].map(function(t){ return '<div class="stat-card" style="padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel,#fff);min-width:140px;flex:1"><div style="font-size:22px;font-weight:800;color:'+(t[2]||'inherit')+'">'+t[1]+'</div><div class="muted" style="font-size:12px">'+t[0]+'</div></div>'; }).join('');
+  var body = filas.map(function(f){
+    var v = f.v;
+    var prods = f.items.map(function(it){ return fmt(it.cantidad_toneladas,3)+' t '+escapeHtml(it.producto_nombre||''); }).join('<br>');
+    var nvTxt = f.nvs.length ? f.nvs.map(function(n){ return escapeHtml(n.numero_nota); }).join('<br>')+'<br><span class="muted" style="font-size:11px">Bs '+fmt(f.totalNv,2)+'</span>' : 'Sin nota';
+    var opTxt = f.ops.length ? f.ops.map(function(o){ return escapeHtml(o.numero_produccion)+(o.estado==='completada'?'':' <i>('+escapeHtml(o.estado||'')+')</i>'); }).join('<br>') : 'Sin orden';
+    if(f.itemsSinOp) opTxt += '<br><span class="k-warn">'+f.itemsSinOp+' línea(s) sin orden</span>';
+    var despTxt = f.desp.length ? fmt(f.tonDesp,3)+' de '+fmt(f.ton,3)+' t<br><span class="muted" style="font-size:11px">'+f.desp.length+' despacho(s)</span>' : 'Sin despacho';
+    var fotoTxt = f.desp.length ? f.desp.map(function(d){ var o = informesState.ops.find(function(x){ return x.id===d.produccion_id; });
+        var et = fmt(d.cantidad,3)+' t '+fmtFecha(String(d.fecha||'').slice(0,10));
+        return infTieneFoto(d) ? '<a href="#" class="inf-ver" data-b="boletas-despacho" data-p="'+escapeHtml(d.boleta_path||(d.boletas_extra||[])[0])+'">📷 '+et+'</a>' : '<span class="k-warn" style="font-size:12px">sin foto · '+et+(o?' · '+escapeHtml(o.numero_produccion):'')+'</span>'; }).join('<br>') : '—';
+    var pagoTxt = f.nvs.length ? 'Bs '+fmt(f.pagado,2)+' de '+fmt(f.totalNv,2)+(f.pagos.length? '<br>'+f.pagos.map(function(p){ return p.comprobante_path ? '<a href="#" class="inf-ver" data-b="comprobantes-pagos-venta" data-p="'+escapeHtml(p.comprobante_path)+'" style="font-size:11px">🧾 '+escapeHtml(p.numero_recibo||'')+' Bs '+fmt(p.monto_bs,2)+'</a>' : '<span class="k-warn">'+escapeHtml(p.numero_recibo||'')+' Bs '+fmt(p.monto_bs,2)+' sin comprobante</span>'; }).join('<br>') : '') : '—';
+    var estado = f.completo ? '<span class="pill-estado pill-pagada">Completo</span>' : '<span class="pill-estado pill-vencida">Falta: '+f.falta.join(', ')+'</span>';
+    if(f.alertas.length) estado += '<br><span style="color:#b5560a;font-size:11px">⚠️ '+f.alertas.map(escapeHtml).join('<br>⚠️ ')+'</span>';
+    return '<tr>'+
+      '<td>'+fmtFecha(v.fecha_pedido)+'</td>'+
+      '<td><b>'+escapeHtml(v.numero_pedido)+'</b><br><span class="muted" style="font-size:11px">'+escapeHtml(v.condicion_pago||'')+'</span></td>'+
+      '<td>'+escapeHtml(v.cliente||'—')+'</td>'+
+      '<td style="font-size:12px">'+prods+'</td>'+
+      '<td>'+infChk(f.ok.nota, nvTxt)+'</td>'+
+      '<td>'+infChk(f.ok.op, opTxt, f.ops.length>0)+'</td>'+
+      '<td>'+infChk(f.ok.desp, despTxt, f.desp.length>0)+'</td>'+
+      '<td style="font-size:12px">'+(f.ok.foto?'✅ ':(f.despConFoto?'🟠 ':'❌ '))+fotoTxt+'</td>'+
+      '<td>'+infChk(f.ok.pago, pagoTxt, f.pagado>0)+'</td>'+
+      '<td>'+estado+'</td>'+
+    '</tr>';
+  }).join('') || '<tr><td colspan="10" class="empty">Ningún pedido coincide con el filtro</td></tr>';
+  document.getElementById('infResumen').innerHTML = filas.length+' de '+nTot+' pedidos';
+  wrap.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">'+tarjetas+'</div>'+
+    '<div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Pedido</th><th>Cliente</th><th>Productos</th><th>Nota de venta</th><th>Orden de producción</th><th>Despacho</th><th>Foto del despacho</th><th>Pago</th><th>Estado</th></tr></thead><tbody>'+body+'</tbody></table></div>';
+  infBindVer(wrap);
+}
+function infBindVer(wrap){
+  wrap.querySelectorAll('.inf-ver').forEach(function(a){ a.addEventListener('click', function(e){ e.preventDefault(); infVer(a.dataset.b, a.dataset.p); }); });
+}
+function renderInformeDuplicados(wrap){
+  var d = informesState.dups;
+  document.getElementById('infResumen').innerHTML = d.length+' observaciones';
+  if(!d.length){ wrap.innerHTML = '<p class="empty">✅ No se encontraron duplicados ni registros sueltos.</p>'; return; }
+  var grupos = {}; d.forEach(function(x){ (grupos[x.tipo] = grupos[x.tipo]||[]).push(x); });
+  wrap.innerHTML = Object.keys(grupos).map(function(t){
+    var g = grupos[t], alta = g[0].gravedad==='alta';
+    return '<div class="section-title" style="margin-top:12px">'+(alta?'🔴 ':'🟠 ')+escapeHtml(t)+' ('+g.length+')</div>'+
+      '<div class="table-wrap"><table><tbody>'+g.map(function(x){ return '<tr><td style="font-size:13px">'+x.detalle+'</td></tr>'; }).join('')+'</tbody></table></div>';
+  }).join('');
+}
+function exportarInformeExcel(){
+  if(!informesState.loaded){ toast('Esperá a que carguen los datos'); return; }
+  var aoa = [['Fecha','Pedido','Cliente','Condición','Productos','Ton pedido','Nota de venta','Total nota Bs','Órdenes de producción','Órdenes completadas','Ton despachado','N° despachos','Despachos con foto','Pagado Bs','Pagos sin comprobante','Estado','Falta','Alertas']];
+  informesState.filas.forEach(function(f){
+    aoa.push([f.v.fecha_pedido, f.v.numero_pedido, f.v.cliente, f.v.condicion_pago,
+      f.items.map(function(it){ return it.cantidad_toneladas+' t '+it.producto_nombre; }).join(' | '), f.ton,
+      f.nvs.map(function(n){ return n.numero_nota; }).join(', ') || 'SIN NOTA', f.totalNv,
+      f.ops.map(function(o){ return o.numero_produccion+' ('+o.estado+')'; }).join(', ') || 'SIN ORDEN', f.opsCompl+'/'+f.ops.length,
+      f.tonDesp, f.desp.length, f.despConFoto, f.pagado, f.pagosSinFoto,
+      f.completo?'COMPLETO':'INCOMPLETO', f.falta.join(', '), f.alertas.join(' | ')]);
+  });
+  var aoa2 = [['Gravedad','Tipo','Detalle','Referencia']];
+  informesState.dups.forEach(function(x){ aoa2.push([x.gravedad.toUpperCase(), x.tipo, x.detalle.replace(/<[^>]+>/g,''), x.refs]); });
+  var wb = XLSX.utils.book_new();
+  var ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [{wch:11},{wch:13},{wch:26},{wch:9},{wch:45},{wch:9},{wch:14},{wch:12},{wch:40},{wch:10},{wch:10},{wch:9},{wch:9},{wch:12},{wch:10},{wch:12},{wch:40},{wch:50}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Control de pedidos');
+  var ws2 = XLSX.utils.aoa_to_sheet(aoa2); ws2['!cols'] = [{wch:9},{wch:34},{wch:110},{wch:22}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Duplicados y errores');
+  XLSX.writeFile(wb, 'informe_control_pedidos_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+(function(){
+  function on(id, ev, fn){ var el = document.getElementById(id); if(el) el.addEventListener(ev, fn); }
+  document.querySelectorAll('#informesTipos button').forEach(function(b){ b.addEventListener('click', function(){ informesState.tipo = b.dataset.inf; renderInformesRows(); }); });
+  on('infEstado','change', renderInformesRows);
+  on('infMes','change', renderInformesRows);
+  on('infSearch','input', renderInformesRows);
+  on('btnInfRecargar','click', function(){ renderInformes(true); });
+  on('btnInfExcel','click', function(){ if(informesState.tipo==='comisiones') exportarComisionesExcel(); else exportarInformeExcel(); });
+  ['infComVend','infComDesde','infComHasta','infComCobradas'].forEach(function(id){ on(id,'change', renderInformesRows); });
+  on('infComPctDef','input', renderInformesRows);
+  on('btnInfComPrint','click', imprimirComisiones);
+  (function(){ var h = new Date(), m = String(h.getMonth()+1).padStart(2,'0'), d1 = document.getElementById('infComDesde');
+    if(d1 && !d1.value) d1.value = h.getFullYear()+'-'+m+'-01'; })();
+})();
+
 var comisionesState = { pendientes: 0 };
 function renderComisiones(){
   var wrap = document.getElementById('comisionesWrap');
@@ -10226,6 +10623,9 @@ function aplicarPermisosRol(){
   refreshSolicitudes();
   var navCom = document.getElementById('navComisiones');
   if(navCom) navCom.style.display = rol==='admin' ? '' : 'none';
+  var navInf = document.getElementById('navGrupoInformes'), cardInf = document.getElementById('homeCardInformes');
+  if(navInf) navInf.style.display = rol==='produccion' ? 'none' : '';
+  if(cardInf) cardInf.style.display = rol==='produccion' ? 'none' : '';
   var btnPv = document.getElementById('btnNuevoPedidoVenta');
   if(btnPv) btnPv.style.display = puedeVenta ? '' : 'none';
   var ocultaPrecio = rol==='produccion';
