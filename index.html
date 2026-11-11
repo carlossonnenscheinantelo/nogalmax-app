@@ -6358,7 +6358,6 @@ function renderPagoForm(){
     historial+
     (t.saldo>0.005 ?
       '<div class="section-title" style="margin-top:14px">Nuevo pago</div>'+
-      '<div id="pg_descSolo"></div>'+
       (function(){
         var pend = t.cobros.filter(function(c){ return c._saldo>0.005; });
         if(!pend.length) return '';
@@ -6370,12 +6369,12 @@ function renderPagoForm(){
       })()+
       '<div class="inline-field"><label>Fecha de pago</label><input type="date" id="pg_fecha" value="'+new Date().toISOString().slice(0,10)+'"></div>'+
       '<div class="inline-field"><label>Monto (Bs)</label><input type="number" step="0.01" min="0.01" id="pg_monto" class="pill-input" placeholder="'+t.saldo+'"></div>'+
-      '<div id="pg_descWrap" style="margin:6px 0"></div>'+
       '<div class="section-title" style="margin-top:10px">Comprobante de pago</div>'+
       '<div class="inline-field"><input type="file" id="pg_file" accept="image/*"></div>'+
       '<div id="pg_preview"></div>'+
       '<button type="button" class="ghost" id="pg_btnDetect" style="margin-top:6px">🔍 Detectar monto en la imagen</button>'+
       '<div id="pg_chips"></div>'+
+      '<div id="pg_descWrap" style="margin:8px 0"></div>'+
       '<div style="margin-top:16px;display:flex;gap:10px">'+
         '<button class="primary" id="btnRegistrarPago">Registrar pago</button>'+
         '<button id="btnCancelarPago2">Cancelar</button>'+
@@ -6417,40 +6416,35 @@ function renderPagoForm(){
       var syncCob = function(){ var o = pgCob.options[pgCob.selectedIndex]; document.getElementById('pg_monto').placeholder = o ? o.dataset.saldo : ''; };
       pgCob.addEventListener('change', syncCob); syncCob();
     }
-    var esAdm = currentProfile && currentProfile.rol==='admin';
-    var DESC_MAX = esAdm ? Infinity : 20;
+    /* después de subir el comprobante: se compara lo depositado con el saldo y, si faltan solo centavos, se ofrece el descuento adicional */
     var saldoSel = function(){ var c = document.getElementById('pg_cobro'); if(c){ var o = c.options[c.selectedIndex]; return Math.round((parseFloat(o && o.dataset.saldo)||0)*100)/100; } return Math.round(t.saldo*100)/100; };
     var pintarDesc = function(){
-      var sal = saldoSel(), m = parseFloat(document.getElementById('pg_monto').value)||0;
+      var w = document.getElementById('pg_descWrap'); if(!w) return;
+      var sal = saldoSel(), m = Math.round((parseFloat(document.getElementById('pg_monto').value)||0)*100)/100;
+      w.dataset.dif = '';
+      if(!pagoFile || !(m>0)){ w.innerHTML = ''; return; }   /* recién con el comprobante cargado */
       var dif = Math.round((sal-m)*100)/100;
-      var w = document.getElementById('pg_descWrap');
-      if(m>0 && dif>0.004 && dif<=DESC_MAX){
-        var prev = document.getElementById('pg_descChk'); var chk = prev ? prev.checked : (dif<1);
-        w.innerHTML = '<label style="display:flex;gap:8px;align-items:center;background:#fff8e6;border:1px solid #f0d585;border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer"><input type="checkbox" id="pg_descChk"'+(chk?' checked':'')+'> 🏷️ El resto, <b>Bs '+fmt(dif,2)+'</b>, va como <b>descuento por redondeo</b> (depositó sin decimales) y la deuda queda saldada.</label>';
+      var caja = function(fondo, borde, html){ return '<div style="background:'+fondo+';border:1px solid '+borde+';border-radius:8px;padding:8px 10px;font-size:13px">'+html+'</div>'; };
+      var linea = 'Comprobante: <b>Bs '+fmt(m,2)+'</b> · Saldo a pagar: <b>Bs '+fmt(sal,2)+'</b>';
+      if(Math.abs(dif)<0.005){ w.innerHTML = caja('#e3f6ea','#9ad3ac', '✅ '+linea+' → cubre el saldo exacto.'); return; }
+      if(dif<0){ w.innerHTML = caja('#fde3e3','#f5b5b5', '⚠️ '+linea+' → el comprobante es <b>Bs '+fmt(-dif,2)+' mayor</b> que el saldo. Revisá el monto.'); return; }
+      if(dif<1){
+        var prev = document.getElementById('pg_descChk'); var chk = prev ? prev.checked : true;
+        w.innerHTML = caja('#fff8e6','#f0d585', '🟠 '+linea+' → <b>faltan Bs '+fmt(dif,2)+'</b> (solo centavos: depositó sin decimales).'+
+          '<label style="display:flex;gap:8px;align-items:center;margin-top:6px;cursor:pointer"><input type="checkbox" id="pg_descChk"'+(chk?' checked':'')+'> 🏷️ Dar <b>Bs '+fmt(dif,2)+'</b> como <b>descuento adicional</b> y dejar la nota saldada</label>');
         w.dataset.dif = dif;
-      } else { w.innerHTML = ''; w.dataset.dif = ''; }
-      var solo = document.getElementById('pg_descSolo');
-      if(sal>0.004 && sal<=DESC_MAX){
-        solo.innerHTML = '<div style="background:#fff8e6;border:1px solid #f0d585;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:13px">Falta solo <b>Bs '+fmt(sal,2)+'</b>. Si el cliente depositó redondeado, podés darla por saldada sin registrar otro pago: <button type="button" class="ghost" id="pg_btnDescSolo" style="margin-left:6px">🏷️ Registrar Bs '+fmt(sal,2)+' como descuento</button></div>';
-        document.getElementById('pg_btnDescSolo').onclick = function(){
-          if(!confirm('¿Registrar Bs '+fmt(sal,2)+' como descuento por redondeo? La nota queda saldada.')) return;
-          this.disabled = true;
-          var cEl = document.getElementById('pg_cobro');
-          sb.rpc('registrar_descuento_pago', {p_nota_venta_id: nota.id, p_monto_bs: sal, p_nota_cobro_id: (cEl && cEl.value) ? Number(cEl.value) : null, p_fecha: document.getElementById('pg_fecha').value||null}).then(function(r){
-            if(r.error){ toast('No se pudo registrar el descuento: '+errMsg(r.error)); return; }
-            toast('Descuento registrado — nota saldada');
-            pagoRefrescarTodo(nota.id);
-          });
-        };
-      } else solo.innerHTML = '';
+        return;
+      }
+      w.innerHTML = caja('#eef1f6','#cbd5e1', 'ℹ️ '+linea+' → <b>faltan Bs '+fmt(dif,2)+'</b>. Queda como pago parcial (el descuento solo se ofrece cuando faltan centavos).');
     };
     document.getElementById('pg_monto').addEventListener('input', pintarDesc);
     if(pgCob) pgCob.addEventListener('change', pintarDesc);
-    pintarDesc();
+    document.getElementById('pg_chips').addEventListener('click', function(){ setTimeout(pintarDesc, 0); });
     document.getElementById('pg_file').addEventListener('change', function(e){
       pagoFile = (e.target.files && e.target.files[0]) ? e.target.files[0] : null;
       document.getElementById('pg_preview').innerHTML = pagoFile ? '<img src="'+URL.createObjectURL(pagoFile)+'" style="max-width:220px;border-radius:8px;margin-top:6px">' : '';
       document.getElementById('pg_chips').innerHTML = '';
+      pintarDesc();
       /* lee el monto del comprobante solo, apenas se elige la foto */
       if(pagoFile) leerMontoComprobante(pagoFile, notaTotales(pagoModalState).saldo, 'pg_chips', function(v){ document.getElementById('pg_monto').value = Math.round(v*100)/100; pintarDesc(); });
     });
