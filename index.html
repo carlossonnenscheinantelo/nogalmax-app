@@ -1251,7 +1251,9 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
           <div id="pf_maquilaBox" style="display:none">
             <div class="section-title">🏭 Maquila (fórmula del cliente)</div>
             <div class="card" style="padding:14px;border:1px solid #f0c27a;background:#fffaf2">
+              <div id="pf_maqAviso" style="display:none;background:#fde3e3;color:#b91c1c;border-radius:8px;padding:8px 10px;font-weight:700;margin-bottom:8px"></div>
               <div class="inline-field"><label>Cliente de la maquila</label><input type="text" id="pf_maqCliente" list="clientesDatalist" placeholder="Nombre del cliente" style="min-width:200px"></div>
+              <div class="inline-field"><label>Nombre de la maquila <span class="muted" style="font-weight:400">(si lo dejás vacío se pone «MAQUILA + cliente»)</span></label><input type="text" id="pf_maqNombre" placeholder="Ej: MAQUILA JUAN PÉREZ MINERAL" style="min-width:260px"></div>
               <div class="inline-field"><label>Servicio de maquila (Bs / Ton)</label><input type="number" step="1" min="0" id="pf_maqTarifa" class="pill-input" placeholder="Ej: 350"></div>
               <div id="pf_maqPedidoWrap" style="border-top:1px dashed #f0c27a;margin-top:8px;padding-top:8px">
                 <div class="inline-field"><label>Toneladas a fabricar</label><input type="number" step="0.01" min="0" id="pf_maqTon" class="pill-input" placeholder="Ej: 5"></div>
@@ -2427,6 +2429,9 @@ function openModal(hoja, opts){
   draft.formula = modalState.formulas[0].formula;
   renderFormulasBar();
   document.getElementById('pf_nombre').value = draft.nombre;
+  var maqNomEl = document.getElementById('pf_maqNombre');
+  if(maqNomEl) maqNomEl.value = (draft.es_maquila && draft.nombre.trim().toUpperCase()!=='MAQUILA') ? draft.nombre : '';
+  var maqAv = document.getElementById('pf_maqAviso'); if(maqAv){ maqAv.style.display='none'; maqAv.textContent=''; }
   if(draft.categoria && !Array.from(document.getElementById('pf_categoria').options).some(function(o){ return o.value===draft.categoria; })){ var oc=document.createElement('option'); oc.value=draft.categoria; oc.textContent=draft.categoria; var selc=document.getElementById('pf_categoria'); selc.insertBefore(oc, selc.lastElementChild); }
   document.getElementById('pf_categoria').value = draft.categoria;
   document.getElementById('pf_maquilaBox').style.display = draft.es_maquila ? '' : 'none';
@@ -2494,6 +2499,22 @@ document.getElementById('pf_maqArchivos').addEventListener('change', function(){
 });
 document.getElementById('pf_maqTarifa').addEventListener('input', function(){ if(modalState) renderModalComputedLight(); });
 document.getElementById('pf_maqNucDesc').addEventListener('input', function(){ if(modalState) renderModalComputedLight(); });
+function maqFalta(id, msg){
+  var av = document.getElementById('pf_maqAviso');
+  if(av){ av.textContent = '⚠️ No se guardó. '+msg; av.style.display = ''; av.scrollIntoView({behavior:'smooth', block:'center'}); }
+  var el = document.getElementById(id);
+  if(el){ el.style.outline = '3px solid #ef4444'; el.style.outlineOffset = '2px'; setTimeout(function(){ el.focus(); }, 350);
+    var quitar = function(){ el.style.outline = ''; el.removeEventListener('input', quitar); el.removeEventListener('change', quitar); };
+    el.addEventListener('input', quitar); el.addEventListener('change', quitar); }
+  toast(msg);
+}
+(function(){
+  var a = document.getElementById('pf_maqNombre'), b = document.getElementById('pf_nombre');
+  if(a && b){
+    a.addEventListener('input', function(){ if(modalState && modalState.draft.es_maquila) b.value = a.value; });
+    b.addEventListener('input', function(){ if(modalState && modalState.draft.es_maquila) a.value = b.value; });
+  }
+})();
 /* ---- cuadre de la mezcla de la maquila: insumos + núcleo = 1.000 Kg/t ---- */
 function renderMaqCuadre(){
   var box = document.getElementById('pf_maqCuadre');
@@ -2785,10 +2806,14 @@ document.getElementById('btnGuardarProducto').addEventListener('click', function
     draft.maquila_cliente = document.getElementById('pf_maqCliente').value.trim();
     draft.maquila_tarifa = parseFloat(document.getElementById('pf_maqTarifa').value)||0;
     draft.maquila_desc_nucleo = Math.min(Math.max((parseFloat(document.getElementById('pf_maqNucDesc').value)||0)/100,0),1);
-    if(!/^MAQUILA\b/i.test(draft.nombre)) draft.nombre = 'MAQUILA ' + draft.nombre;
-    if(draft.nombre.trim().toUpperCase()==='MAQUILA'){ toast('Ponele un nombre a la maquila (ej: MAQUILA Juan Pérez Mineral)'); return; }
-    if(!draft.maquila_cliente){ toast('Poné el cliente de la maquila'); return; }
-    if(!maqNucleosValidos(draft).length){ toast('Elegí el núcleo NOGALMAX: la maquila siempre lleva nuestro núcleo'); return; }
+    var nomMaq = (document.getElementById('pf_maqNombre').value||'').trim() || draft.nombre.trim();
+    if(!nomMaq || nomMaq.toUpperCase()==='MAQUILA') nomMaq = draft.maquila_cliente ? 'MAQUILA '+draft.maquila_cliente.toUpperCase() : '';
+    if(nomMaq && !/^MAQUILA\b/i.test(nomMaq)) nomMaq = 'MAQUILA ' + nomMaq;
+    draft.nombre = nomMaq;
+    document.getElementById('pf_nombre').value = nomMaq; document.getElementById('pf_maqNombre').value = nomMaq;
+    if(!draft.maquila_cliente){ maqFalta('pf_maqCliente', 'Falta el CLIENTE de la maquila: escribilo en «Cliente de la maquila».'); return; }
+    if(!maqNucleosValidos(draft).length){ maqFalta('pf_maqNucSel', 'Falta el NÚCLEO NOGALMAX: elegí el núcleo, poné los Kg por tonelada y tocá «+ Agregar».'); return; }
+    var avOk = document.getElementById('pf_maqAviso'); if(avOk) avOk.style.display = 'none';
     var kgMez = computeProducto(draft).kgMezcla;
     if(Math.abs(kgMez-1000)>0.5 && !confirm('Insumos + núcleo suman '+fmt(kgMez,1)+' Kg por tonelada (debería ser 1.000). ¿Guardar igual?')) return;
     if(!(draft.maquila_tarifa>0) && !confirm('El servicio de maquila está en 0 Bs/Ton. ¿Guardar igual?')) return;
