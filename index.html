@@ -1266,14 +1266,14 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
                   <button type="button" class="ghost" id="pf_maqNucAdd">+ Agregar</button>
                 </div>
                 <div id="pf_maqNucLista" style="margin-top:6px;font-size:12px"></div>
-                <p class="footnote" style="margin:4px 0 0">El cliente <b>siempre</b> tiene que comprarnos el núcleo: no se puede guardar una maquila sin núcleo. Se cobra a su <b>precio de venta</b> y, al producir, se descuentan del stock los insumos de ese núcleo (sin bolsas). Insumos + núcleo deben sumar 1.000 Kg por tonelada.</p>
+                <p class="footnote" style="margin:4px 0 0">El cliente <b>siempre</b> tiene que comprarnos el núcleo: no se puede guardar una maquila sin núcleo. Entra al costo de producción a su <b>costo</b> (la ganancia sale de la rentabilidad que pongas) y, al producir, se descuentan del stock los insumos de ese núcleo (sin bolsas). Insumos + núcleo deben sumar 1.000 Kg por tonelada.</p>
               </div>
               <div id="pf_maqCuadre" style="border-top:1px dashed #f0c27a;margin-top:8px;padding-top:8px"></div>
               <div class="inline-field" style="display:block;margin-top:8px"><label>Fórmula del cliente (foto o PDF)</label>
                 <input type="file" id="pf_maqArchivos" accept="image/*,application/pdf" multiple style="margin-top:4px">
                 <div id="pf_maqArchivosLista" style="margin-top:6px;font-size:12px"></div>
               </div>
-              <p class="footnote" style="margin:6px 0 0">Se cobra: <b>precio de los insumos de la fórmula</b> (con el margen/comisión de abajo, podés dejar margen 0 para cobrarlos al costo) <b>+ el núcleo NOGALMAX a precio de venta + el servicio de maquila por tonelada</b>. Para cargar las cantidades desde la foto usá 📷.</p>
+              <p class="footnote" style="margin:6px 0 0"><b>Cómo se calcula el precio:</b> costo de producción = <b>insumos del cliente (a costo) + núcleo NOGALMAX (a su costo de producción) + servicio de maquila</b>. Sobre ese costo ponés abajo la <b>rentabilidad para la empresa</b> y ese es el precio que se le cobra al cliente. Para cargar las cantidades desde la foto usá 📷.</p>
             </div>
           </div>
           <div class="section-title">Precio, rentabilidad y comisión</div>
@@ -1786,8 +1786,8 @@ function computeProducto(p){
     Object.keys(p.maquila_productos).forEach(function(h){
       var kg = Number(p.maquila_productos[h])||0; if(kg<=0 || h===p.hoja) return;
       var np = state.productos.find(function(x){ return x.hoja===h && !x.es_maquila; }); if(!np) return;
-      var pv = computeProducto(np).precioVentaConCom;
-      nucKg += kg; nucBs += kg*pv/1000; nucRows.push({hoja:h, nombre:np.nombre, kg:kg, precioTon:pv, bs:kg*pv/1000});
+      var cnp = computeProducto(np), pv = cnp.precioVentaConCom, ct = cnp.costoFacturadoTon;
+      nucKg += kg; nucBs += kg*ct/1000; nucRows.push({hoja:h, nombre:np.nombre, kg:kg, precioTon:pv, costoTon:ct, bs:kg*ct/1000});
     });
   }
   var kgMezcla = mpKg + nucKg;
@@ -1816,6 +1816,23 @@ function computeProducto(p){
   if(nucBsTon){ precioVentaSinCom += nucBsTon; precioVentaConCom += nucBsTon; ingresoEmpresa += nucBsTon; }
   if(maquilaTarifa){ precioVentaSinCom += maquilaTarifa; precioVentaConCom += maquilaTarifa; ingresoEmpresa += maquilaTarifa; }
   var utilidadNetaPct = ingresoEmpresa!==0 ? (ingresoEmpresa-costoFacturadoTon)/ingresoEmpresa : 0;
+  var maqCostoInsumosTon = 0, maqCostoProdTon = 0, maqUtilidadTon = 0;
+  if(p.es_maquila){
+    /* MAQUILA: costo de producción = insumos del cliente (costo, ÷0.87 si es con factura) + núcleo NOGALMAX a su costo de producción + servicio de maquila.
+       Sobre ese costo se aplica la rentabilidad (margen) que elige el usuario y, si hay, la comisión del vendedor. */
+    maqCostoInsumosTon = p.con_factura===false ? costoMPTon : costoMPTon/0.87;
+    maqCostoProdTon = maqCostoInsumosTon + nucBsTon + maquilaTarifa;
+    precioVentaSinCom = margen<1 ? maqCostoProdTon/(1-margen) : 0;
+    costoComisionado = comision<1 ? maqCostoProdTon/(1-comision) : 0;
+    precioVentaConCom = margen<1 ? costoComisionado/(1-margen) : 0;
+    comisionBsTon = precioVentaConCom*comision;
+    ingresoEmpresa = precioVentaConCom - comisionBsTon;
+    maqUtilidadTon = ingresoEmpresa - maqCostoProdTon;
+    utilidadNetaPct = ingresoEmpresa!==0 ? maqUtilidadTon/ingresoEmpresa : 0;
+    costoFacturadoTon = maqCostoProdTon;
+    precioInsumosConCom = maqCostoInsumosTon; precioInsumosSinCom = maqCostoInsumosTon;
+    margenEfectivo = margen;
+  }
   mpRows.forEach(function(r){ r.pct = mpCosto>0 ? r.costo/mpCosto : 0; });
   return {
     mpCosto:mpCosto, mpKg:mpKg, envCosto:envCosto, totalBs:totalBs,
@@ -1826,7 +1843,8 @@ function computeProducto(p){
     mpRows:mpRows, envRows:envRows,
     maquilaTarifa:maquilaTarifa, precioInsumosConCom:precioInsumosConCom, precioInsumosSinCom:precioInsumosSinCom,
     nucKg:nucKg, nucBsTon:nucBsTon, nucRows:nucRows, kgMezcla:kgMezcla,
-    precioFijo:precioFijo, margenEfectivo:margenEfectivo
+    precioFijo:precioFijo, margenEfectivo:margenEfectivo,
+    maqCostoInsumosTon:maqCostoInsumosTon, maqCostoProdTon:maqCostoProdTon, maqUtilidadTon:maqUtilidadTon
   };
 }
 
@@ -2508,7 +2526,7 @@ function renderMaqCuadre(){
   var aS = document.getElementById('pf_maqUsarSug');
   if(aS) aS.addEventListener('click', function(e){ e.preventDefault(); document.getElementById('pf_maqNucKg').value = aS.dataset.kg; document.getElementById('pf_maqNucKg').focus(); renderMaqCuadre(); });
 }
-['pf_maqTon','pf_maqNucKg'].forEach(function(id){ var el = document.getElementById(id); if(el) el.addEventListener('input', function(){ try{ renderMaqCuadre(); }catch(e){} }); });
+['pf_maqTon','pf_maqNucKg'].forEach(function(id){ var el = document.getElementById(id); if(el) el.addEventListener('input', function(){ try{ if(id==='pf_maqTon' && modalState) renderModalComputedLight(); else renderMaqCuadre(); }catch(e){} }); });
 (function(){ var el = document.getElementById('pf_maqNucSel'); if(el) el.addEventListener('change', function(){ try{ renderMaqCuadre(); }catch(e){} }); })();
 /* ---- núcleo NOGALMAX obligatorio en la maquila ---- */
 function nucleosDisponibles(){
@@ -2644,12 +2662,13 @@ function pfMostrarRentabilidad(draft, c){
     nota.innerHTML = 'El precio queda fijo aunque cambie el costo de los insumos — lo que varía es la rentabilidad. Para cambiar el precio, escribí el nuevo arriba.'+(c.margenEfectivo<0.05?' <b style="color:#b91c1c">⚠ Rentabilidad baja.</b>':'');
   } else {
     if(mEl.disabled){ mEl.disabled = false; mEl.value = draft.margen; }
-    lbl.textContent = '% Utilidad / margen';
+    lbl.textContent = draft.es_maquila ? 'Rentabilidad para la empresa sobre el costo (ej: 0.15 = 15%)' : '% Utilidad / margen';
     nota.textContent = draft.es_maquila ? '' : 'Sin precio fijo: el precio se calcula con el margen. Al guardar, ese precio queda fijo.';
   }
 }
 function pfSummaryHtml(draft, c){
   var maq = draft.es_maquila;
+  if(maq) return pfSummaryMaquila(draft, c);
   return row('Subtotal materias primas', fmtBs(c.mpCosto)) +
     row('Subtotal envases y servicios', fmtBs(c.envCosto)) +
     row('Total general (Bs)', fmtBs(c.totalBs), true) +
@@ -2665,6 +2684,40 @@ function pfSummaryHtml(draft, c){
     row('Utilidad neta % (después comisión)', fmtPct(c.utilidadNetaPct)) +
     (c.precioFijo ? row('📌 Rentabilidad sobre precio fijo', fmtPct(c.margenEfectivo), true) : '');
 }
+function pfSummaryMaquila(draft, c){
+  var ton = parseFloat((document.getElementById('pf_maqTon')||{}).value)||0;
+  var m = Number(draft.margen)||0, com = Number(draft.comision)||0;
+  var h = row('Peso insumos del cliente + núcleo (Kg)'+(Math.abs(c.kgMezcla-1000)>0.5?' ⚠ debería ser 1.000':''), fmt(c.kgMezcla,1)) +
+    '<div class="row" style="font-weight:700;margin-top:6px;border-top:1px solid var(--line);padding-top:6px"><span>COSTO DE PRODUCCIÓN / Ton</span><span></span></div>' +
+    row('Insumos del cliente (costo'+(draft.con_factura===false?'':', ÷0.87 con factura')+')', fmtBs(c.maqCostoInsumosTon)) +
+    c.nucRows.map(function(r){ return row('+ Núcleo '+escapeHtml(r.nombre)+' ('+fmt(r.kg,1)+' Kg) a costo de producción', fmtBs(c.kgMezcla>0 ? r.bs/c.kgMezcla*1000 : 0)); }).join('') +
+    row('+ Servicio de maquila', fmtBs(c.maquilaTarifa)) +
+    row('= COSTO DE PRODUCCIÓN / Ton', fmtBs(c.maqCostoProdTon), true) +
+    row('Rentabilidad para la empresa', fmtPct(m)) +
+    (com ? row('Comisión vendedor', fmtPct(com)) : '') +
+    row('💰 PRECIO A COBRAR AL CLIENTE / Ton', fmtBs(c.precioVentaConCom), true) +
+    (com ? row('Comisión vendedor / Ton', fmtBs(c.comisionBsTon)) : '') +
+    row('Utilidad empresa / Ton', fmtBs(c.maqUtilidadTon));
+  if(ton>0) h += '<div class="row" style="font-weight:700;margin-top:6px;border-top:1px solid var(--line);padding-top:6px"><span>Para '+fmt(ton,2)+' t a producir</span><span></span></div>' +
+    row('Costo de producción total', fmtBs(c.maqCostoProdTon*ton)) +
+    row('💰 Total a cobrar al cliente', fmtBs(c.precioVentaConCom*ton), true) +
+    row('Utilidad empresa total', fmtBs(c.maqUtilidadTon*ton));
+  /* referencia rápida de precios según rentabilidad */
+  var ref = [0.05,0.10,0.15,0.20,0.25].map(function(x){
+    var pr = (com<1 && x<1) ? c.maqCostoProdTon/(1-com)/(1-x) : 0;
+    var act = Math.abs(x-m)<0.0001;
+    return '<tr'+(act?' style="background:#eef6ef;font-weight:700"':'')+'><td><a href="#" class="maq-set-margen" data-m="'+x+'">'+fmt(x*100,0)+'%</a></td><td class="num">'+fmtBs(pr)+'</td><td class="num">'+fmtBs(pr*(1-com)-c.maqCostoProdTon)+'</td>'+(ton>0?'<td class="num">'+fmtBs(pr*ton)+'</td>':'')+'</tr>';
+  }).join('');
+  h += '<div style="margin-top:8px;font-size:12px"><b>Precio según la rentabilidad</b> (tocá un % para usarlo):'+
+    '<table class="nv-table"><thead><tr><th>Rentab.</th><th class="num">Precio / t</th><th class="num">Utilidad / t</th>'+(ton>0?'<th class="num">Total '+fmt(ton,2)+' t</th>':'')+'</tr></thead><tbody>'+ref+'</tbody></table></div>';
+  return h;
+}
+document.getElementById('pf_summary').addEventListener('click', function(e){
+  var a = e.target.closest && e.target.closest('.maq-set-margen'); if(!a || !modalState) return;
+  e.preventDefault();
+  document.getElementById('pf_margen').value = a.dataset.m;
+  renderModalComputedLight();
+});
 function row(l,v,total){ return '<div class="row'+(total?' total':'')+'"><span>'+l+'</span><span>'+v+'</span></div>'; }
 
 document.getElementById('pf_margen').addEventListener('input', renderModalComputedLight);
