@@ -4189,11 +4189,14 @@ function renderInformesRows(){
   function cnt(k){ return todas.filter(function(f){ return !f.ok[k]; }).length; }
   var nCompl = todas.filter(function(f){ return f.completo; }).length;
   var tarjetas = [
-    ['Pedidos de venta', nTot, ''], ['Completos (todo cargado)', nCompl, '#1a7a3d'],
-    ['Sin nota de venta', cnt('nota'), cnt('nota')?'#b91c1c':''], ['Orden sin completar / sin orden', cnt('op'), cnt('op')?'#b91c1c':''],
-    ['Despacho pendiente o parcial', cnt('desp'), cnt('desp')?'#b91c1c':''], ['Despacho sin foto', cnt('foto'), cnt('foto')?'#b91c1c':''],
-    ['Pago pendiente o parcial', cnt('pago'), cnt('pago')?'#b91c1c':''], ['Posibles duplicados / errores', informesState.dups.length, informesState.dups.length?'#b5560a':'']
-  ].map(function(t){ return '<div class="stat-card" style="padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel,#fff);min-width:140px;flex:1"><div style="font-size:22px;font-weight:800;color:'+(t[2]||'inherit')+'">'+t[1]+'</div><div class="muted" style="font-size:12px">'+t[0]+'</div></div>'; }).join('');
+    ['Pedidos de venta', nTot, '', ''], ['Completos (todo cargado)', nCompl, '#1a7a3d', 'completos'],
+    ['Sin nota de venta', cnt('nota'), cnt('nota')?'#b91c1c':'', 'falta-nota'], ['Orden sin completar / sin orden', cnt('op'), cnt('op')?'#b91c1c':'', 'falta-op'],
+    ['Despacho pendiente o parcial', cnt('desp'), cnt('desp')?'#b91c1c':'', 'falta-desp'], ['Despacho sin foto', cnt('foto'), cnt('foto')?'#b91c1c':'', 'falta-foto'],
+    ['Pago pendiente o parcial', cnt('pago'), cnt('pago')?'#b91c1c':'', 'falta-pago'], ['Posibles duplicados / errores', informesState.dups.length, informesState.dups.length?'#b5560a':'', '#dups']
+  ].map(function(t){
+    var activa = t[3]!=='#dups' && fEst===t[3];
+    return '<div class="stat-card inf-card" data-f="'+t[3]+'" title="Tocá para ver estos pedidos en el listado" style="cursor:pointer;padding:10px 12px;border:'+(activa?'2px solid var(--brand,#2f5d3a)':'1px solid var(--line)')+';border-radius:10px;background:'+(activa?'var(--brand-light,#eef6ef)':'var(--panel,#fff)')+';min-width:140px;flex:1;transition:box-shadow .15s"><div style="font-size:22px;font-weight:800;color:'+(t[2]||'inherit')+'">'+t[1]+'</div><div class="muted" style="font-size:12px">'+t[0]+'</div>'+(activa?'<div style="font-size:11px;font-weight:700;color:var(--brand-dark,#2f5d3a);margin-top:2px">● Filtrando · tocá de nuevo para ver todos</div>':'')+'</div>';
+  }).join('');
   var body = filas.map(function(f){
     var v = f.v;
     var prods = f.items.map(function(it){ return fmt(it.cantidad_toneladas,3)+' t '+escapeHtml(it.producto_nombre||''); }).join('<br>');
@@ -4224,6 +4227,19 @@ function renderInformesRows(){
   wrap.innerHTML = infBannerDups()+'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">'+tarjetas+'</div>'+
     '<div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Pedido</th><th>Cliente</th><th>Productos</th><th>Nota de venta</th><th>Orden de producción</th><th>Despacho</th><th>Foto del despacho</th><th>Pago</th><th>Estado</th></tr></thead><tbody>'+body+'</tbody></table></div>';
   infBindVer(wrap);
+  wrap.querySelectorAll('.inf-card').forEach(function(c){
+    c.addEventListener('mouseenter', function(){ c.style.boxShadow='0 2px 8px rgba(0,0,0,.12)'; });
+    c.addEventListener('mouseleave', function(){ c.style.boxShadow=''; });
+    c.addEventListener('click', function(){
+      var f = c.dataset.f;
+      if(f==='#dups'){ informesState.tipo='duplicados'; renderInformesRows(); return; }
+      var sel = document.getElementById('infEstado');
+      sel.value = (sel.value===f) ? '' : f;
+      renderInformesRows();
+      var tabla = document.querySelector('#informesWrap .table-wrap');
+      if(tabla) tabla.scrollIntoView({behavior:'smooth', block:'start'});
+    });
+  });
   var irD = wrap.querySelector('.inf-ir-dups'); if(irD) irD.addEventListener('click', function(e){ e.preventDefault(); informesState.tipo='duplicados'; renderInformesRows(); });
 }
 function infBindVer(wrap){
