@@ -2798,7 +2798,7 @@ document.getElementById('btnGuardarProducto').addEventListener('click', function
   pfLeerPrecioMargen(draft);
   draft.comision = parseFloat(document.getElementById('pf_comision').value)||0;
   draft.con_factura = document.getElementById('pf_factura').value !== '0';
-  if(!draft.nombre){ toast('Ponele un nombre al producto'); return; }
+  if(!draft.nombre && !draft.es_maquila){ toast('Ponele un nombre al producto'); return; }
   // al guardar, si el producto no tiene precio fijo, se fija el precio calculado con el margen
   if(!draft.es_maquila && !(draft.precio_fijo>0)){ var cFix = computeProducto(draft); if(cFix.precioVentaConCom>0) draft.precio_fijo = Math.round(cFix.precioVentaConCom*100)/100; }
   if(draft.es_maquila) draft.precio_fijo = null;
