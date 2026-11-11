@@ -1268,6 +1268,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
                 <div id="pf_maqNucLista" style="margin-top:6px;font-size:12px"></div>
                 <p class="footnote" style="margin:4px 0 0">El cliente <b>siempre</b> tiene que comprarnos el núcleo: no se puede guardar una maquila sin núcleo. Se cobra a su <b>precio de venta</b> y, al producir, se descuentan del stock los insumos de ese núcleo (sin bolsas). Insumos + núcleo deben sumar 1.000 Kg por tonelada.</p>
               </div>
+              <div id="pf_maqCuadre" style="border-top:1px dashed #f0c27a;margin-top:8px;padding-top:8px"></div>
               <div class="inline-field" style="display:block;margin-top:8px"><label>Fórmula del cliente (foto o PDF)</label>
                 <input type="file" id="pf_maqArchivos" accept="image/*,application/pdf" multiple style="margin-top:4px">
                 <div id="pf_maqArchivosLista" style="margin-top:6px;font-size:12px"></div>
@@ -2461,6 +2462,54 @@ document.getElementById('pf_maqArchivos').addEventListener('change', function(){
   this.value = ''; renderMaqArchivos();
 });
 document.getElementById('pf_maqTarifa').addEventListener('input', function(){ if(modalState) renderModalComputedLight(); });
+/* ---- cuadre de la mezcla de la maquila: insumos + núcleo = 1.000 Kg/t ---- */
+function renderMaqCuadre(){
+  var box = document.getElementById('pf_maqCuadre');
+  if(!box || !modalState) return;
+  var d = modalState.draft;
+  if(!d.es_maquila){ box.innerHTML = ''; return; }
+  var c = computeProducto(d);
+  var ton = parseFloat(document.getElementById('pf_maqTon').value)||0;
+  var kgTipeado = parseFloat(document.getElementById('pf_maqNucKg').value)||0;
+  var hsSel = document.getElementById('pf_maqNucSel').value;
+  var ins = c.mpRows.filter(function(r){ return r.qty>0; });
+  var totIns = Math.round(c.mpKg*100)/100, totNuc = Math.round(c.nucKg*100)/100;
+  var total = Math.round((totIns+totNuc)*100)/100, dif = Math.round((1000-total)*100)/100;
+  var cuadra = Math.abs(dif)<=0.5;
+  var conTon = ton>0;
+  var kgT = function(kg){ return conTon ? '<td class="num">'+fmt(kg*ton,1)+'</td>' : ''; };
+  var filas = ins.map(function(r){
+    return '<tr><td>'+escapeHtml(r.nombre)+'</td><td class="num">'+fmt(r.qty,2)+'</td><td class="num">'+fmt(r.qty/10,2)+'%</td>'+kgT(r.qty)+'</tr>';
+  }).join('');
+  if(!ins.length) filas = '<tr><td colspan="'+(conTon?4:3)+'" class="muted">Todavía no cargaste insumos en la fórmula (columna «Cant.» de Materias primas).</td></tr>';
+  filas += '<tr style="background:#eef6ef"><td colspan="'+(conTon?4:3)+'" style="font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.03em">Subtotal insumos del cliente: '+fmt(totIns,2)+' Kg/t'+(conTon?' · '+fmt(totIns*ton,1)+' Kg en total':'')+'</td></tr>';
+  filas += c.nucRows.length ? c.nucRows.map(function(r){
+    return '<tr style="background:#f3f0ff"><td>🧪 <b>Núcleo '+escapeHtml(r.nombre)+'</b></td><td class="num"><b>'+fmt(r.kg,2)+'</b></td><td class="num">'+fmt(r.kg/10,2)+'%</td>'+kgT(r.kg)+'</tr>';
+  }).join('') : '<tr style="background:#fde3e3"><td colspan="'+(conTon?4:3)+'" style="color:#b91c1c">🧪 Falta el núcleo NOGALMAX (obligatorio)'+(kgTipeado>0?' — tenés escrito '+fmt(kgTipeado,2)+' Kg, tocá «+ Agregar»':'')+'</td></tr>';
+  var estado;
+  if(cuadra) estado = '<div style="background:#e3f6ea;color:#1a7a3d;border-radius:8px;padding:8px 10px;font-weight:700">✅ La mezcla cuadra: '+fmt(total,2)+' Kg por tonelada'+(conTon?' → '+fmt(total*ton,1)+' Kg para las '+fmt(ton,2)+' t a producir':'')+'.</div>';
+  else estado = '<div style="background:'+(dif>0?'#fdeee0':'#fde3e3')+';color:'+(dif>0?'#b5560a':'#b91c1c')+';border-radius:8px;padding:8px 10px;font-weight:700">'+
+    (dif>0 ? '⚠️ FALTAN '+fmt(dif,2)+' Kg por tonelada' : '❌ SOBRAN '+fmt(-dif,2)+' Kg por tonelada')+
+    ' (suma '+fmt(total,2)+' de 1.000 Kg)'+(conTon?' → en las '+fmt(ton,2)+' t a producir '+(dif>0?'faltan ':'sobran ')+fmt(Math.abs(dif)*ton,1)+' Kg ('+fmt(total*ton,1)+' de '+fmt(1000*ton,1)+' Kg)':'')+'.</div>';
+  /* sugerencia: cuánto núcleo hace falta para llegar a 1.000 */
+  var sugerido = Math.round((1000-totIns)*100)/100, sug = '';
+  if(!cuadra && totIns>0 && sugerido>0){
+    var unico = c.nucRows.length===1 ? c.nucRows[0] : null;
+    if(unico) sug = '<button type="button" class="ghost" id="pf_maqAjustarNuc" data-h="'+escapeHtml(unico.hoja)+'" data-kg="'+sugerido+'" style="margin-top:6px">🧪 Ajustar núcleo a '+fmt(sugerido,2)+' Kg/t para que cuadre</button>';
+    else if(!c.nucRows.length) sug = '<div class="footnote" style="margin-top:6px">Para cuadrar, el núcleo tendría que ir con <b>'+fmt(sugerido,2)+' Kg/t</b>'+(hsSel?'':' (elegí el núcleo arriba)')+'. <a href="#" id="pf_maqUsarSug" data-kg="'+sugerido+'">Poner '+fmt(sugerido,2)+' Kg</a></div>';
+    else sug = '<div class="footnote" style="margin-top:6px">Con estos insumos, los núcleos deberían sumar <b>'+fmt(sugerido,2)+' Kg/t</b>.</div>';
+  }
+  box.innerHTML = '<div class="section-title" style="margin:0 0 4px">⚖️ Cuadre de la mezcla (por tonelada'+(conTon?' y para '+fmt(ton,2)+' t':'')+')</div>'+
+    '<div class="table-wrap" style="max-height:none"><table class="nv-table" style="margin-top:0"><thead><tr><th>Insumo</th><th class="num">Kg / t</th><th class="num">%</th>'+(conTon?'<th class="num">Kg total</th>':'')+'</tr></thead><tbody>'+filas+'</tbody>'+
+    '<tfoot><tr style="font-weight:800"><td>TOTAL MEZCLA</td><td class="num">'+fmt(total,2)+'</td><td class="num">'+fmt(total/10,2)+'%</td>'+(conTon?'<td class="num">'+fmt(total*ton,1)+'</td>':'')+'</tr>'+
+    '<tr class="muted"><td>Debe sumar</td><td class="num">1.000,00</td><td class="num">100%</td>'+(conTon?'<td class="num">'+fmt(1000*ton,1)+'</td>':'')+'</tr></tfoot></table></div>'+estado+sug;
+  var bA = document.getElementById('pf_maqAjustarNuc');
+  if(bA) bA.addEventListener('click', function(){ d.maquila_productos[bA.dataset.h] = Number(bA.dataset.kg); renderMaqNucleos(); renderModalComputedLight(); toast('Núcleo ajustado a '+fmt(Number(bA.dataset.kg),2)+' Kg/t'); });
+  var aS = document.getElementById('pf_maqUsarSug');
+  if(aS) aS.addEventListener('click', function(e){ e.preventDefault(); document.getElementById('pf_maqNucKg').value = aS.dataset.kg; document.getElementById('pf_maqNucKg').focus(); renderMaqCuadre(); });
+}
+['pf_maqTon','pf_maqNucKg'].forEach(function(id){ var el = document.getElementById(id); if(el) el.addEventListener('input', function(){ try{ renderMaqCuadre(); }catch(e){} }); });
+(function(){ var el = document.getElementById('pf_maqNucSel'); if(el) el.addEventListener('change', function(){ try{ renderMaqCuadre(); }catch(e){} }); })();
 /* ---- núcleo NOGALMAX obligatorio en la maquila ---- */
 function nucleosDisponibles(){
   return state.productos.filter(function(x){ return !x.es_maquila && x.categoria==='NUCLEOS Y PREMIX'; }).sort(function(a,b){ return a.nombre.localeCompare(b.nombre); });
@@ -2513,6 +2562,7 @@ document.getElementById('pf_categoria').addEventListener('change', function(){
 
 function renderModalComputed(){
   var draft = modalState.draft;
+  try{ renderMaqCuadre(); }catch(e){}
   pfLeerPrecioMargen(draft);
   draft.comision = parseFloat(document.getElementById('pf_comision').value)||0;
   draft.con_factura = document.getElementById('pf_factura').value !== '0';
@@ -2556,6 +2606,7 @@ function renderModalComputed(){
 /* lighter recompute that doesn't rebuild the ingredient table rows (keeps focus) */
 function renderModalComputedLight(){
   var draft = modalState.draft;
+  try{ renderMaqCuadre(); }catch(e){}
   pfLeerPrecioMargen(draft);
   draft.comision = parseFloat(document.getElementById('pf_comision').value)||0;
   draft.con_factura = document.getElementById('pf_factura').value !== '0';
