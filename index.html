@@ -471,6 +471,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
       <div class="home-card" data-tab="compras"><div class="hc-icon">🛒</div><div class="hc-title">Compras</div><div class="hc-sub">Compras de insumos y comprobantes</div></div>
       <div class="home-card" data-tab="informes" id="homeCardInformes"><div class="hc-icon">📑</div><div class="hc-title">Informes</div><div class="hc-sub">Control de pedidos, despachos, pagos y duplicados</div></div>
     </div>
+    <div id="homeAvisoDups"></div>
     <div class="grid-cards" id="statCards"></div>
     <div id="homeCobros"></div>
     <div class="card" style="margin-top:16px">
@@ -1908,6 +1909,7 @@ function isEditingIn(sectionId){
 
 /* ================= RESUMEN ================= */
 function renderResumen(){
+  try{ if(currentProfile) infAvisoInicio(); }catch(e){}
   var stats = document.getElementById('statCards');
   stats.innerHTML = [
     statCard('…','Pedidos pendientes de producción', true),
@@ -4068,7 +4070,8 @@ function infCalcular(){
   });
   /* ---- duplicados y registros sueltos ---- */
   var dups = [];
-  function add(tipo, gravedad, detalle, refs){ dups.push({tipo:tipo, gravedad:gravedad, detalle:detalle, refs:refs||''}); }
+  function add(tipo, gravedad, detalle, refs, accion){ dups.push({tipo:tipo, gravedad:gravedad, detalle:detalle, refs:refs||'', accion:accion||''}); }
+  var bs = function(n){ return 'Bs '+fmt(n,2); };
   /* pedidos con mismo cliente y mismos productos/cantidades (sumando líneas) */
   var firma = {};
   S.filas.forEach(function(f){
@@ -4078,47 +4081,69 @@ function infCalcular(){
   });
   Object.keys(firma).forEach(function(k){
     var g = firma[k]; if(g.length<2) return;
-    add('Pedidos posiblemente duplicados', 'alta', 'Cliente <b>'+escapeHtml(g[0].v.cliente||'')+'</b> con los mismos productos y cantidades: '+g.map(function(f){ return '<b>'+escapeHtml(f.v.numero_pedido)+'</b> ('+fmtFecha(f.v.fecha_pedido)+', Bs '+fmt(f.totalPv,2)+(f.nvs.length?', '+escapeHtml(f.nvs.map(function(n){return n.numero_nota;}).join('/')):'')+')'; }).join(' · ')+'. Revisá si es una compra repetida real o se cargó dos veces.', g.map(function(f){ return f.v.numero_pedido; }).join(', '));
+    g.sort(function(a,b){ return (a.v.fecha_pedido||'')<(b.v.fecha_pedido||'')?-1:1; });
+    var mismoMonto = g.every(function(f){ return Math.abs(f.totalPv-g[0].totalPv)<0.05; });
+    var prods = g[0].items.map(function(it){ return fmt(it.cantidad_toneladas,3)+' t '+escapeHtml(it.producto_nombre||''); }).join(' + ');
+    var lista = g.map(function(f){ return '<b>'+escapeHtml(f.v.numero_pedido)+'</b> del '+fmtFecha(f.v.fecha_pedido)+' por '+bs(f.totalPv)+(f.nvs.length?' (nota '+escapeHtml(f.nvs.map(function(n){return n.numero_nota;}).join('/'))+')':' (sin nota)'); }).join(' y ');
+    add(mismoMonto?'Pedidos duplicados (mismo monto exacto)':'Pedidos parecidos (montos distintos)', mismoMonto?'alta':'media',
+      'Cliente <b>'+escapeHtml(g[0].v.cliente||'')+'</b>: '+lista+' tienen los mismos productos ('+prods+')'+(mismoMonto?' y <b>el mismo monto exacto</b>, cada uno con su propia nota de venta.':', pero con fechas y precios distintos.'),
+      g.map(function(f){ return f.v.numero_pedido; }).join(', '),
+      mismoMonto ? 'Muy probable que sea un solo pedido cargado dos veces. Confirmá con el cliente/despacho y, si es así, anulá el pedido repetido con su nota de venta.' : 'Pueden ser dos compras reales. Confirmá que el cliente haya recibido y deba ambas.');
   });
   /* órdenes para cliente sin pedido de venta */
   S.ops.forEach(function(o){
     if(o.pedido_venta_id || o.es_stock_fabrica) return;
     var parecido = S.filas.filter(function(f){ return infNorm(f.v.cliente)===infNorm(o.cliente) && f.items.some(function(it){ return infNorm(it.producto_nombre)===infNorm(o.producto_nombre) && Math.abs((Number(it.cantidad_toneladas)||0)-(Number(o.cantidad_toneladas)||0))<0.001; }); });
-    add('Orden de producción sin pedido de venta', parecido.length?'alta':'media', '<b>'+escapeHtml(o.numero_produccion)+'</b> — '+escapeHtml(o.cliente||'')+' · '+fmt(o.cantidad_toneladas,3)+' t '+escapeHtml(o.producto_nombre||'')+' · '+escapeHtml(o.estado||'')+(o.despachado?' · <b>despachada</b>':' · sin despachar')+(parecido.length?'. <b>Posible duplicado</b> de '+parecido.map(function(f){ return escapeHtml(f.v.numero_pedido)+' ('+f.ops.map(function(x){return escapeHtml(x.numero_produccion);}).join(', ')+')'; }).join(', '):''), o.numero_produccion);
+    var base = '<b>'+escapeHtml(o.numero_produccion)+'</b> de <b>'+escapeHtml(o.cliente||'')+'</b> ('+fmt(o.cantidad_toneladas,3)+' t de '+escapeHtml(o.producto_nombre||'')+', '+escapeHtml(o.estado||'')+(o.despachado?', ya despachada':', sin despachar')+') no está ligada a ningún pedido de venta.';
+    if(parecido.length){
+      var f = parecido[0], op2 = f.ops.filter(function(x){ return infNorm(x.producto_nombre)===infNorm(o.producto_nombre); }).map(function(x){ return escapeHtml(x.numero_produccion); }).join(', ');
+      add('Orden de producción duplicada', 'alta', base+' Es casi seguro un duplicado de la <b>'+op2+'</b> del <b>'+escapeHtml(f.v.numero_pedido)+'</b>, que tiene el mismo producto y cantidad'+(o.despachado?' y también está despachada':'')+'.', o.numero_produccion+' / '+f.v.numero_pedido,
+        'Verificá que se haya producido y despachado una sola vez. Si es repetida, eliminá la orden '+o.numero_produccion+' (revisá también el stock de insumos que descontó).');
+    } else {
+      add('Orden de producción sin pedido de venta', 'media', base, o.numero_produccion, 'Cargá el pedido de venta de este cliente (o pasala a Stock en Fábrica si no es una venta).');
+    }
   });
   /* órdenes repetidas dentro del mismo pedido */
   S.filas.forEach(function(f){
     var vistos = {};
     f.ops.forEach(function(o){ var k = infNorm(o.producto_nombre)+'|'+infR(o.cantidad_toneladas); (vistos[k] = vistos[k]||[]).push(o); });
     Object.keys(vistos).forEach(function(k){ var g = vistos[k]; if(g.length<2) return;
-      add('Órdenes repetidas en un pedido', 'media', '<b>'+escapeHtml(f.v.numero_pedido)+'</b> ('+escapeHtml(f.v.cliente||'')+') tiene '+g.length+' órdenes iguales: '+g.map(function(o){ return escapeHtml(o.numero_produccion)+' '+fmt(o.cantidad_toneladas,3)+' t '+escapeHtml(o.producto_nombre||''); }).join(' · ')+'. Puede ser correcto si el pedido tiene dos líneas del mismo producto.', f.v.numero_pedido);
+      add('Órdenes iguales dentro de un pedido', 'media', '<b>'+escapeHtml(f.v.numero_pedido)+'</b> ('+escapeHtml(f.v.cliente||'')+') tiene '+g.length+' órdenes iguales: '+g.map(function(o){ return escapeHtml(o.numero_produccion)+' de '+fmt(o.cantidad_toneladas,3)+' t '+escapeHtml(o.producto_nombre||''); }).join(' y ')+'.', f.v.numero_pedido,
+        'Puede ser correcto si el pedido tiene dos líneas del mismo producto; revisá que no se haya producido de más.');
     });
   });
   /* despachos repetidos (misma orden, misma cantidad, mismo día) */
   var dk = {};
   S.desp.forEach(function(d){ var k = d.produccion_id+'|'+infR(d.cantidad)+'|'+String(d.fecha||'').slice(0,10); (dk[k] = dk[k]||[]).push(d); });
   Object.keys(dk).forEach(function(k){ var g = dk[k]; if(g.length<2) return; var o = opPorId[g[0].produccion_id]||{};
-    add('Despacho registrado dos veces', 'alta', 'Orden <b>'+escapeHtml(o.numero_produccion||'?')+'</b>: '+g.length+' despachos de '+fmt(g[0].cantidad,3)+' t el '+fmtFecha(String(g[0].fecha).slice(0,10)), o.numero_produccion);
+    add('Despacho registrado dos veces', 'alta', 'Orden <b>'+escapeHtml(o.numero_produccion||'?')+'</b>: '+g.length+' despachos de '+fmt(g[0].cantidad,3)+' t el mismo día ('+fmtFecha(String(g[0].fecha).slice(0,10))+').', o.numero_produccion||'', 'Eliminá el despacho repetido para que el stock y lo entregado al cliente cuadren.');
   });
   /* despachos de órdenes de cliente sin pedido */
   S.desp.forEach(function(d){ var o = opPorId[d.produccion_id]; if(d.pedido_venta_id || !o || o.pedido_venta_id || o.es_stock_fabrica) return;
-    add('Despacho sin pedido de venta', 'media', 'Despacho de '+fmt(d.cantidad,3)+' t de la orden <b>'+escapeHtml(o.numero_produccion)+'</b> ('+escapeHtml(o.cliente||'')+') el '+fmtFecha(String(d.fecha).slice(0,10))+' no está ligado a ningún pedido de venta.', o.numero_produccion);
+    add('Despacho sin pedido de venta', 'media', 'Se despacharon '+fmt(d.cantidad,3)+' t de la orden <b>'+escapeHtml(o.numero_produccion)+'</b> ('+escapeHtml(o.cliente||'')+') el '+fmtFecha(String(d.fecha).slice(0,10))+' sin pedido de venta ligado.', o.numero_produccion, 'Si es una venta, no se le está cobrando por el sistema: ligala a un pedido y nota de venta.');
   });
   /* pagos repetidos (misma nota, monto y fecha) */
   var pk = {};
   S.notas.forEach(function(n){ (n.pagos_venta||[]).forEach(function(p){ var k = n.id+'|'+Number(p.monto_bs).toFixed(2)+'|'+p.fecha_pago; (pk[k] = pk[k]||[]).push({p:p,n:n}); }); });
   Object.keys(pk).forEach(function(k){ var g = pk[k]; if(g.length<2) return;
-    add('Pago cargado dos veces', 'alta', 'Nota <b>'+escapeHtml(g[0].n.numero_nota)+'</b>: '+g.length+' pagos de Bs '+fmt(g[0].p.monto_bs,2)+' del '+fmtFecha(g[0].p.fecha_pago)+' (recibos '+g.map(function(x){ return escapeHtml(x.p.numero_recibo||'s/n'); }).join(', ')+')', g[0].n.numero_nota);
+    add('Pago cargado dos veces', 'alta', 'Nota <b>'+escapeHtml(g[0].n.numero_nota)+'</b>: '+g.length+' pagos de '+bs(g[0].p.monto_bs)+' del mismo día '+fmtFecha(g[0].p.fecha_pago)+' (recibos '+g.map(function(x){ return escapeHtml(x.p.numero_recibo||'s/n'); }).join(', ')+').', g[0].n.numero_nota, 'Compará los comprobantes: si es la misma transferencia, eliminá el pago repetido.');
   });
-  /* sobrepagos y varias notas */
+  /* sobrepagos, varias notas, despacho de más */
   S.filas.forEach(function(f){
-    if(f.nvs.length && f.pagado > f.totalNv+1) add('Pago mayor que la nota de venta', 'alta', '<b>'+escapeHtml(f.v.numero_pedido)+'</b> / '+escapeHtml(f.nvs.map(function(n){return n.numero_nota;}).join(', '))+' ('+escapeHtml(f.v.cliente||'')+'): nota Bs '+fmt(f.totalNv,2)+', pagado Bs '+fmt(f.pagado,2)+' → sobra Bs '+fmt(f.pagado-f.totalNv,2)+'. Puede ser un pago que corresponde a otra nota.', f.v.numero_pedido);
-    if(f.nvs.length>1) add('Pedido con más de una nota de venta', 'media', '<b>'+escapeHtml(f.v.numero_pedido)+'</b>: '+escapeHtml(f.nvs.map(function(n){return n.numero_nota;}).join(', ')), f.v.numero_pedido);
-    if(f.tonDesp > f.ton+0.001) add('Despachado más de lo pedido', 'alta', '<b>'+escapeHtml(f.v.numero_pedido)+'</b>: pedido '+fmt(f.ton,3)+' t, despachado '+fmt(f.tonDesp,3)+' t', f.v.numero_pedido);
+    if(f.nvs.length && f.pagado > f.totalNv+1){
+      var sobra = Math.round((f.pagado-f.totalNv)*100)/100;
+      var baseProd = Math.round(f.items.reduce(function(s,it){ return s+(Number(it.total_pactado)||0); },0)*100)/100;
+      var pista = Math.abs(sobra-baseProd)<0.05 ? ' Lo que sobra es <b>justo el total de los productos del pedido</b>, así que parece que el pago se cargó doble.' :
+        (function(){ var otra = S.notas.find(function(n){ return f.nvs.indexOf(n)===-1 && Math.abs((Number(n.total_bs)||0)-sobra)<0.05; }); return otra ? ' Lo que sobra coincide con el total de la nota <b>'+escapeHtml(otra.numero_nota)+'</b> ('+escapeHtml(otra.cliente||'')+'): puede que ese pago sea de esa nota.' : ''; })();
+      add('Pago mayor que la nota de venta', 'alta', '<b>'+escapeHtml(f.v.numero_pedido)+'</b> / '+escapeHtml(f.nvs.map(function(n){return n.numero_nota;}).join(', '))+' ('+escapeHtml(f.v.cliente||'')+'): la nota es de '+bs(f.totalNv)+' y el pago cargado es de '+bs(f.pagado)+'. Sobran <b>'+bs(sobra)+'</b>.'+pista, f.v.numero_pedido,
+        'Revisá el comprobante: corregí el monto del pago o pasá la diferencia a la nota que corresponde.');
+    }
+    if(f.nvs.length>1) add('Pedido con más de una nota de venta', 'media', '<b>'+escapeHtml(f.v.numero_pedido)+'</b> tiene '+f.nvs.length+' notas: '+escapeHtml(f.nvs.map(function(n){return n.numero_nota+' ('+bs(n.total_bs)+')';}).join(', '))+'.', f.v.numero_pedido, 'Debería tener una sola nota de venta; revisá si alguna está repetida.');
+    if(f.tonDesp > f.ton+0.001) add('Despachado más de lo pedido', 'alta', '<b>'+escapeHtml(f.v.numero_pedido)+'</b> ('+escapeHtml(f.v.cliente||'')+'): pedido '+fmt(f.ton,3)+' t, despachado '+fmt(f.tonDesp,3)+' t.', f.v.numero_pedido, 'Revisá si hay un despacho repetido o si el cliente llevó de más (y hay que cobrarlo).');
   });
   /* notas sin pedido */
   var pvIds = {}; S.pedidos.forEach(function(v){ pvIds[v.id]=true; });
-  S.notas.forEach(function(n){ if(!n.pedido_venta_id || !pvIds[n.pedido_venta_id]) add('Nota de venta sin pedido', 'media', 'Nota <b>'+escapeHtml(n.numero_nota)+'</b> ('+escapeHtml(n.cliente||'')+', Bs '+fmt(n.total_bs,2)+') no tiene pedido de venta.', n.numero_nota); });
+  S.notas.forEach(function(n){ if(!n.pedido_venta_id || !pvIds[n.pedido_venta_id]) add('Nota de venta sin pedido', 'media', 'Nota <b>'+escapeHtml(n.numero_nota)+'</b> ('+escapeHtml(n.cliente||'')+', '+bs(n.total_bs)+') no tiene pedido de venta.', n.numero_nota, 'Ligala a su pedido o anulala si quedó suelta.'); });
   var orden = {alta:0, media:1};
   dups.sort(function(a,b){ return (orden[a.gravedad]-orden[b.gravedad]) || (a.tipo<b.tipo?-1:1); });
   S.dups = dups;
@@ -4196,43 +4221,159 @@ function renderInformesRows(){
     '</tr>';
   }).join('') || '<tr><td colspan="10" class="empty">Ningún pedido coincide con el filtro</td></tr>';
   document.getElementById('infResumen').innerHTML = filas.length+' de '+nTot+' pedidos';
-  wrap.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">'+tarjetas+'</div>'+
+  wrap.innerHTML = infBannerDups()+'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">'+tarjetas+'</div>'+
     '<div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Pedido</th><th>Cliente</th><th>Productos</th><th>Nota de venta</th><th>Orden de producción</th><th>Despacho</th><th>Foto del despacho</th><th>Pago</th><th>Estado</th></tr></thead><tbody>'+body+'</tbody></table></div>';
   infBindVer(wrap);
+  var irD = wrap.querySelector('.inf-ir-dups'); if(irD) irD.addEventListener('click', function(e){ e.preventDefault(); informesState.tipo='duplicados'; renderInformesRows(); });
 }
 function infBindVer(wrap){
   wrap.querySelectorAll('.inf-ver').forEach(function(a){ a.addEventListener('click', function(e){ e.preventDefault(); infVer(a.dataset.b, a.dataset.p); }); });
+}
+var XLSX_ESTILO = null;
+function infCargarXlsxEstilo(cb){
+  if(XLSX_ESTILO) return cb(XLSX_ESTILO);
+  var previo = window.XLSX;
+  var s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js';
+  s.onload = function(){ XLSX_ESTILO = window.XLSX; if(previo) window.XLSX = previo; cb(XLSX_ESTILO); };
+  s.onerror = function(){ if(previo) window.XLSX = previo; cb(null); };
+  document.head.appendChild(s);
+}
+function exportarInformeExcel(){
+  if(!informesState.loaded){ toast('Esperá a que carguen los datos'); return; }
+  toast('Armando el Excel…');
+  infCargarXlsxEstilo(function(X){ infArmarExcel(X || XLSX, !!X); });
+}
+function infArmarExcel(X, conEstilo){
+  var S = informesState, hoy = new Date();
+  var hoyTxt = String(hoy.getDate()).padStart(2,'0')+'/'+String(hoy.getMonth()+1).padStart(2,'0')+'/'+hoy.getFullYear();
+  var plano = function(h){ return String(h||'').replace(/<br\s*\/?>/g,' ').replace(/<[^>]+>/g,'').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'"); };
+  var C = { verde:'E3F6EA', verdeTx:'1A7A3D', rojo:'FDE3E3', rojoTx:'B91C1C', nar:'FDEEE0', narTx:'B5560A', cab:'2F5D3A', gris:'F3F4F6' };
+  var borde = { top:{style:'thin',color:{rgb:'D1D5DB'}}, bottom:{style:'thin',color:{rgb:'D1D5DB'}}, left:{style:'thin',color:{rgb:'D1D5DB'}}, right:{style:'thin',color:{rgb:'D1D5DB'}} };
+  function st(ws, ref, o){ if(!conEstilo || !ws[ref]) return; ws[ref].s = o; }
+  function stCab(ws, fila, ncol){ for(var c=0;c<ncol;c++) st(ws, X.utils.encode_cell({r:fila,c:c}), {font:{bold:true,color:{rgb:'FFFFFF'}}, fill:{fgColor:{rgb:C.cab}}, alignment:{wrapText:true,vertical:'center',horizontal:'center'}, border:borde}); }
+  function stCel(ws, r, c, tono, bold){ var o = {alignment:{wrapText:true,vertical:'top'}, border:borde};
+    if(tono==='ok') { o.fill={fgColor:{rgb:C.verde}}; o.font={color:{rgb:C.verdeTx},bold:true}; }
+    if(tono==='mal'){ o.fill={fgColor:{rgb:C.rojo}};  o.font={color:{rgb:C.rojoTx},bold:true}; }
+    if(tono==='par'){ o.fill={fgColor:{rgb:C.nar}};   o.font={color:{rgb:C.narTx},bold:true}; }
+    if(bold){ o.font = Object.assign({}, o.font||{}, {bold:true}); }
+    st(ws, X.utils.encode_cell({r:r,c:c}), o); }
+  function titulo(ws, ref, tam){ st(ws, ref, {font:{bold:true,sz:tam||14,color:{rgb:C.cab}}}); }
+  var wb = X.utils.book_new();
+  var nTot = S.filas.length, nCompl = S.filas.filter(function(f){ return f.completo; }).length;
+  function cnt(k){ return S.filas.filter(function(f){ return !f.ok[k]; }).length; }
+  var altas = S.dups.filter(function(d){ return d.gravedad==='alta'; });
+
+  /* ---------- Hoja 1: RESUMEN ---------- */
+  var r1 = [
+    ['NOGALMAX — INFORME DE CONTROL DE PEDIDOS DE VENTA'],
+    ['Generado el '+hoyTxt+'. Revisa por cada pedido si tiene nota de venta, orden de producción, despacho, foto del despacho y pago.'],
+    [],
+    ['¿CÓMO ESTÁN LOS PEDIDOS?','Cantidad','Qué significa'],
+    ['Pedidos de venta en total', nTot, ''],
+    ['✅ Completos (todo cargado)', nCompl, 'Tienen nota, orden completada, despacho completo con foto y pago completo.'],
+    ['❌ Con algo pendiente', nTot-nCompl, 'Ver la hoja «Control de pedidos», columna «QUÉ FALTA».'],
+    ['   Sin nota de venta', cnt('nota'), ''],
+    ['   Orden de producción sin completar o sin orden', cnt('op'), ''],
+    ['   Despacho pendiente o parcial', cnt('desp'), ''],
+    ['   Despacho sin foto', cnt('foto'), ''],
+    ['   Pago pendiente o parcial', cnt('pago'), ''],
+    [],
+    ['⚠️ POSIBLES DUPLICADOS Y ERRORES: '+S.dups.length+' (de los cuales '+altas.length+' urgentes)'],
+  ];
+  var filaDups = r1.length;
+  r1.push(['Qué pasó','Prioridad','Qué hacer']);
+  S.dups.forEach(function(d){ r1.push([plano(d.tipo)+': '+plano(d.detalle), d.gravedad==='alta'?'URGENTE':'Revisar', d.accion]); });
+  if(!S.dups.length) r1.push(['No se encontraron duplicados ni registros sueltos.','','']);
+  var ws1 = X.utils.aoa_to_sheet(r1);
+  ws1['!cols'] = [{wch:95},{wch:12},{wch:70}];
+  ws1['!merges'] = [{s:{r:0,c:0},e:{r:0,c:2}},{s:{r:1,c:0},e:{r:1,c:2}},{s:{r:filaDups-1,c:0},e:{r:filaDups-1,c:2}}];
+  titulo(ws1,'A1',15); st(ws1,'A2',{font:{italic:true,color:{rgb:'555555'}},alignment:{wrapText:true}});
+  stCab(ws1,3,3); stCab(ws1,filaDups,3);
+  st(ws1, 'A'+filaDups, {font:{bold:true,sz:13,color:{rgb:C.rojoTx}}});
+  for(var i=4;i<=11;i++){ stCel(ws1,i,0,null,i<=6); stCel(ws1,i,1,i===5?'ok':(i>=6 && r1[i][1]>0?'mal':(i>=6?'ok':null)),true); stCel(ws1,i,2); }
+  for(var j=filaDups+1;j<r1.length;j++){ var urg = r1[j][1]==='URGENTE'; stCel(ws1,j,0,null); stCel(ws1,j,1,urg?'mal':(r1[j][1]?'par':null),true); stCel(ws1,j,2); }
+  X.utils.book_append_sheet(wb, ws1, 'Resumen');
+
+  /* ---------- Hoja 2: CONTROL DE PEDIDOS ---------- */
+  var cab = ['N°','Fecha pedido','Pedido','Cliente','Condición','Productos','Ton pedidas','NOTA DE VENTA','ORDEN DE PRODUCCIÓN','DESPACHO','FOTO DEL DESPACHO','PAGO','ESTADO','QUÉ FALTA','ALERTAS / OBSERVACIONES'];
+  var r2 = [['NOGALMAX — CONTROL DE PEDIDOS DE VENTA ('+hoyTxt+')'], ['Verde = está cargado · Rojo = falta · Naranja = cargado a medias. Filtrá con las flechas del encabezado (por ejemplo ESTADO = PENDIENTE).'], cab];
+  var tonos = [];
+  S.filas.forEach(function(f, idx){
+    var v = f.v;
+    var tNota = f.nvs.length ? 'SÍ — '+f.nvs.map(function(n){ return n.numero_nota; }).join(', ')+' ('+fmt(f.totalNv,2)+' Bs)' : 'NO TIENE';
+    var tOp = !f.ops.length ? 'NO TIENE' : (f.ok.op ? 'SÍ — ' : 'SIN COMPLETAR — ')+f.ops.map(function(o){ return o.numero_produccion+(o.estado==='completada'?'':' ('+o.estado+')'); }).join(', ')+(f.itemsSinOp?' · '+f.itemsSinOp+' producto(s) sin orden':'');
+    var tDesp = !f.desp.length ? 'NO DESPACHADO' : (f.ok.desp ? 'COMPLETO — '+fmt(f.tonDesp,3)+' t' : 'PARCIAL — '+fmt(f.tonDesp,3)+' de '+fmt(f.ton,3)+' t (faltan '+fmt(f.ton-f.tonDesp,3)+' t)');
+    var tFoto = !f.desp.length ? '—' : (f.ok.foto ? 'SÍ — todas ('+f.despConFoto+')' : (f.despConFoto ? 'FALTA — '+(f.desp.length-f.despConFoto)+' de '+f.desp.length+' despachos sin foto' : 'NO TIENE FOTO'));
+    var tPago = !f.nvs.length ? '—' : (f.ok.pago ? 'PAGADO — '+fmt(f.pagado,2)+' Bs' : (f.pagado>0 ? 'PARCIAL — pagó '+fmt(f.pagado,2)+' de '+fmt(f.totalNv,2)+' Bs (debe '+fmt(f.totalNv-f.pagado,2)+')' : 'NO PAGADO — debe '+fmt(f.totalNv,2)+' Bs'));
+    if(f.pagos.length && f.pagosSinFoto) tPago += ' · '+f.pagosSinFoto+' pago(s) sin comprobante';
+    r2.push([idx+1, fmtFecha(v.fecha_pedido), v.numero_pedido, v.cliente, (v.condicion_pago||'').toUpperCase(),
+      f.items.map(function(it){ return fmt(it.cantidad_toneladas,3)+' t '+it.producto_nombre; }).join('\n'), f.ton,
+      tNota, tOp, tDesp, tFoto, tPago, f.completo?'COMPLETO':'PENDIENTE', f.falta.join(', '), f.alertas.join('\n')]);
+    tonos.push([ f.ok.nota?'ok':'mal', f.ok.op?'ok':(f.ops.length?'par':'mal'), f.ok.desp?'ok':(f.desp.length?'par':'mal'),
+      !f.desp.length?null:(f.ok.foto?'ok':(f.despConFoto?'par':'mal')), !f.nvs.length?null:(f.ok.pago?'ok':(f.pagado>0?'par':'mal')), f.completo?'ok':'mal', f.alertas.length?'par':null ]);
+  });
+  var ws2 = X.utils.aoa_to_sheet(r2);
+  ws2['!cols'] = [{wch:4},{wch:11},{wch:13},{wch:24},{wch:10},{wch:34},{wch:8},{wch:26},{wch:30},{wch:30},{wch:24},{wch:34},{wch:12},{wch:32},{wch:42}];
+  ws2['!merges'] = [{s:{r:0,c:0},e:{r:0,c:14}},{s:{r:1,c:0},e:{r:1,c:14}}];
+  ws2['!autofilter'] = {ref: X.utils.encode_range({s:{r:2,c:0},e:{r:r2.length-1,c:14}})};
+  ws2['!freeze'] = {xSplit:4, ySplit:3};
+  ws2['!views'] = [{state:'frozen', xSplit:4, ySplit:3, topLeftCell:'E4'}];
+  titulo(ws2,'A1',14); st(ws2,'A2',{font:{italic:true,color:{rgb:'555555'}}});
+  stCab(ws2,2,cab.length);
+  tonos.forEach(function(t, k){ var r = k+3;
+    for(var c=0;c<cab.length;c++) stCel(ws2, r, c, null, c===2);
+    [7,8,9,10,11,12].forEach(function(c, q){ if(t[q]) stCel(ws2, r, c, t[q], true); });
+    if(t[6]) stCel(ws2, r, 14, 'par');
+  });
+  X.utils.book_append_sheet(wb, ws2, 'Control de pedidos');
+
+  /* ---------- Hoja 3: POSIBLES DUPLICADOS ---------- */
+  var r3 = [['NOGALMAX — POSIBLES DUPLICADOS Y ERRORES ('+hoyTxt+')'], [], ['Prioridad','Tipo','Qué pasó','Qué hacer','Pedido / orden']];
+  S.dups.forEach(function(d){ r3.push([d.gravedad==='alta'?'URGENTE':'Revisar', plano(d.tipo), plano(d.detalle), d.accion, d.refs]); });
+  if(!S.dups.length) r3.push(['','','No se encontraron duplicados ni registros sueltos.','','']);
+  var ws3 = X.utils.aoa_to_sheet(r3);
+  ws3['!cols'] = [{wch:10},{wch:30},{wch:80},{wch:55},{wch:22}];
+  ws3['!merges'] = [{s:{r:0,c:0},e:{r:0,c:4}}];
+  titulo(ws3,'A1',14); stCab(ws3,2,5);
+  for(var k=3;k<r3.length;k++){ for(var c2=0;c2<5;c2++) stCel(ws3,k,c2,null,c2===1); if(r3[k][0]) stCel(ws3,k,0,r3[k][0]==='URGENTE'?'mal':'par',true); }
+  X.utils.book_append_sheet(wb, ws3, 'Posibles duplicados');
+
+  X.writeFile(wb, 'NOGALMAX_control_pedidos_'+hoy.toISOString().slice(0,10)+'.xlsx');
 }
 function renderInformeDuplicados(wrap){
   var d = informesState.dups;
   document.getElementById('infResumen').innerHTML = d.length+' observaciones';
   if(!d.length){ wrap.innerHTML = '<p class="empty">✅ No se encontraron duplicados ni registros sueltos.</p>'; return; }
-  var grupos = {}; d.forEach(function(x){ (grupos[x.tipo] = grupos[x.tipo]||[]).push(x); });
-  wrap.innerHTML = Object.keys(grupos).map(function(t){
-    var g = grupos[t], alta = g[0].gravedad==='alta';
-    return '<div class="section-title" style="margin-top:12px">'+(alta?'🔴 ':'🟠 ')+escapeHtml(t)+' ('+g.length+')</div>'+
-      '<div class="table-wrap"><table><tbody>'+g.map(function(x){ return '<tr><td style="font-size:13px">'+x.detalle+'</td></tr>'; }).join('')+'</tbody></table></div>';
+  wrap.innerHTML = d.map(function(x){
+    var alta = x.gravedad==='alta';
+    return '<div class="card" style="margin-bottom:10px;padding:10px 14px;border:1px solid '+(alta?'#f5b5b5':'#f0d585')+';border-left:5px solid '+(alta?'#b91c1c':'#d97706')+';border-radius:8px;background:'+(alta?'#fff5f5':'#fffbeb')+'">'+
+      '<div style="font-weight:700;margin-bottom:4px">'+(alta?'🔴 URGENTE · ':'🟠 Revisar · ')+escapeHtml(x.tipo)+'</div>'+
+      '<div style="font-size:13px">'+x.detalle+'</div>'+
+      (x.accion?'<div style="font-size:12.5px;margin-top:6px"><b>👉 Qué hacer:</b> '+escapeHtml(x.accion)+'</div>':'')+'</div>';
   }).join('');
 }
-function exportarInformeExcel(){
-  if(!informesState.loaded){ toast('Esperá a que carguen los datos'); return; }
-  var aoa = [['Fecha','Pedido','Cliente','Condición','Productos','Ton pedido','Nota de venta','Total nota Bs','Órdenes de producción','Órdenes completadas','Ton despachado','N° despachos','Despachos con foto','Pagado Bs','Pagos sin comprobante','Estado','Falta','Alertas']];
-  informesState.filas.forEach(function(f){
-    aoa.push([f.v.fecha_pedido, f.v.numero_pedido, f.v.cliente, f.v.condicion_pago,
-      f.items.map(function(it){ return it.cantidad_toneladas+' t '+it.producto_nombre; }).join(' | '), f.ton,
-      f.nvs.map(function(n){ return n.numero_nota; }).join(', ') || 'SIN NOTA', f.totalNv,
-      f.ops.map(function(o){ return o.numero_produccion+' ('+o.estado+')'; }).join(', ') || 'SIN ORDEN', f.opsCompl+'/'+f.ops.length,
-      f.tonDesp, f.desp.length, f.despConFoto, f.pagado, f.pagosSinFoto,
-      f.completo?'COMPLETO':'INCOMPLETO', f.falta.join(', '), f.alertas.join(' | ')]);
-  });
-  var aoa2 = [['Gravedad','Tipo','Detalle','Referencia']];
-  informesState.dups.forEach(function(x){ aoa2.push([x.gravedad.toUpperCase(), x.tipo, x.detalle.replace(/<[^>]+>/g,''), x.refs]); });
-  var wb = XLSX.utils.book_new();
-  var ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [{wch:11},{wch:13},{wch:26},{wch:9},{wch:45},{wch:9},{wch:14},{wch:12},{wch:40},{wch:10},{wch:10},{wch:9},{wch:9},{wch:12},{wch:10},{wch:12},{wch:40},{wch:50}];
-  XLSX.utils.book_append_sheet(wb, ws, 'Control de pedidos');
-  var ws2 = XLSX.utils.aoa_to_sheet(aoa2); ws2['!cols'] = [{wch:9},{wch:34},{wch:110},{wch:22}];
-  XLSX.utils.book_append_sheet(wb, ws2, 'Duplicados y errores');
-  XLSX.writeFile(wb, 'informe_control_pedidos_'+new Date().toISOString().slice(0,10)+'.xlsx');
+function infBannerDups(){
+  var d = informesState.dups; if(!d.length) return '';
+  var altas = d.filter(function(x){ return x.gravedad==='alta'; });
+  var top = (altas.length?altas:d).slice(0,4).map(function(x){ return '<li style="margin:3px 0">'+x.detalle+'</li>'; }).join('');
+  return '<div class="card" style="margin-bottom:12px;padding:10px 14px;border:1px solid #f5b5b5;border-left:5px solid #b91c1c;border-radius:8px;background:#fff5f5">'+
+    '<b>⚠️ '+d.length+' posible(s) duplicado(s) o error(es)'+(altas.length?' — '+altas.length+' urgente(s)':'')+'</b>'+
+    '<ul style="margin:6px 0 6px 18px;padding:0;font-size:13px">'+top+'</ul>'+
+    '<a href="#" class="inf-ir-dups" style="font-weight:700">Ver todos y qué hacer →</a></div>';
+}
+function infAvisoInicio(){
+  var box = document.getElementById('homeAvisoDups'); if(!box) return;
+  if(!currentProfile || currentProfile.rol==='produccion'){ box.innerHTML=''; return; }
+  function pintar(){
+    box.innerHTML = infBannerDups();
+    var a = box.querySelector('.inf-ir-dups');
+    if(a) a.addEventListener('click', function(e){ e.preventDefault(); informesState.tipo='duplicados'; var b=document.querySelector('.nav-item[data-tab="informes"]'); if(b) b.click(); });
+  }
+  if(informesState.loaded) return pintar();
+  var espera = setInterval(function(){ if(informesState.loaded){ clearInterval(espera); pintar(); } }, 400);
+  setTimeout(function(){ clearInterval(espera); }, 20000);
+  renderInformes(true);
 }
 (function(){
   function on(id, ev, fn){ var el = document.getElementById(id); if(el) el.addEventListener(ev, fn); }
@@ -10626,6 +10767,7 @@ function aplicarPermisosRol(){
   var navInf = document.getElementById('navGrupoInformes'), cardInf = document.getElementById('homeCardInformes');
   if(navInf) navInf.style.display = rol==='produccion' ? 'none' : '';
   if(cardInf) cardInf.style.display = rol==='produccion' ? 'none' : '';
+  try{ infAvisoInicio(); }catch(e){}
   var btnPv = document.getElementById('btnNuevoPedidoVenta');
   if(btnPv) btnPv.style.display = puedeVenta ? '' : 'none';
   var ocultaPrecio = rol==='produccion';
