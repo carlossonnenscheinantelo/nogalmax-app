@@ -13563,9 +13563,9 @@ function aplicarPermisosRol(){
   if(ordenesState.loaded && activeTab()==='ordenes') renderOrdenesRows();
   if(ventaState.loaded && activeTab()==='pedidosventa') renderPedidosVentaRows();
   if(rol==='planta') abrirModoPlanta(true);
+  else if(plantaState.fijo){ plantaState.fijo=false; cerrarModoPlanta(); }
   var mqr = location.hash.match(/^#qr=(\d+)/);
   if(mqr && rol){ if(rol!=='planta') abrirModoPlanta(false); plantaCargarQR(Number(mqr[1])); try{ history.replaceState(null,'',location.pathname); }catch(e){} }
-  else if(plantaState.fijo){ plantaState.fijo=false; cerrarModoPlanta(); }
 }
 function actualizarBadgeOrdenes(){
   var b1 = document.getElementById('navBadgeOrdenes');
