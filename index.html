@@ -413,6 +413,17 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
   .pv-stock-box,.pv-lista-precios,.desp-hist{overflow-x:auto;display:block}
   #authOverlay .auth-box{padding:22px 18px}
 }
+
+/* ===== Etiquetas de bolsa ===== */
+#prodEtqBox{margin-top:18px;border-top:1px dashed #c9c9c9;padding-top:12px}
+.etq-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:8px 0 4px}
+.etq-form label{display:flex;flex-direction:column;font-size:12px;font-weight:600;gap:3px}
+.etq-form input{padding:6px 8px;border:1px solid #ccc;border-radius:6px;font-size:14px}
+.etq-prev-wrap{width:100%;overflow:hidden;background:#f3f3f3;border-radius:6px}
+.etq-prev{transform-origin:top left;width:max-content}
+.etq-ed-f{display:flex;flex-direction:column;font-size:12px;font-weight:600;gap:3px;margin-bottom:10px}
+.etq-ed-f input,.etq-ed-f textarea{padding:6px 8px;border:1px solid #ccc;border-radius:6px;font-size:13px;font-family:inherit;font-weight:400}
+.etq-ed-chk{display:flex;align-items:center;gap:6px;font-size:13px;margin-bottom:10px}
 </style>
 </head>
 <body>
@@ -1361,7 +1372,7 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
 </div>
 
 <div id="prodDocModalOverlay" class="overlay2">
-  <div class="ocr-box" style="max-width:560px">
+  <div class="ocr-box" style="max-width:640px">
     <div class="ocr-head">
       <h3>Documento de producción</h3>
       <button class="close-x" id="btnCerrarProdDoc">✕</button>
@@ -1372,6 +1383,20 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
         <button class="primary" id="btnDescargarProdPdf">⬇ Descargar PDF (2 copias)</button>
       </div>
       <p class="footnote">El PDF tiene 2 páginas idénticas — una para planta y otra para administración.</p>
+      <div id="prodEtqBox"></div>
+    </div>
+  </div>
+</div>
+
+<div id="etqEditOverlay" class="overlay2">
+  <div class="ocr-box" style="max-width:620px">
+    <div class="ocr-head">
+      <h3>🏷️ Contenido de la etiqueta</h3>
+      <button class="close-x" id="btnCerrarEtqEdit">✕</button>
+    </div>
+    <div class="ocr-body">
+      <div id="etqEditBody"></div>
+      <div style="margin-top:6px;display:flex;gap:10px"><button class="primary" id="btnEtqGuardar">💾 Guardar etiqueta</button></div>
     </div>
   </div>
 </div>
@@ -1728,7 +1753,7 @@ function rowToInsumo(r){
   return { id:r.id, nombre:r.nombre, unidad:r.unidad, precioIngresado:Number(r.precio_ingresado)||0, unidadPrecio:r.unidad_precio, tipo:r.tipo, stockActual:Number(r.stock_actual)||0 };
 }
 function rowToProducto(r){
-  return { id:r.id, hoja:r.hoja, nombre:r.nombre, categoria:r.categoria, formula: r.formula || {}, margen:Number(r.margen)||0, precio_fijo:(r.precio_fijo!=null && Number(r.precio_fijo)>0)?Number(r.precio_fijo):null, comision:Number(r.comision)||0, con_factura: r.con_factura!==false, formula_nombre: r.formula_nombre||'', variantes: Array.isArray(r.variantes) ? r.variantes : [], es_maquila: r.es_maquila===true, maquila_cliente: r.maquila_cliente||'', maquila_tarifa: Number(r.maquila_tarifa)||0, maquila_desc_nucleo: Number(r.maquila_desc_nucleo)||0, maquila_archivos: Array.isArray(r.maquila_archivos) ? r.maquila_archivos : [], maquila_productos: (r.maquila_productos && typeof r.maquila_productos==='object' && !Array.isArray(r.maquila_productos)) ? r.maquila_productos : {} };
+  return { etiqueta:(r.etiqueta && typeof r.etiqueta==='object') ? r.etiqueta : null, id:r.id, hoja:r.hoja, nombre:r.nombre, categoria:r.categoria, formula: r.formula || {}, margen:Number(r.margen)||0, precio_fijo:(r.precio_fijo!=null && Number(r.precio_fijo)>0)?Number(r.precio_fijo):null, comision:Number(r.comision)||0, con_factura: r.con_factura!==false, formula_nombre: r.formula_nombre||'', variantes: Array.isArray(r.variantes) ? r.variantes : [], es_maquila: r.es_maquila===true, maquila_cliente: r.maquila_cliente||'', maquila_tarifa: Number(r.maquila_tarifa)||0, maquila_desc_nucleo: Number(r.maquila_desc_nucleo)||0, maquila_archivos: Array.isArray(r.maquila_archivos) ? r.maquila_archivos : [], maquila_productos: (r.maquila_productos && typeof r.maquila_productos==='object' && !Array.isArray(r.maquila_productos)) ? r.maquila_productos : {} };
 }
 
 /* ---------- calculation engine (mirrors the original Excel formulas — unchanged) ---------- */
@@ -7699,6 +7724,7 @@ function openProdDocModal(o){
   prodDocState = o;
   renderProduccionDocCard(o, 'PLANTA');
   document.getElementById('prodDocModalOverlay').classList.add('active');
+  try{ renderEtiquetasSeccion(o); }catch(err){ console.error('etiquetas', err); }
 }
 document.getElementById('btnCerrarProdDoc').addEventListener('click', function(){
   document.getElementById('prodDocModalOverlay').classList.remove('active');
@@ -7754,6 +7780,1948 @@ document.getElementById('btnDescargarProdPdf').addEventListener('click', functio
     }).catch(function(err){ btn.disabled=false; toast('No se pudo generar el PDF: '+(err&&err.message?err.message:String(err))); });
   }).catch(function(err){ btn.disabled=false; toast('No se pudo generar el PDF: '+(err&&err.message?err.message:String(err))); });
 });
+
+
+/* ================= ETIQUETAS DE BOLSA (impresora Honeywell PC42t — 152,4 x 101,5 mm) ================= */
+// Contenido de cada etiqueta: se guarda en productos.etiqueta (Supabase). Si un producto todavía no la
+// tiene guardada, se usa la versión copiada de los archivos BarTender (ETIQUETAS_BASE).
+var ETIQUETAS_BASE = {
+"FOSVAX 60": {
+"titulo": "FOS VAX 60",
+"subtitulo": "SUPLEMENTO MINERAL PARA BOVINOS",
+"garantias": [
+[
+"CALCIO",
+"%",
+"14,15"
+],
+[
+"FOSFORO",
+"%",
+"6,02"
+],
+[
+"SODIO",
+"g",
+"102,60"
+],
+[
+"MAGNESIO",
+"g",
+"16,11"
+],
+[
+"AZUFRE",
+"g",
+"15,00"
+],
+[
+"COBALTO",
+"mg",
+"48,36"
+],
+[
+"COBRE",
+"mg",
+"765,00"
+],
+[
+"IODO",
+"mg",
+"46,50"
+],
+[
+"MANGANESO",
+"mg",
+"585,00"
+],
+[
+"SELENIO",
+"mg",
+"15,53"
+],
+[
+"ZINC",
+"",
+"2.010,00"
+]
+],
+"caracteristicas": "Suplemento mineral. Fbaricado con insumos de biodisponibilidad, contiene MACRO Y MICRO MINERALES",
+"indicacion": "*Producto indicado para complementar la dieta de bovinos de todas las categorias pasto en epoca seca.",
+"modo_usar": "* Suplemento mineral para uso directo en comederos protegidos.\n* Considerar espacio lineal de comederosde 4 cm por animal.\n* Consumo estimado: 25 gramos por cada 100 kg de peso vivo.\n* Mantener buena disponibilidad de agua, forraje y FOSVAX.",
+"especie": "* Bovinos en cualquier fase de la produccion.",
+"uso_animal": false,
+"restricciones": "* Ninguna",
+"conservacion": "* Mantener en un lugar seco, fresco, ventilado y protegido.\n* Evitar contacto con piso y alejado 30 cm de las paredes.",
+"presentacion": "Presentación: Bolsas de 25 kg",
+"kg_bolsa": 25
+},
+"PT300 NG": {
+"titulo": "PT 300 NG",
+"subtitulo": "SUPLEMENTO MINERAL PROTEICO PARA BOVINOS",
+"garantias": [
+[
+"CALCIO MINIMO",
+"%",
+"6,65"
+],
+[
+"FOSFORO",
+"%",
+"1,56"
+],
+[
+"SODIO",
+"g",
+"76,20"
+],
+[
+"MAGNESIO",
+"g",
+"5,59"
+],
+[
+"AZUFRE",
+"g",
+"8,12"
+],
+[
+"COBALTO",
+"mg",
+"14,71"
+],
+[
+"COBRE",
+"mg",
+"244,50"
+],
+[
+"IODO",
+"mg",
+"14,35"
+],
+[
+"MANGANESO",
+"mg",
+"215,50"
+],
+[
+"SELENIO",
+"mg",
+"4,86"
+],
+[
+"ZINC",
+"mg",
+"673,00"
+],
+[
+"NDT",
+"%",
+"35,00"
+],
+[
+"ADT",
+"mg",
+"300,00"
+],
+[
+"PB",
+"%",
+"30,00"
+],
+[
+"NNP",
+"%",
+"20,00"
+],
+[
+"POTASIO",
+"g",
+"3,40"
+]
+],
+"caracteristicas": "Suplemento mineral proteico. Fabricado con insumos de alta biodisponibilidad con Aditivos, Macro y Micro minerales.",
+"indicacion": "*Producto indicado para complementar la dieta de bovinos en pastoreo.",
+"modo_usar": "* Suplemento mineral para uso directo en comederos protegidos.\n* Considerar espacio lineal de comederosde 12 cm lineal por animal.\n* Consumo estimado: 100 gramos por cada 100 kg de peso vivo.\n* Mantener buena disponibilidad de agua, forraje y PT 300 NG",
+"especie": "* Bovinos en cualquier fase de la produccion.",
+"uso_animal": false,
+"restricciones": "* No proveer para equideos y tampoco para animales hambrientos. Contiene urea.",
+"conservacion": "* Mantener en un lugar seco, fresco, ventilado y protegido.\n* Evitar contacto con piso y alejado 30 cm de las paredes.",
+"presentacion": "Presentación: Bolsas de 25 kg",
+"kg_bolsa": 25
+},
+"ADIVAX  PRIME 300": {
+"titulo": "ADIVAX PRIME 300",
+"subtitulo": "SUPLEMENTO MINERAL EN POLVO DE PRONTO USO",
+"garantias": [
+[
+"Humedad (Max.)",
+"%",
+"1.00"
+],
+[
+"CALCIO",
+"%",
+"13.80"
+],
+[
+"FOSFORO",
+"%",
+"3.00"
+],
+[
+"SODIO",
+"g",
+"76.00"
+],
+[
+"MAGNESIO",
+"g",
+"18.00"
+],
+[
+"AZUFRE",
+"g",
+"15.00"
+],
+[
+"COBALTO",
+"mg",
+"65.00"
+],
+[
+"COBRE",
+"mg",
+"810.00"
+],
+[
+"IODO",
+"mg",
+"40.00"
+],
+[
+"MANGANESO",
+"mg",
+"830.00"
+],
+[
+"SELENIO",
+"mg",
+"16.00"
+],
+[
+"PROTEINA BRUTA",
+"%",
+"20.00"
+],
+[
+"NDT",
+"%",
+"9.00"
+],
+[
+"ZINC",
+"mg",
+"2,430.00"
+],
+[
+"NNP Eq. Proteico Maxi.",
+"g",
+"180.00"
+]
+],
+"caracteristicas": "Suplemento mineral en polvo, elaborado con insumos de biodisponibilidad que mejoran la eficiencia alimentaria.",
+"indicacion": "*Producto indicado para complementar la dieta de bovinos en pastoreo para animales de cria, recria y engorde bajo pasturas.\n*Al ser un suplemento puede usarse en animales de carne y leche",
+"modo_usar": "* Suplemento mineral para uso directo a campo. Usar comederos con minimo de 4 cm lineal por animal en comederos distribuidos en el campo.\n* Adivax prime 300 puede suplementar 11 animales de 300 kg por 30 dias.\n* Consumo estimado: Minimo de 25 gramos a un maximo de 50 gramos por cada 100 kg de peso vivo, por animal, por dia.\n* Mantener buena disponibilidad de agua, forraje y Adivax prime 300",
+"especie": "Bovinos y bubalinos en cualquier fase de edad.",
+"uso_animal": true,
+"restricciones": "No administrar a ovinos y equinos\nSiga las instrucciones de su tecnico responsable\nEste producto contiene Urea. Usar las dosis recomendadas.",
+"conservacion": "* Mantener en un lugar seco, fresco, ventilado y protegido.\n* Evitar contacto con piso y paredes.",
+"presentacion": "Presentación: Bolsas de 5Kg-10Kg-15Kg-20Kg-25Kg-30Kg-35Kg-40Kg-45Kg-50Kg",
+"kg_bolsa": 25
+},
+"ADIVAX PRIME 400": {
+"titulo": "ADIVAX PRIME 400",
+"subtitulo": "SUPLEMENTO MINERAL ADITIVADO PARA BOVINOS",
+"garantias": [
+[
+"CALCIO",
+"%",
+"11.78"
+],
+[
+"FOSFORO",
+"%",
+"4.03"
+],
+[
+"SODIO",
+"g",
+"95.00"
+],
+[
+"MAGNESIO",
+"g",
+"6.06"
+],
+[
+"AZUFRE",
+"g",
+"15.00"
+],
+[
+"COBALTO",
+"mg",
+"64.48"
+],
+[
+"COBRE",
+"mg",
+"1.020.00"
+],
+[
+"IODO",
+"mg",
+"62.00"
+],
+[
+"MANGANESO",
+"mg",
+"780.00"
+],
+[
+"SELENIO",
+"mg",
+"20.70"
+],
+[
+"ZINC",
+"mg",
+"2.680.00"
+],
+[
+"NDT",
+"%",
+"12.00"
+],
+[
+"ADT",
+"mg",
+"840.00"
+],
+[
+"PB.",
+"%",
+"20.05"
+],
+[
+"NNP",
+"%",
+"18.55"
+]
+],
+"caracteristicas": "Suplemento mineral aditivado. Fabricado con insumos de alta biodisponibilidad con Aditivos, Macro y Micro minerales.",
+"indicacion": "*Producto indicado para complementar la dieta de bovinos en pastoreo.",
+"modo_usar": "* Suplemento mineral para uso directo en saleros protegidos.\n* Considerar espacio de comedero de 8 cm lineal por animal.\n* Consumo estimado: 25 a 50 gramos por cada 100 kg de peso vivo.\n* Mantener buena disponibilidad de agua, forraje y ADIVAX 40 MD",
+"especie": "Bovinos en cualquier fase de produccion.",
+"uso_animal": true,
+"restricciones": "No administrar a ovinos y equinos\nSiga las instrucciones de su tecnico responsable\nEste producto contiene Urea y Ionofor. Usar las dosis recomendadas.",
+"conservacion": "* Mantener en un lugar seco, fresco, ventilado y protegido.\n* Evitar contacto con piso y alejado 30 cm de las paredes.",
+"presentacion": "Presentación: Bolsas de 5Kg-10Kg-15Kg-20Kg-25Kg-30Kg-35Kg-40Kg-45Kg-50Kg",
+"kg_bolsa": 25
+},
+"ADIVAX PRIME REPRO": {
+"titulo": "ADIVAX PRIME REPRO",
+"subtitulo": "SUPLEMENTO MINERAL MEJORADOR PARA BOVINOS",
+"garantias": [
+[
+"CALCIO MINIMO",
+"%",
+"10,58"
+],
+[
+"FOSFORO",
+"%",
+"6,01"
+],
+[
+"SODIO",
+"%",
+"9,50"
+],
+[
+"MAGNESIO",
+"%",
+"3,13"
+],
+[
+"AZUFRE",
+"%",
+"1,76"
+],
+[
+"COBALTO",
+"mg",
+"80,60"
+],
+[
+"COBRE",
+"mg",
+"1.275,00"
+],
+[
+"IODO",
+"mg",
+"77,50"
+],
+[
+"MANGANESO",
+"mg",
+"975,00"
+],
+[
+"SELENIO",
+"mg",
+"25,88"
+],
+[
+"ZINC",
+"mg",
+"3.350,00"
+],
+[
+"NDT",
+"%",
+"17,60"
+],
+[
+"ADT",
+"mg",
+"960,00"
+],
+[
+"PB",
+"g",
+"20,35"
+],
+[
+"NNP",
+"%",
+"18,55"
+]
+],
+"caracteristicas": "Suplemento mineral aditivado, fabricado con insumos de alta biodisponibilidad y con aditivos mejoradores, urea pecuaria protegida, macro y micro minerales.",
+"indicacion": "*Producto indicado para complementar la dieta de Hembras Bovinas en reproduccion bajo pasturas con requerimiento genetico superior. Enriquecido con aditivos mejoradres de desempeño.",
+"modo_usar": "* Suplemento mineral para uso directo en saleros protegidos.\n* Considerar espacio de comedero de 8 cm lineal por animal.\n* Consumo estimado: 25 a 50 gramos por cada 100 animales.\n* Mantener buena disponibilidad de agua, forraje y Adivax Prime Repro",
+"especie": "*Bovinos de carne en cualquier fase de reproduccion.",
+"uso_animal": false,
+"restricciones": "*No proveer para equinos o animales hambrientos. Contiene Urea y Ionoforo.",
+"conservacion": "* Mantener en un lugar seco, fresco, ventilado y protegido.\n* Evitar contacto con piso y alejado 30 cm de las paredes.",
+"presentacion": "Presentación: Bolsas de 25 kg",
+"kg_bolsa": 25
+},
+"AGREGAMAX 700 GP": {
+"titulo": "AGREGAMAX 700",
+"subtitulo": "NUCLEO PROTEICO MINERAL UREADO Y ADITIVADO",
+"garantias": [
+[
+"Materia seca",
+"%",
+"99,00"
+],
+[
+"Calcio - minimo",
+"%",
+"5,84"
+],
+[
+"Fosforo - minimo",
+"%",
+"7,50"
+],
+[
+"Sodio",
+"%",
+"2,31"
+],
+[
+"Azufre",
+"%",
+"0,69"
+],
+[
+"Cobalto",
+"mg",
+"12,26"
+],
+[
+"Cobre",
+"mg",
+"292,50"
+],
+[
+"Iodo",
+"mg",
+"16,86"
+],
+[
+"Manganeso",
+"mg",
+"410,00"
+],
+[
+"Selenio",
+"mg",
+"5,70"
+],
+[
+"Zinc",
+"mg",
+"823,25"
+],
+[
+"Proteina Cruda",
+"%",
+"71,52"
+],
+[
+"NNP EQ Proteina",
+"%",
+"60,42"
+],
+[
+"NDT",
+"%",
+"38,56"
+],
+[
+"Vitamina A",
+"UI/KG",
+"30000,00"
+],
+[
+"Vitamina D",
+"UI/KG",
+"3000,00"
+],
+[
+"Vitamina E",
+"UI/KG",
+"157,00"
+],
+[
+"Aditivo Mejorador",
+"mg/kg",
+"400,00"
+]
+],
+"caracteristicas": "*Nucleo Proteico formulado con insumos de alta biodisponibilidad con Aditivo Mejorador, Proteina Verdadera, Urea Pecuaria, Macro Minerales y Micro Minerales.\n\n*Uso en formulacion de balanceados para bovinos en confinamiento y semiconfinamiento.\nMezcla sugerida: 90% de Maiz/Sorgo + 10% de Agregamax 700 totalizando 100%.\nCambios en el % de inclusion de Agregamax 700 solo bajo asesoria tecnica.",
+"indicacion": "",
+"modo_usar": "*Nucleo Proteico especifico para mezclas con ingredientes energeticos como maiz, sorgo......\n*Consumo de la mezcla proteica con Agregamax 700: 100 gramos por 100 kg de peso vivo.\n*Consumo estimado de la mezcla para un bovino de 400 kg - 400 a 500 gramos animal/dia.\n*Mantener 50 cm lineal de linea de comedero con buena oferta de Rastrojo, Silaje o Heno.",
+"especie": "*Todas las categorias de bovinos de carne con mas de 3 meses de edad.",
+"uso_animal": false,
+"restricciones": "*No proveer para animales hambrientos. No proveer para Equinos. Contiene Urea y Ionoforos.",
+"conservacion": "* Mantener en un lugar seco, fresco, ventilado y protegido.\n* Evitar contacto con piso y alejado 30 cm de las paredes.",
+"presentacion": "Presentación: Bolsas de 5Kg-10Kg-15Kg-20Kg-25Kg-30Kg-35Kg-40Kg-45Kg-50Kg",
+"kg_bolsa": 25
+},
+"AGREGA MAX BEEF 2A": {
+"titulo": "AGREGA MAX BEEF 2A",
+"subtitulo": "NUCLEO MINERAL ADITIVADO PARA BOVINOS",
+"garantias": [
+[
+"CALCIO MINIMO",
+"%",
+"18,70"
+],
+[
+"FOSFORO",
+"%",
+"1,80"
+],
+[
+"SODIO",
+"g",
+"46,00"
+],
+[
+"MAGNESIO",
+"g",
+"17,00"
+],
+[
+"AZUFRE",
+"g",
+"20,00"
+],
+[
+"COBALTO",
+"mg",
+"51,00"
+],
+[
+"COBRE",
+"mg",
+"612,00"
+],
+[
+"IODO",
+"mg",
+"41,00"
+],
+[
+"MANGANESO",
+"mg",
+"1.203,00"
+],
+[
+"SELENIO",
+"mg",
+"10,00"
+],
+[
+"ZINC",
+"mg",
+"2.000,00"
+],
+[
+"ADT1",
+"mg",
+"950,00"
+],
+[
+"ADT2",
+"mg",
+"800,00"
+],
+[
+"VITAMINA A",
+"UI/Kg",
+"120000,00"
+],
+[
+"VITAMINA D",
+"UI/Kg",
+"12000,00"
+],
+[
+"VITAMINA E",
+"UI/kg",
+"600,00"
+]
+],
+"caracteristicas": "*Nucleo mineral fabricado con ingredientes de alta biodisponibilidad, enriquecidos con aditivos, macro y micro minerales.",
+"indicacion": "*Producto indicado para confeccion de alimentos para bovinos en terminacion en sistemas confinados. Uso sugerido en dieta total (TMR). Maxima eficiencia.",
+"modo_usar": "*Nucleo minereal completo para uso directo en mezclas de alimentos.\n*Consumo estimado: 200 a 300 gramos por animal por dia o 3% en la materia seca de la dieta total. Uso exclusivo en mezclas de alimentos terminados.\n*Mantener buena disponibilidad de agua, forraje y Agregamax Beef 2A en la formulacion.",
+"especie": "* Bovinos de carne confinados para alto rendimiento.",
+"uso_animal": false,
+"restricciones": "*No proveer para equidos y tampoco para animales hambrientos. Contiene Ionoforo.",
+"conservacion": "* Mantener en un lugar seco, fresco, ventilado y protegido.\n* Evitar contacto con piso y alejado 30 cm de las paredes.",
+"presentacion": "Presentación: Bolsas de 5Kg-10Kg-15Kg-20Kg-25Kg-30Kg-35Kg-40Kg-45Kg-50Kg",
+"kg_bolsa": 25
+},
+"AGREGAMAX NITRO": {
+"titulo": "AGREGA MAX NITRO",
+"subtitulo": "NUCLEO MINERAL ADITIVADO PARA BOVINOS",
+"garantias": [
+[
+"CALCIO MINIMO",
+"%",
+"13,80"
+],
+[
+"FOSFORO",
+"%",
+"9,50"
+],
+[
+"SODIO",
+"g",
+"38,00"
+],
+[
+"MAGNESIO",
+"g",
+"12,66"
+],
+[
+"AZUFRE",
+"g",
+"15,00"
+],
+[
+"COBALTO",
+"mg",
+"9,00"
+],
+[
+"COBRE",
+"mg",
+"456,00"
+],
+[
+"IODO",
+"mg",
+"27,50"
+],
+[
+"MANGANESO",
+"mg",
+"900,00"
+],
+[
+"SELENIO",
+"mg",
+"9,00"
+],
+[
+"ZINC",
+"mg",
+"1.209,00"
+],
+[
+"PB",
+"%",
+"84,30"
+],
+[
+"NNP EQ PROT",
+"%",
+"84,30"
+],
+[
+"ADT",
+"mg",
+"600,00"
+],
+[
+"VITAMINA A",
+"UI/Kg",
+"603,00"
+],
+[
+"VITAMINA D",
+"UI/Kg",
+"604,00"
+],
+[
+"VITAMINA E",
+"UI/Kg",
+"605,00"
+]
+],
+"caracteristicas": "*Nucleo mineral ureado fabricado con ingredientes de alta biodisponibilidad, enriquecidos con aditivos, urea pecuaria, macro y micro minerales.",
+"indicacion": "*Producto indicado para confeccion de alimentos terminados para bovinos en suplementacion sea en pasturas o confinamiento.",
+"modo_usar": "*Nucleo minereal ureado completo para uso directo en mezclas de alimentos.\n*Consumo estimado: Usar 10% de AGREGAMAX NITRO con 90% de granos, afrechos o harinas energeticas. Consumo de la mezcla de 0.50 a 0.70 kg por cada 100 kg de peso vivo.",
+"especie": "* Bovinos de carne bajo pasturas o confinados. Requiere adaptacion previo uso.",
+"uso_animal": false,
+"restricciones": "*No proveer para equidos y tampoco para animales hambrientos. Contiene Ionoforo y Urea.",
+"conservacion": "* Mantener en un lugar seco, fresco, ventilado y protegido.\n* Evitar contacto con piso y alejado 30 cm de las paredes.",
+"presentacion": "Presentación: Bolsas de 5Kg-10Kg-15Kg-20Kg-25Kg-30Kg-35Kg-40Kg-45Kg-50Kg",
+"kg_bolsa": 25
+},
+"ELITE MAX JUNIOR": {
+"titulo": "ELITE MAX JUNIOR",
+"subtitulo": "ALIMENTO BALANCEADO PARA TERNERO",
+"garantias": [
+[
+"CALCIO MINIMO",
+"%",
+"0,73"
+],
+[
+"FOSFORO",
+"%",
+"0,66"
+],
+[
+"SODIO",
+"%",
+"21,00"
+],
+[
+"MAGNESIO",
+"%",
+"0,18"
+],
+[
+"AZUFRE",
+"%",
+"0,13"
+],
+[
+"COBALTO",
+"mg",
+"0,38"
+],
+[
+"COBRE",
+"mg",
+"24,15"
+],
+[
+"IODO",
+"mg",
+"0,95"
+],
+[
+"MANGANESO",
+"mg",
+"58,06"
+],
+[
+"SELENIO",
+"mg",
+"0,38"
+],
+[
+"ZINC",
+"mg",
+"94,31"
+],
+[
+"NDT",
+"%",
+"71,60"
+],
+[
+"ADT 1",
+"mg",
+"42,00"
+],
+[
+"ADT 2",
+"mg",
+"40,00"
+],
+[
+"PB",
+"%",
+"21,00"
+],
+[
+"NDT",
+"%",
+"80,00"
+],
+[
+"Sacharomyces C.",
+"ufc/kg",
+"4.5 x 10 e 13"
+],
+[
+"VITAMINA A",
+"UI/kg",
+"2400,00"
+],
+[
+"VITAMINA D",
+"UI/kg",
+"240,00"
+],
+[
+"VITAMINA E",
+"UI/kg",
+"12,50"
+],
+[
+"Cromo Organico",
+"mg",
+"0,15"
+],
+[
+"POTASIO",
+"%",
+"0,58"
+]
+],
+"caracteristicas": "*Alimento balanceado para animales de cabaña. Fabricado con ingredientes proteicos, energeticos, aditivos, levadura viva, macro y micro minerales organicos.",
+"indicacion": "*Producto para suplementar terneros en destete hasta la fase de recria bajo pasturas o confinados.",
+"modo_usar": "*Alimento balanceado para uso directo en comederos protegidos.\n*Considerar espacio de comedero de 40 cm lineal por animal.\n*Consumo estimado: 1,00 a 1,50% del peso vivo.\n*Mantener buena disponibilidad de agua, forraje y Elite Max Junior.",
+"especie": "*Bovinos de carne de alto valor genetico.",
+"uso_animal": false,
+"restricciones": "*No proveer para equideos. Contiene ionoforos.",
+"conservacion": "* Mantener en un lugar seco, fresco, ventilado y protegido.\n* Evitar contacto con piso y alejado 30 cm de las paredes.",
+"presentacion": "Presentación: Bolsas de 5Kg-10Kg-15Kg-20Kg-25Kg-30Kg-35Kg-40Kg-45Kg-50Kg",
+"kg_bolsa": 25
+},
+"FLEX PASTO MA P": {
+"titulo": "NUCLEO FLEX PASTO NG",
+"subtitulo": "NUCLEO MINERAL ADITIVADO",
+"garantias": [
+[
+"Materia Seca",
+"%",
+"95,00"
+],
+[
+"Calcio - minimo",
+"%",
+"17,60"
+],
+[
+"Fosforo - minimo",
+"%",
+"0,97"
+],
+[
+"Sodio",
+"%",
+"7,60"
+],
+[
+"Azufre",
+"%",
+"3,80"
+],
+[
+"Cobalto",
+"mg",
+"39,00"
+],
+[
+"Cobre",
+"mg",
+"875,00"
+],
+[
+"Iodo",
+"mg",
+"53,00"
+],
+[
+"Manganeso",
+"mg",
+"1.110,00"
+],
+[
+"Selenio",
+"mg",
+"18,00"
+],
+[
+"Zinc",
+"mg",
+"2.307,00"
+],
+[
+"ADITIVO 1",
+"mg",
+"450,00"
+],
+[
+"ADITIVO 2",
+"mg",
+"600,00"
+],
+[
+"VITAMINA A",
+"UI",
+"96000,00"
+],
+[
+"VITAMINA D",
+"UI",
+"9600,00"
+],
+[
+"VITAMINA E",
+"UI",
+"500,00"
+]
+],
+"caracteristicas": "*Nucleo Proteico formulado con isnumos de al biodisponibilidad con Proteina, Macro Minerales y Micro Minerales.",
+"indicacion": "*Uso en formulacion de suplementos balanceados, proteicos y energeticos para bovinos.\nUtilizar de 5 a 20% en las formulaciones de alimento terminado.",
+"modo_usar": "* Nucleo Proteico para mezclas con ingredientes energeticos y proteicos.\n* Consumo de la mezcla proteica con Nucleo Flex 75 gramos por 100 kg de peso vivo\n* Consumo estimado de la mezcla para un bovino de 500 a 800 gramos por dia\n* Mantener Area de comedero con suficiente alcance de todos los animales.",
+"especie": "* Todas las categorias de bovinos de carne y leche.",
+"uso_animal": false,
+"restricciones": "* No proveer para animales hambrientos. Contiene ionosforos.",
+"conservacion": "* Mantener en un lugar seco, fresco, ventilado y protegido.\n* Evitar contacto con piso y alejado 30 cm de las paredes.",
+"presentacion": "Presentación: Bolsas de 5Kg-10Kg-15Kg-20Kg-25Kg-30Kg-35Kg-40Kg-45Kg-50Kg",
+"kg_bolsa": 25
+},
+"FOSVAX 40": {
+"titulo": "FOS VAX 40",
+"subtitulo": "SUPLEMENTO MINERAL PARA BOVINOS",
+"garantias": [
+[
+"CALCIO",
+"%",
+"13,63"
+],
+[
+"FOSFORO",
+"%",
+"4,02"
+],
+[
+"SODIO",
+"g",
+"114,00"
+],
+[
+"MAGNESIO",
+"g",
+"8,36"
+],
+[
+"AZUFRE",
+"g",
+"15,00"
+],
+[
+"COBALTO",
+"mg",
+"48,36"
+],
+[
+"COBRE",
+"mg",
+"765,00"
+],
+[
+"IODO",
+"mg",
+"46,50"
+],
+[
+"MANGANESO",
+"mg",
+"585,00"
+],
+[
+"SELENIO",
+"mg",
+"15,53"
+],
+[
+"ZINC",
+"",
+"2.010,00"
+]
+],
+"caracteristicas": "Suplemento mineral. Fbaricado con insumos de biodisponibilidad, contiene MACRO Y MICRO MINERALES",
+"indicacion": "*Producto indicado para complementar la dieta de bovinos de todas las categorias en epoca seca.",
+"modo_usar": "* Suplemento mineral para uso directo en comederos protegidos.\n* Considerar espacio lineal de comederosde 4 cm por animal.\n* Consumo estimado: 25 gramos por cada 100 kg de peso vivo.\n* Mantener buena disponibilidad de agua, forraje y FOSVAX.",
+"especie": "* Bovinos en cualquier fase de la produccion.",
+"uso_animal": false,
+"restricciones": "* Ninguna",
+"conservacion": "* Mantener en un lugar seco, fresco, ventilado y protegido.\n* Evitar contacto con piso y alejado 30 cm de las paredes.",
+"presentacion": "Presentación: Bolsas de 25 kg",
+"kg_bolsa": 25
+},
+"FOSVAX 60 NG": {
+"titulo": "FOS VAX 60 NG",
+"subtitulo": "SUPLEMENTO MINERAL PARA BOVINOS",
+"garantias": [
+[
+"CALCIO",
+"%",
+"14,15"
+],
+[
+"FOSFORO",
+"%",
+"6,02"
+],
+[
+"SODIO",
+"g",
+"102,60"
+],
+[
+"MAGNESIO",
+"g",
+"16,11"
+],
+[
+"AZUFRE",
+"g",
+"15,00"
+],
+[
+"COBALTO",
+"mg",
+"48,36"
+],
+[
+"COBRE",
+"mg",
+"765,00"
+],
+[
+"IODO",
+"mg",
+"46,50"
+],
+[
+"MANGANESO",
+"mg",
+"585,00"
+],
+[
+"SELENIO",
+"mg",
+"15,53"
+],
+[
+"ZINC",
+"mg",
+"2.010,00"
+]
+],
+"caracteristicas": "Suplemento mineral. Fbaricado con insumos de biodisponibilidad, contiene MACRO Y MICRO MINERALES",
+"indicacion": "*Producto indicado para complementar la dieta de bovinos de todas las categorias pasto en epoca seca.",
+"modo_usar": "* Suplemento mineral para uso directo en comederos protegidos.\n* Considerar espacio lineal de comederosde 4 cm por animal.\n* Consumo estimado: 25 gramos por cada 100 kg de peso vivo.\n* Mantener buena disponibilidad de agua, forraje y FOSVAX 60 NG.",
+"especie": "* Bovinos en cualquier fase de la produccion.",
+"uso_animal": false,
+"restricciones": "* Ninguna",
+"conservacion": "* Mantener en un lugar seco, fresco, ventilado y protegido.\n* Evitar contacto con piso y alejado 30 cm de las paredes.",
+"presentacion": "Presentación: Bolsas de 25 kg",
+"kg_bolsa": 25
+},
+"LECHEMAX 161 MD": {
+"titulo": "LECHE MAX 161 MD",
+"subtitulo": "ALIMENTO BALANCEADO PARA VACAS LECHERAS EN PRODUCCION",
+"garantias": [
+[
+"CALCIO MINIMO",
+"%",
+"4,37"
+],
+[
+"FOSFORO",
+"%",
+"0,23"
+],
+[
+"SODIO",
+"%",
+"0,39"
+],
+[
+"MAGNESIO",
+"%",
+"0,53"
+],
+[
+"AZUFRE",
+"%",
+"0,12"
+],
+[
+"COBALTO",
+"mg",
+"1,89"
+],
+[
+"COBRE",
+"mg",
+"42,12"
+],
+[
+"IODO",
+"mg",
+"2,30"
+],
+[
+"MANGANESO",
+"mg",
+"57,50"
+],
+[
+"SELENIO",
+"mg",
+"0,80"
+],
+[
+"ZINC",
+"mg",
+"126,18"
+],
+[
+"NDT",
+"%",
+"65,26"
+],
+[
+"ADT 1",
+"mg",
+"50,00"
+],
+[
+"PB",
+"%",
+"16,11"
+],
+[
+"NNP",
+"%",
+"6,18"
+],
+[
+"VITAMINA A",
+"UI/KG",
+"2400,00"
+]
+],
+"caracteristicas": "*Alimento balanceado. Fabricado con ingredientes proteicos, energeticos, aditivos, urea pecuaria, macro y micro minerales.",
+"indicacion": "*Producto indicado para complementar la dieta de bovinos lecheros en sistema de pastoreo lotacion continua.",
+"modo_usar": "*Alimento balanceado para uso directo en comederos protegidos.\n*Considerar espacio de comedero de 50 cm lineal por animal.\n*Consumo estimado: 1.0 kg de Lechemax para 3 litros de leche producido.\n*Mantener buena disponibilidad de agua, forraje y Leche Pasto.",
+"especie": "*Bovinos lecheros en produccion",
+"uso_animal": false,
+"restricciones": "*No proveer para equideos y tampoco para animales hambrientos. Contiene Urea",
+"conservacion": "* Mantener en un lugar seco, fresco, ventilado y protegido.\n* Evitar contacto con piso y alejado 30 cm de las paredes.",
+"presentacion": "Presentación: Bolsas de 5Kg-10Kg-15Kg-20Kg-25Kg-30Kg-35Kg-40Kg-45Kg-50Kg",
+"kg_bolsa": 25
+},
+"MAXENERGY18": {
+"titulo": "MAX ENERGY 18",
+"registro": "012919/25",
+"subtitulo": "SUPLEMENTO PROTEICO ENERGETICO PARA BOVINOS",
+"garantias": [
+[
+"CALCIO",
+"%",
+"2.70"
+],
+[
+"FOSFORO",
+"%",
+"0.60"
+],
+[
+"SODIO",
+"g",
+"19.00"
+],
+[
+"MAGNESIO",
+"g",
+"7.00"
+],
+[
+"AZUFRE",
+"g",
+"2.00"
+],
+[
+"COBALTO",
+"mg",
+"8.00"
+],
+[
+"COBRE",
+"mg",
+"130.00"
+],
+[
+"IODO",
+"mg",
+"8.00"
+],
+[
+"MANGANESO",
+"mg",
+"104.00"
+],
+[
+"SELENIO",
+"mg",
+"3.00"
+],
+[
+"ZINC",
+"mg",
+"346.00"
+],
+[
+"NDT",
+"%",
+"65.00"
+],
+[
+"ADT",
+"mg",
+"90.00"
+],
+[
+"PB",
+"g",
+"18.00"
+],
+[
+"NNP",
+"%",
+"9.00"
+],
+[
+"POTASIO",
+"g",
+"1.00"
+]
+],
+"caracteristicas": "Suplemento mineral proteico energetico. Fabricado con insumos de alta biodisponibilidad con Aditivos Macro y Micro minerales.",
+"indicacion": "*Producto indicado para complementar la dieta de bovinos en pastoreo.",
+"modo_usar": "* Suplemento mineral para uso directo en comederos protegidos.\n* Considerar espacio de comedero de 25 cm lineal por animal.\n* Consumo estimado 300 gramos por cada 100 kg de peso vivo.\n* Mantener buena disponibilidad de agua, forraje y Max Energy 18",
+"especie": "* Bovinos en cualquier fase de produccion.",
+"uso_animal": true,
+"restricciones": "* NINGUNA",
+"conservacion": "* Mantener en un lugar seco, fresco, ventilado y protegido.\n* Evitar contacto con piso y alejado 30 cm de las paredes.",
+"presentacion": "Presentación: Bolsas de 5Kg-10Kg-15Kg-20Kg-25Kg-30Kg-35Kg-40Kg-45Kg-50Kg",
+"kg_bolsa": 25
+},
+"PE250": {
+"titulo": "PE 250 NGMAX",
+"subtitulo": "SUPLEMENTO PROTEICO ENERGETICO MINERAL HARINADO",
+"garantias": [
+[
+"Humedad (Max.)",
+"%",
+"10.00"
+],
+[
+"CALCIO",
+"%",
+"35.00"
+],
+[
+"FOSFORO",
+"%",
+"0.70"
+],
+[
+"SODIO",
+"g",
+"10.00"
+],
+[
+"MAGNESIO",
+"g",
+"9.00"
+],
+[
+"AZUFRE",
+"g",
+"5.00"
+],
+[
+"COBALTO",
+"mg",
+"4.00"
+],
+[
+"COBRE",
+"mg",
+"50.00"
+],
+[
+"IODO",
+"mg",
+"2.50"
+],
+[
+"MANGANESO",
+"mg",
+"70.00"
+],
+[
+"SELENIO",
+"mg",
+"1.00"
+],
+[
+"PROTEINA BRUTA",
+"%",
+"25.00"
+],
+[
+"NDT",
+"%",
+"62.00"
+],
+[
+"ZINC",
+"mg",
+"170.00"
+],
+[
+"NNP Eq. Proteico",
+"g",
+"125.00"
+]
+],
+"caracteristicas": "Suplemento proteico mineral harinado, elaborado con insumos de alta biodisponibilidad que mejoran la eficiencia alimentaria.",
+"indicacion": "*Producto indicado para complementar la dieta de bovinos en pastoreo para animales de cria, recria y engorde bajo pasturas.\n*Al ser un suplemento puede usarse en animales de carne y leche",
+"modo_usar": "* Suplemento proteico mineral para uso direto en comederos, minimo de 25 cm lineal por animal. Necesita adaptacion del producto a los animales. Durante primeros 10 dias 50% del producto con 50% de suplemento mineral, despues de los 10 dias, usar solo NG 250 a los animales.\n* PE 250 puede suplementar 1 animal de 450 kg por 15 dias.\n* Consumo estimado: Minimo de 300 gramos por 100 kg de peso vivo, por animal, por dia.\n* Mantener buena disponibilidad de agua, forraje y PE 250.",
+"especie": "Bovinos y bubalinos a partir de 4 meses de edad.",
+"uso_animal": true,
+"restricciones": "No administrar a ovinos y equinos\nSiga las instrucciones de su tecnico responsable\nEste producto contiene Urea. Usar las dosis recomendadas.",
+"conservacion": "* Mantener en un lugar seco, fresco, ventilado y protegido.\n* Evitar contacto con piso y paredes.",
+"presentacion": "Presentación: Bolsas de 5Kg-10Kg-15Kg-20Kg-25Kg-30Kg-35Kg-40Kg-45Kg-50Kg",
+"kg_bolsa": 25
+},
+"POWER LAC PASTO": {
+"titulo": "POWER LAC PASTO",
+"subtitulo": "SUPLEMENTO MINERAL PROTEICO ENERGETICO ADITIVADO PARA BOVINOS LECHEROS",
+"garantias": [
+[
+"CALCIO MINIMO",
+"%",
+"6,20"
+],
+[
+"FOSFORO",
+"%",
+"1,60"
+],
+[
+"SODIO",
+"%",
+"1,70"
+],
+[
+"MAGNESIO",
+"%",
+"1,20"
+],
+[
+"AZUFRE",
+"%",
+"0,90"
+],
+[
+"COBALTO",
+"mg",
+"10,00"
+],
+[
+"COBRE",
+"mg",
+"168,00"
+],
+[
+"IODO",
+"mg",
+"10,00"
+],
+[
+"MANGANESO",
+"mg",
+"157,00"
+],
+[
+"SELENIO",
+"mg",
+"3,00"
+],
+[
+"ZINC",
+"mg",
+"472,00"
+],
+[
+"Aditivo",
+"mg",
+"240,00"
+],
+[
+"NNP",
+"%",
+"17,00"
+],
+[
+"PB",
+"%",
+"34,00"
+],
+[
+"NDT",
+"%",
+"51,00"
+],
+[
+"Acido Oleico",
+"mg",
+"734,00"
+],
+[
+"Acido Linoleico",
+"mg",
+"652,00"
+],
+[
+"Acido Palmitico",
+"mg",
+"245,00"
+]
+],
+"caracteristicas": "*Suplemento mineral proteico y energetico. Fabricado con insumos de alta biodisponibilidad, ingredientes proteicos y energeticos, aditivos, grasa protegida macro y micro minerales.",
+"indicacion": "*Promover una adecuada suplementacion proteica y mineral en complementacion a la pastura (voluminoso) de la dieta, de acuerdo a las caracteristicas tecnicas de Power Lac Pasto.",
+"modo_usar": "* En la primera semana ofertar 50% del consumo estimado (150 a 200 por cada 100 kg PV)\n*Considerar espacio de comedero minimo de 40 cm lineal por animal.\n*Consumo estimado: 300 a 400 gramos por cada 100 kg de peso vivo.",
+"especie": "* Bovinos lecheros en la fase de produccion.",
+"uso_animal": false,
+"restricciones": "*No administrar a equideos y tampoco para animales hambrientos. Contiene urea y ionoforo.",
+"conservacion": "* Mantener en un lugar seco, fresco, ventilado y protegido.\n* Evitar contacto con piso y alejado 30 cm de las paredes.",
+"presentacion": "Presentación: Bolsas de 5Kg-10Kg-15Kg-20Kg-25Kg-30Kg-35Kg-40Kg-45Kg-50Kg",
+"kg_bolsa": 25
+},
+"PT400 NG": {
+"titulo": "PT 400",
+"subtitulo": "SUPLEMENTO MINERAL PROTEICO PARA BOVINOS",
+"garantias": [
+[
+"CALCIO MINIMO",
+"%",
+"4,49"
+],
+[
+"FOSFORO",
+"%",
+"1,58"
+],
+[
+"SODIO",
+"g",
+"76,20"
+],
+[
+"MAGNESIO",
+"g",
+"2,95"
+],
+[
+"AZUFRE",
+"g",
+"8,20"
+],
+[
+"COBALTO",
+"mg",
+"14,71"
+],
+[
+"COBRE",
+"mg",
+"244,50"
+],
+[
+"IODO",
+"mg",
+"14,35"
+],
+[
+"MANGANESO",
+"mg",
+"215,50"
+],
+[
+"SELENIO",
+"mg",
+"4,86"
+],
+[
+"ZINC",
+"mg",
+"673,00"
+],
+[
+"NDT",
+"%",
+"40,00"
+],
+[
+"ADT",
+"mg",
+"300,00"
+],
+[
+"PB",
+"%",
+"40,00"
+],
+[
+"NNP",
+"%",
+"28,00"
+],
+[
+"POTASIO",
+"g",
+"3,80"
+]
+],
+"caracteristicas": "Suplemento mineral proteico. Fabricado con insumos de alta biodisponibilidad con Aditivos, Macro y Micro minerales.",
+"indicacion": "*Producto indicado para complementar la dieta de bovinos en pastoreo.",
+"modo_usar": "* Suplemento mineral para uso directo en comederos protegidos.\n* Considerar espacio lineal de comederosde 12 cm lineal por animal.\n* Consumo estimado: 100 gramos por cada 100 kg de peso vivo.\n* Mantener buena disponibilidad de agua, forraje y PT 400",
+"especie": "* Bovinos en cualquier fase de la produccion.",
+"uso_animal": false,
+"restricciones": "* No proveer para equideos y tampoco para animales hambrientos. Contiene urea.",
+"conservacion": "* Mantener en un lugar seco, fresco, ventilado y protegido.\n* Evitar contacto con piso y alejado 30 cm de las paredes.",
+"presentacion": "Presentación: Bolsas de 25 kg",
+"kg_bolsa": 25
+},
+"TERNEMAX MODULADOR": {
+"titulo": "TERNEMAX MODULADOR",
+"subtitulo": "ALIMENTO TERMINADO PARA TERNEROS EN SISTEMA DE CREEP FEEDING O DESTETE PRECOZ PARA PRONTO USO",
+"garantias": [
+[
+"Humedad (Max.)",
+"%",
+"1.00"
+],
+[
+"CALCIO",
+"%",
+"2.50"
+],
+[
+"FOSFORO",
+"%",
+"0.57"
+],
+[
+"SODIO",
+"g",
+"4.00"
+],
+[
+"MAGNESIO",
+"g",
+"3.49"
+],
+[
+"AZUFRE",
+"g",
+"1.77"
+],
+[
+"COBALTO",
+"mg",
+"0.74"
+],
+[
+"COBRE",
+"mg",
+"42.36"
+],
+[
+"IODO",
+"mg",
+"2.05"
+],
+[
+"MANGANESO",
+"mg",
+"94.00"
+],
+[
+"SELENIO",
+"mg",
+"0.74"
+],
+[
+"PROTEIBA BRUTA",
+"%",
+"20.00"
+],
+[
+"NDT",
+"%",
+"71.60"
+],
+[
+"ZINC",
+"mg",
+"143.00"
+],
+[
+"NNP Eq. Proteico Maxi.",
+"g",
+"14.10"
+],
+[
+"Bacitracina de Zinc",
+"mg",
+"75.00"
+],
+[
+"Monensina",
+"mg",
+"30.00"
+],
+[
+"Vitamina A",
+"ui/kg",
+"7.200.00"
+],
+[
+"Vitamina B",
+"ui/kg",
+"720.00"
+],
+[
+"Vitamina E",
+"ui/kg",
+"37.50"
+],
+[
+"Sachromyces Cerevisae",
+"Ufc/kg",
+"4.5x10e11"
+]
+],
+"caracteristicas": "Alimento proteico, energetico, mineral y vitaminico harinado, elaborado con insumos de alta biodisponibilidad enriquecidos con Aditivos mejoradores de desempeño",
+"indicacion": "*Producto indicado para complementar la dieta de terneros en pastoreo sea destete precoz o creep feeding.\n*indicado para Bovinos y Bubalinos de carne y leche",
+"modo_usar": "* Alimento para uso directo en comederos, minimo de 25 cm lineal por animal.\n* Ternemax Modulador puede suplementar terneros a partir de los 60 dias de vida hasta su edad para destete\n* Consumo estimado: Consumo de 1.00 a 1.50% del peso vivo, por animal, por dia.",
+"especie": "Bovinos y bubalinos en cualquier fase de edad",
+"uso_animal": true,
+"restricciones": "No administrar a ovinos y equinos\nSiga las instrucciones de su tecnico responsable",
+"conservacion": "* Mantener en un lugar seco, fresco, ventilado y protegido.\n* Evitar contacto con piso y paredes.",
+"presentacion": "Presentación: Bolsas de 5Kg-10Kg-15Kg-20Kg-25Kg-30Kg-35Kg-40Kg-45Kg-50Kg",
+"kg_bolsa": 25
+}
+};
+var ETQ_PIE = {
+  senasag: 'BOLIVIA SENASAG Reg. PUV - N°. ',
+  fabricante: 'FABRICADO Y DISTRIBUIDO POR : Planta Procesadora de Alimentos Nogalmax S.R.L.',
+  nit: 'NIT:  554964025',
+  planta: 'Reg. Sanitario Planta SENASAG N°: 07-17958',
+  vencimiento: '12 meses despues de la fecha de elaboracion'
+};
+var ETQ_CSS =
+  '.etq{width:152.4mm;height:101.5mm;box-sizing:border-box;border:.35mm solid #000;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif;display:flex;flex-direction:column;overflow:hidden;position:relative}'+
+  '.etq *{box-sizing:border-box}'+
+  '.etq-top{display:flex;align-items:center;height:11.5mm;border-bottom:.35mm solid #000;padding:0 2mm}'+
+  '.etq-tit{flex:1;text-align:center;font-family:"Arial Black",Arial,sans-serif;font-weight:900;font-size:24pt;line-height:1;white-space:nowrap;letter-spacing:.2pt;overflow:hidden}'+
+  '.etq-logo{height:7.6mm;width:auto;margin-left:2mm}'+
+  '.etq-sub{border-bottom:.35mm solid #000;text-align:center;font-weight:700;font-size:7.4pt;line-height:1.15;padding:.5mm 1mm;letter-spacing:.2pt;white-space:nowrap;overflow:hidden}'+
+  '.etq-body{flex:1;display:flex;min-height:0}'+
+  '.etq-l{width:43%;border-right:.35mm solid #000;display:flex;flex-direction:column;padding:1.2mm 1.6mm 1.5mm 2.4mm;font-size:calc(6.6pt * var(--fl,1))}'+
+  '.etq-l h4{margin:0 0 1mm;font-size:1.05em;font-weight:700;text-align:center}'+
+  '.etq-gt{width:100%;border-collapse:collapse;line-height:1.12}'+
+  '.etq-gt th{font-size:1.2em;font-weight:700;text-align:left;padding:0 0 .6mm}'+
+  '.etq-gt th:nth-child(2),.etq-gt td:nth-child(2){text-align:center;width:24%}'+
+  '.etq-gt th:nth-child(3),.etq-gt td:nth-child(3){text-align:right;width:26%}'+
+  '.etq-gt td{padding:0;vertical-align:top;line-height:1.2;height:1.2em}'+
+  '.etq-vet{margin-top:auto;text-align:center;font-weight:700;font-size:calc(9.6pt * var(--fl,1));line-height:1.3;padding-bottom:1mm}'+
+  '.etq-r{width:57%;display:flex;flex-direction:column;min-height:0}'+
+  '.etq-rc{flex:1;min-height:0;overflow:hidden;padding:.8mm 1.6mm 0 1.6mm;font-size:calc(5.9pt * var(--fr,1));line-height:1.22}'+
+  '.etq-rc h5{margin:.9mm 0 .4mm;text-align:center;font-size:1.22em;font-weight:700}'+
+  '.etq-rc h5:first-child{margin-top:0}'+
+  '.etq-rc p{margin:0;white-space:pre-line}'+
+  '.etq-rc .etq-uso{text-align:center;font-weight:700;font-size:1.22em;margin-top:.8mm}'+
+  '.etq-pres{margin-top:1mm}'+
+  '.etq-fe{border-top:.35mm solid #000;padding:.8mm 1.6mm .6mm;font-size:5.9pt;line-height:1.3;position:relative}'+
+  '.etq-fe b{font-weight:700}'+
+  '.etq-fe .etq-sen{position:absolute;right:1.6mm;bottom:.7mm;font-weight:700;font-size:5.4pt}'+
+  '.etq-fab{border-top:.35mm solid #000;padding:.6mm 1.6mm .8mm;font-size:5.5pt;font-weight:700;line-height:1.3;white-space:nowrap;overflow:hidden}'+
+  '.etq-dato{font-weight:700;font-size:6.6pt}';
+
+// Registro SENASAG del producto según su categoría (se puede cambiar por producto en el editor de la etiqueta)
+var ETQ_REG_CATEGORIA = {
+  'PROTEINADOS':'012919/25',
+  'SALES MINERALES':'012870/25',
+  'MINERALES ADITIVADOS':'012870/25',
+  'ALIMENTOS BALANCEADOS':'012921/25',
+  'NUCLEOS Y PREMIX':'012919/25'
+};
+function etqRegistroDe(hoja, et){
+  if(et && et.registro) return et.registro;
+  var p = state.productos.find(function(x){ return x.hoja===hoja; });
+  return (p && ETQ_REG_CATEGORIA[p.categoria]) || '012919/25';
+}
+function etiquetaDeProducto(hoja){
+  var p = state.productos.find(function(x){ return x.hoja===hoja; });
+  if(p && p.etiqueta && typeof p.etiqueta==='object' && p.etiqueta.titulo) return p.etiqueta;
+  return ETIQUETAS_BASE[hoja] || null;
+}
+function etqFechaHoy(){ var d=new Date(); return ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear(); }
+function etqIsoAFecha(iso){ if(!iso) return ''; var m=String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3]+'/'+m[2]+'/'+m[1] : ''; }
+function etqFechaAIso(f){ var m=String(f||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return m ? m[3]+'-'+m[2]+'-'+m[1] : ''; }
+
+function renderEtiquetaHtml(et, fecha, lote, fl, fr, registro){
+  function e(s){ return escapeHtml(s==null?'':String(s)); }
+  function sec(t, txt){ return txt ? '<h5>'+e(t)+'</h5><p>'+e(txt)+'</p>' : ''; }
+  var filas = (et.garantias||[]).map(function(g){ return '<tr><td>'+e(g[0])+'</td><td>'+e(g[1])+'</td><td>'+e(g[2])+'</td></tr>'; }).join('');
+  return '<div class="etq" style="--fl:'+(fl||1)+';--fr:'+(fr||1)+'">'+
+    '<div class="etq-top"><div class="etq-tit">'+e(et.titulo)+'</div><img class="etq-logo" src="'+LOGO_DATA_URI+'" alt="NOGALMAX"></div>'+
+    '<div class="etq-sub">'+e(et.subtitulo)+'</div>'+
+    '<div class="etq-body">'+
+      '<div class="etq-l"><h4>NIVELES DE GARANTIA POR KG PRODUCTO</h4>'+
+        '<table class="etq-gt"><thead><tr><th>NUTRIENTE</th><th>UNIDAD</th><th>VALOR</th></tr></thead><tbody>'+filas+'</tbody></table>'+
+        '<div class="etq-vet">PRODUCTO DE USO<br>VETERINARIO<br>MANTENER FUERA DEL<br>ALCANCE DE LOS NIÑOS</div>'+
+      '</div>'+
+      '<div class="etq-r">'+
+        '<div class="etq-rc">'+
+          sec('CARACTERISTICAS DEL PRODUCTO', et.caracteristicas)+
+          sec('INDICACION DE USO', et.indicacion)+
+          sec('MODO DE USAR', et.modo_usar)+
+          sec('ESPECIE DE DESTINO', et.especie)+
+          (et.uso_animal ? '<div class="etq-uso">"USO EN ALIMENTACIÓN ANIMAL"</div>' : '')+
+          sec('RESTRICCIONES DE USO', et.restricciones)+
+          sec('MODO DE CONSERVACION', et.conservacion)+
+          (et.presentacion ? '<p class="etq-pres">'+(function(t){ var m=String(t).match(/^([^:]{1,20}:)([\s\S]*)$/); return m ? '<b>'+e(m[1])+'</b>'+e(m[2]) : e(t); })(et.presentacion)+'</p>' : '')+
+        '</div>'+
+        '<div class="etq-fe">FECHA DE ELABORACION: <span class="etq-dato">'+e(fecha)+'</span><br>'+
+          'FECHA DE VENCIMIENTO: '+e(et.vencimiento || ETQ_PIE.vencimiento)+'<br>'+
+          'LOTE: <span class="etq-dato">'+e(lote)+'</span>'+
+          '<span class="etq-sen">'+e(ETQ_PIE.senasag+(registro||et.registro||'012919/25'))+'</span></div>'+
+        '<div class="etq-fab">'+e(ETQ_PIE.fabricante)+'<br>'+e(ETQ_PIE.nit)+'<span style="float:right">'+e(ETQ_PIE.planta)+'</span></div>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+// Achica la letra de cada columna hasta que entre todo en la etiqueta (sin cortar texto).
+function etqAjustar(host){
+  var etq = host.querySelector('.etq'); if(!etq) return {fl:1, fr:1};
+  var l = etq.querySelector('.etq-l'), rc = etq.querySelector('.etq-rc');
+  var fl = 1, fr = 1;
+  for(var i=0;i<30 && l.scrollHeight > l.clientHeight+1 && fl>0.55;i++){ fl -= 0.03; etq.style.setProperty('--fl', fl.toFixed(2)); }
+  for(var j=0;j<30 && rc.scrollHeight > rc.clientHeight+1 && fr>0.55;j++){ fr -= 0.03; etq.style.setProperty('--fr', fr.toFixed(2)); }
+  var tit = etq.querySelector('.etq-tit'); var fs = 24;
+  while(tit.scrollWidth > tit.clientWidth+1 && fs>12){ fs -= 1; tit.style.fontSize = fs+'pt'; }
+  var sub = etq.querySelector('.etq-sub'); var fsu = 7.4;
+  while(sub.scrollWidth > sub.clientWidth+1 && fsu>4.6){ fsu = Math.round((fsu-0.2)*10)/10; sub.style.fontSize = fsu+'pt'; }
+  return {fl:Number(fl.toFixed(2)), fr:Number(fr.toFixed(2)), tit:fs, sub:fsu};
+}
+
+/* ---- sección de etiquetas dentro del documento de producción ---- */
+var etqState = null;
+function etqLoteDeOrden(o){ return o.desde_stock_existente ? origenStockInfo(o).lote : (o.lote||''); }
+function renderEtiquetasSeccion(o){
+  var box = document.getElementById('prodEtqBox'); if(!box) return;
+  var et = etiquetaDeProducto(o.producto_hoja);
+  var p = state.productos.find(function(x){ return x.hoja===o.producto_hoja; });
+  if(!et){
+    etqState = {o:o, et:null};
+    box.innerHTML = '<div class="fi-section">🏷️ Etiquetas para bolsas</div>'+
+      '<p class="footnote" style="margin:4px 0 8px">«'+escapeHtml(o.producto_nombre)+'» todavía no tiene etiqueta cargada.</p>'+
+      (p ? '<button class="ghost" id="btnEtqEditar">➕ Cargar etiqueta de este producto</button>' : '');
+    var b0 = document.getElementById('btnEtqEditar'); if(b0) b0.addEventListener('click', function(){ openEtqEditor(p); });
+    return;
+  }
+  var kgBolsa = Number(et.kg_bolsa)||25;
+  var kg = Math.round((Number(o.cantidad_toneladas)||0)*1000);
+  var fecha = etqIsoAFecha(o.completado_en) || etqFechaHoy();
+  etqState = {o:o, et:et, fecha:fecha, lote:etqLoteDeOrden(o), kgBolsa:kgBolsa, cant:Math.max(1, Math.ceil(kg/kgBolsa))};
+  box.innerHTML =
+    '<div class="fi-section">🏷️ Etiquetas para bolsas — imprimir en planta</div>'+
+    '<div class="etq-form">'+
+      '<label>Fecha de elaboración<input type="date" id="etqFecha" value="'+etqFechaAIso(fecha)+'"></label>'+
+      '<label>Lote<input type="text" id="etqLote" value="'+escapeHtml(etqState.lote)+'"></label>'+
+      '<label>Kg por bolsa<input type="number" id="etqKgBolsa" min="1" step="1" value="'+kgBolsa+'"></label>'+
+      '<label>N° de etiquetas<input type="number" id="etqCant" min="1" step="1" value="'+etqState.cant+'"></label>'+
+    '</div>'+
+    '<p class="footnote" style="margin:2px 0 8px" id="etqNota"></p>'+
+    '<div class="etq-prev-wrap"><div class="etq-prev" id="etqPrev"></div></div>'+
+    '<div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">'+
+      '<button class="primary" id="btnEtqImprimir">🖨 Imprimir etiquetas</button>'+
+      (p ? '<button class="ghost" id="btnEtqEditar">✏️ Editar contenido de la etiqueta</button>' : '')+
+    '</div>'+
+    '<p class="footnote">Al imprimir elegí la <b>Honeywell PC42t</b>, tamaño de papel <b>152,4 × 101,5 mm</b> (6×4"), márgenes <b>Ninguno</b> y escala <b>100%</b>. Sale una etiqueta por página.</p>';
+  function nota(){
+    var kgB = Number(document.getElementById('etqKgBolsa').value)||kgBolsa;
+    document.getElementById('etqNota').textContent = fmt(kg,0)+' Kg ÷ '+fmt(kgB,0)+' Kg por bolsa = '+Math.ceil(kg/kgB)+' bolsas.';
+  }
+  function prev(){
+    var iso = document.getElementById('etqFecha').value;
+    etqState.fecha = etqIsoAFecha(iso) || etqFechaHoy();
+    etqState.lote = document.getElementById('etqLote').value.trim();
+    var host = document.getElementById('etqPrev');
+    host.innerHTML = renderEtiquetaHtml(et, etqState.fecha, etqState.lote, 1, 1, etqRegistroDe(o.producto_hoja, et));
+    etqState.fit = etqAjustar(host);
+    var wrap = host.parentNode, etqEl = host.querySelector('.etq');
+    var s = Math.min(1, (wrap.clientWidth||520) / etqEl.offsetWidth);
+    host.style.transform = 'scale('+s+')'; wrap.style.height = Math.ceil(etqEl.offsetHeight*s)+'px';
+  }
+  document.getElementById('etqFecha').addEventListener('change', prev);
+  document.getElementById('etqLote').addEventListener('input', prev);
+  document.getElementById('etqKgBolsa').addEventListener('input', function(){
+    var kgB = Number(this.value)||0; if(kgB>0) document.getElementById('etqCant').value = Math.max(1, Math.ceil(kg/kgB)); nota();
+  });
+  document.getElementById('btnEtqImprimir').addEventListener('click', imprimirEtiquetas);
+  var be = document.getElementById('btnEtqEditar'); if(be) be.addEventListener('click', function(){ openEtqEditor(p); });
+  nota(); prev();
+}
+function imprimirEtiquetas(){
+  if(!etqState || !etqState.et) return;
+  var n = Math.floor(Number(document.getElementById('etqCant').value)||0);
+  if(n<1){ toast('Poné cuántas etiquetas imprimir'); return; }
+  if(n>400 && !confirm('¿Imprimir '+n+' etiquetas?')) return;
+  var fit = etqState.fit || {fl:1, fr:1, tit:24};
+  var una = renderEtiquetaHtml(etqState.et, etqState.fecha, etqState.lote, fit.fl, fit.fr, etqRegistroDe(etqState.o.producto_hoja, etqState.et)).replace('class="etq-tit"', 'class="etq-tit" style="font-size:'+(fit.tit||24)+'pt"').replace('class="etq-sub"', 'class="etq-sub" style="font-size:'+(fit.sub||7.4)+'pt"');
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiquetas '+escapeHtml(etqState.o.producto_nombre)+' '+escapeHtml(etqState.lote)+'</title><style>'+
+    '@page{size:152.4mm 101.5mm;margin:0}html,body{margin:0;padding:0;background:#fff}'+ETQ_CSS+
+    '.etq{page-break-after:always;break-after:page}.etq:last-child{page-break-after:auto;break-after:auto}'+
+    '*{-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
+    '</style></head><body>'+new Array(n+1).join(una)+'</body></html>';
+  var old = document.getElementById('etqPrintFrame'); if(old) old.remove();
+  var fr = document.createElement('iframe');
+  fr.id = 'etqPrintFrame';
+  fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(fr);
+  var d = fr.contentWindow.document; d.open(); d.write(html); d.close();
+  var imgs = d.images, pend = imgs.length;
+  function go(){ setTimeout(function(){ fr.contentWindow.focus(); fr.contentWindow.print(); }, 150); }
+  if(!pend) go(); else { var hecho=false; var listo=function(){ if(--pend<=0 && !hecho){ hecho=true; go(); } };
+    for(var i=0;i<imgs.length;i++){ if(imgs[i].complete) listo(); else { imgs[i].onload = listo; imgs[i].onerror = listo; } } }
+}
+
+/* ---- editor del contenido de la etiqueta (se guarda en productos.etiqueta) ---- */
+var etqEditProducto = null;
+function openEtqEditor(p){
+  if(!p) return;
+  etqEditProducto = p;
+  var et = etiquetaDeProducto(p.hoja) || {titulo:p.nombre, subtitulo:'', garantias:[], kg_bolsa:25, presentacion:'Presentación: Bolsas de 25 kg'};
+  function f(id, label, val, rows){
+    return '<label class="etq-ed-f">'+label+(rows ? '<textarea id="'+id+'" rows="'+rows+'">'+escapeHtml(val||'')+'</textarea>' : '<input type="text" id="'+id+'" value="'+escapeHtml(val||'')+'">')+'</label>';
+  }
+  document.getElementById('etqEditBody').innerHTML =
+    '<p class="footnote" style="margin-top:0">Producto: <b>'+escapeHtml(p.nombre)+'</b>. La fecha de elaboración y el lote se completan solos desde la orden de producción.</p>'+
+    f('etqE_titulo','Título (nombre grande)', et.titulo)+
+    f('etqE_subtitulo','Subtítulo', et.subtitulo)+
+    f('etqE_garantias','Niveles de garantía — una línea por nutriente: NUTRIENTE | UNIDAD | VALOR', (et.garantias||[]).map(function(g){ return g.join(' | '); }).join('\n'), 10)+
+    f('etqE_caracteristicas','Características del producto', et.caracteristicas, 3)+
+    f('etqE_indicacion','Indicación de uso', et.indicacion, 3)+
+    f('etqE_modo_usar','Modo de usar', et.modo_usar, 4)+
+    f('etqE_especie','Especie de destino', et.especie, 2)+
+    '<label class="etq-ed-chk"><input type="checkbox" id="etqE_uso_animal"'+(et.uso_animal?' checked':'')+'> Mostrar «USO EN ALIMENTACIÓN ANIMAL»</label>'+
+    f('etqE_restricciones','Restricciones de uso', et.restricciones, 3)+
+    f('etqE_conservacion','Modo de conservación', et.conservacion, 2)+
+    f('etqE_presentacion','Presentación', et.presentacion)+
+    f('etqE_vencimiento','Fecha de vencimiento (texto)', et.vencimiento || ETQ_PIE.vencimiento)+
+    f('etqE_registro','Registro SENASAG del producto (vacío = el de su categoría: '+(ETQ_REG_CATEGORIA[p.categoria]||'012919/25')+')', et.registro||'')+
+    '<label class="etq-ed-f">Kg por bolsa (para calcular cuántas etiquetas)<input type="number" id="etqE_kg_bolsa" min="1" step="1" value="'+(Number(et.kg_bolsa)||25)+'"></label>';
+  document.getElementById('etqEditOverlay').classList.add('active');
+}
+function guardarEtqEditor(){
+  var p = etqEditProducto; if(!p) return;
+  function v(id){ return document.getElementById(id).value.trim(); }
+  var garantias = v('etqE_garantias').split('\n').map(function(l){ return l.trim(); }).filter(function(l){ return l; }).map(function(l){
+    var parts = l.split('|').map(function(x){ return x.trim(); });
+    while(parts.length<3) parts.push('');
+    return [parts[0], parts[1], parts.slice(2).join(' | ')];
+  });
+  var et = {titulo:v('etqE_titulo'), subtitulo:v('etqE_subtitulo'), garantias:garantias, caracteristicas:v('etqE_caracteristicas'), indicacion:v('etqE_indicacion'),
+    modo_usar:v('etqE_modo_usar'), especie:v('etqE_especie'), uso_animal:document.getElementById('etqE_uso_animal').checked, restricciones:v('etqE_restricciones'),
+    conservacion:v('etqE_conservacion'), presentacion:v('etqE_presentacion'), vencimiento:v('etqE_vencimiento'), registro:v('etqE_registro'), kg_bolsa:Number(v('etqE_kg_bolsa'))||25};
+  if(!et.titulo){ toast('Poné el título de la etiqueta'); return; }
+  var btn = document.getElementById('btnEtqGuardar'); btn.disabled = true;
+  sb.from('productos').update({etiqueta:et}).eq('id', p.id).then(function(res){
+    btn.disabled = false;
+    if(res.error){ toast('No se pudo guardar la etiqueta: '+errMsg(res.error)); return; }
+    p.etiqueta = et;
+    document.getElementById('etqEditOverlay').classList.remove('active');
+    toast('Etiqueta de '+p.nombre+' guardada');
+    if(prodDocState && prodDocState.producto_hoja===p.hoja) renderEtiquetasSeccion(prodDocState);
+  });
+}
+document.getElementById('btnEtqGuardar').addEventListener('click', guardarEtqEditor);
+document.getElementById('btnCerrarEtqEdit').addEventListener('click', function(){ document.getElementById('etqEditOverlay').classList.remove('active'); });
+
+document.head.insertAdjacentHTML('beforeend','<style id="etqCss">'+ETQ_CSS+'</style>');
 
 /* ================= DESPACHO (boleta al cliente) ================= */
 function openDespachoModal(o){
