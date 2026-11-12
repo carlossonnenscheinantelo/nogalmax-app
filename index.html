@@ -548,7 +548,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   <section id="view-resumen" class="view active">
     <div id="bannerPush" class="card" style="display:none;margin-bottom:14px;border-color:#f0d585;background:#fff8e6">
       <b>🔔 Avisos en tu celular</b>
-      <p style="margin:6px 0 10px;font-size:13px">Activalos para que la app te avise apenas haya un cambio de pedido u orden esperando tu aprobación, aunque la tengas cerrada. Se activa una vez en cada teléfono o computadora.</p>
+      <p style="margin:6px 0 10px;font-size:13px">Activalos para recibir en este celular los avisos de la app (como el informe diario de planta de las 18:00), aunque la tengas cerrada. Se activa una vez en cada teléfono o computadora.</p>
       <button class="primary btn-activar-push" type="button">🔔 Activar avisos en este celular</button>
     </div>
     <div class="section-title" style="margin-top:0">Secciones</div>
@@ -13523,8 +13523,9 @@ function activarPush(){
     });
   }).catch(function(e){ toast('No se pudieron activar los avisos: '+((e&&e.message)||e)); });
 }
+function recibeAvisosUsr(){ return esAdminUsr() || !!(currentProfile && currentProfile.recibe_informe_planta); }
 function actualizarBotonPush(){
-  var mostrar = esAdminUsr();
+  var mostrar = recibeAvisosUsr();
   var activo = ('Notification' in window) && Notification.permission==='granted';
   document.querySelectorAll('.btn-activar-push').forEach(function(b){
     b.style.display = mostrar ? '' : 'none';
@@ -13543,7 +13544,7 @@ function aplicarPermisosRol(){
   if(btnCompra) btnCompra.style.display = puedeIngreso ? '' : 'none';
   var puedeVenta = rol==='admin' || rol==='comercial';
   actualizarBotonPush();
-  if(esAdminUsr() && pushSoportado() && Notification.permission==='granted') guardarSuscripcionPush(true).catch(function(){});
+  if(recibeAvisosUsr() && pushSoportado() && Notification.permission==='granted') guardarSuscripcionPush(true).catch(function(){});
   if(location.hash && location.hash.length>1){ var tabHash = location.hash.slice(1); setTimeout(function(){ irATab(tabHash); }, 300); }
   var navAp = document.getElementById('navAprobaciones');
   if(navAp) navAp.style.display = esGestorVentas() ? '' : 'none';
