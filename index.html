@@ -13529,6 +13529,12 @@ function onSignedIn(session){
       renderAll();
       setupRealtime();
     }).catch(function(err){
+      if(textoEsJwtVencido(errMsg(err)) || (err && err.code==='PGRST301')){
+        // la sesión guardada venció y no se pudo renovar: pedir login de nuevo en vez de mostrar el error crudo
+        sb.auth.signOut();
+        toast('Tu sesión venció — volvé a iniciar sesión.');
+        return;
+      }
       toast('No se pudieron cargar los datos: '+errMsg(err));
     });
   }
@@ -13822,6 +13828,33 @@ function onSignedOut(){
 }
 
 /* ---------- arranque de la conexión (después de que cargue supabase-js, que es "defer") ---------- */
+// Renovación automática del token (fix 13 NOV "JWT expired"):
+// TODAS las consultas a la base (lecturas de tablas, rpc, storage) pasan por acá. Si el servidor
+// responde que el token venció (pasa cuando la compu se durmió, la app quedó abierta mucho tiempo
+// o el reloj de la PC está desfasado), se renueva la sesión y se repite la misma consulta una vez,
+// sin que el usuario vea ningún error.
+var _renovandoSesion = null;
+function textoEsJwtVencido(t){ return /jwt expired|jwt is expired|invalid jwt|PGRST301|PGRST303|token is expired/i.test(t||''); }
+function fetchConRenovacionJwt(input, init){
+  return fetch(input, init).then(function(resp){
+    var url = (typeof input === 'string') ? input : ((input && input.url) || '');
+    if(resp.status !== 401 || url.indexOf('/auth/v1/') !== -1 || !sb) return resp;
+    return resp.clone().text().then(function(txt){
+      if(!textoEsJwtVencido(txt)) return resp;
+      if(!_renovandoSesion){
+        _renovandoSesion = sb.auth.refreshSession().then(function(r){ _renovandoSesion = null; return r; }, function(e){ _renovandoSesion = null; throw e; });
+      }
+      return _renovandoSesion.then(function(r){
+        var ses = r && r.data && r.data.session;
+        if(!ses || !ses.access_token) return resp;
+        var h = new Headers((init && init.headers) || {});
+        h.set('Authorization', 'Bearer ' + ses.access_token);
+        var init2 = Object.assign({}, init || {}, { headers: h });
+        return fetch(input, init2);
+      }).catch(function(){ return resp; });
+    }).catch(function(){ return resp; });
+  });
+}
 function iniciarConexionSupabase(){
   if(sb) return; // ya conectado, no repetir
   if(typeof window.supabase === 'undefined' || !window.supabase.createClient){
@@ -13829,7 +13862,7 @@ function iniciarConexionSupabase(){
     return;
   }
   try{
-    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { fetch: fetchConRenovacionJwt } });
   }catch(e){ sb = null; }
   if(!sb){
     showAuthMsg(elAuthError, 'No se pudo conectar con el servidor. Revisá tu conexión a internet y recargá la página.');
