@@ -2445,7 +2445,7 @@ function renderHistorialRows(){
     return '<div class="hist-row">'+
       '<div class="when">'+fmtWhen(r.creado_en)+'</div>'+
       '<div><span class="who">'+escapeHtml(r.usuario_nombre||'Carga inicial')+'</span><br>'+
-        '<span class="hist-tag">'+(r.tabla==='insumos'?'Insumo':'Producto')+'</span> '+
+        '<span class="hist-tag">'+({insumos:'Insumo',productos:'Producto',producciones:'Orden de producción',despacho_eventos:'Despacho',notas_venta:'Nota de venta',pedido_venta_items:'Pedido de venta',pedidos_venta:'Pedido de venta',compras_insumos:'Compra'}[r.tabla]||r.tabla)+'</span> '+
         '<span class="muted">'+escapeHtml(r.registro_nombre||'')+'</span></div>'+
       '<div class="hist-diff"><div class="muted" style="font-size:11px">'+escapeHtml(campoLabel(r.campo))+'</div>'+
         (r.campo==='creado' ? '<span class="new">creado</span>' :
@@ -3784,7 +3784,8 @@ function renderOrdenesRows(){
                     : '<button class="ghost" disabled title="Ya está completada, despachada o con despacho parcial — no se puede eliminar">🗑️</button>'));
     var editarCell = !puedeGestionOrd ? '' : solOrd ? '<button class="ghost" disabled title="Ya tiene un cambio esperando aprobación">✏️</button>' : (puedeEliminarOrd
       ? '<button class="ghost btn-editar-ord" title="Editar esta producción">✏️</button>'
-      : '<button class="ghost" disabled title="Ya está completada, despachada o con despacho parcial — no se puede editar">✏️</button>');
+      : (esAdminOrd ? '<button class="ghost btn-editar-ord" title="Editar (solo administrador): orden ya producida o despachada — queda registrado en el historial">✏️</button>'
+                    : '<button class="ghost" disabled title="Ya está completada, despachada o con despacho parcial — solo el administrador puede editarla">✏️</button>'));
     var rowClass = o.despachado ? 'ord-row-despachado' : (despCant>0 ? 'ord-row-parcial' : (o.estado==='completada' ? 'ord-row-completada' : ''));
     return '<tr data-id="'+o.id+'"'+(rowClass?' class="'+rowClass+'"':'')+'>'+
       '<td>'+fmtFecha(o.fecha_pedido)+'</td>'+
@@ -10770,6 +10771,9 @@ function renderEditarOrdModalBody(){
     (ligadaAVenta ? '' :
       '<div class="inline-field"><label>Cliente (vacío = stock de fábrica)</label><input type="text" id="eo_cliente" style="min-width:220px" value="'+escapeHtml(o.cliente||'')+'"></div>'+
       '<div class="inline-field"><label>Fecha de entrega</label><input type="date" id="eo_fecha" value="'+(o.fecha_entrega||'')+'"></div>')+
+    ((o.estado==='completada' || o.despachado || Number(o.despachado_cantidad)>0)
+      ? '<p class="footnote" style="color:var(--brand-dark)">⚠️ Esta orden ya fue producida'+((o.despachado||Number(o.despachado_cantidad)>0)?' y despachada':'')+'. Como administrador podés corregirla: se ajustan los insumos'+((o.despachado||Number(o.despachado_cantidad)>0)?', el último despacho':'')+(o.pedido_venta_id?', la nota de venta y sus cuotas':'')+'. El cambio queda registrado en el historial con tu nombre.</p>'
+      : '')+
     '<p class="footnote">Al guardar se devuelve al stock el insumo que esta producción tenía descontado y se vuelve a descontar con los datos nuevos.</p>'+
     '<div style="margin-top:16px;display:flex;gap:10px">'+
       '<button class="primary" id="btnGuardarEditarOrd">Guardar cambios</button>'+
@@ -10875,8 +10879,11 @@ function renderEditarPvModalBody(){
     items.map(function(it){
       var prod = it.producciones || {};
       var bloqueada = prod.estado==='completada' || prod.despachado;
-      return '<div class="pv-linea-row" data-itemid="'+it.id+'">'+
-        (bloqueada ? '<p class="footnote" style="margin:0 0 6px;color:var(--brand-dark)">Esta línea ya está completada o despachada — el producto y la cantidad no se pueden cambiar, pero el precio sí.</p>' : '')+
+      var adminCant = bloqueada && !!(currentProfile && currentProfile.rol==='admin');
+      return '<div class="pv-linea-row" data-itemid="'+it.id+'" data-bloq="'+(adminCant?'1':'')+'" data-cantorig="'+Math.round(Number(it.cantidad_toneladas)*1000)+'">'+
+        (bloqueada ? '<p class="footnote" style="margin:0 0 6px;color:var(--brand-dark)">'+(adminCant
+          ? 'Esta línea ya está completada o despachada — el producto no se puede cambiar. Como administrador podés corregir la cantidad (se ajustan la orden, el despacho, la nota y sus cuotas) y el precio.'
+          : 'Esta línea ya está completada o despachada — el producto y la cantidad no se pueden cambiar, pero el precio sí.')+'</p>' : '')+
         '<div class="inline-field"><label>Producto</label><select class="epvi-producto" data-orig="'+escapeHtml(it.producto_hoja||'')+'" style="min-width:220px"'+(bloqueada?' disabled':'')+'>'+buildProductoOptions(it.producto_hoja)+'</select></div>'+
         (function(){
           var pp = state.productos.find(function(x){ return x.hoja===it.producto_hoja; });
@@ -10885,7 +10892,7 @@ function renderEditarPvModalBody(){
           var actual = (it.variante && String(it.variante).toLowerCase()!==String(pp.formula_nombre||'').toLowerCase()) ? it.variante : '';
           return '<div class="inline-field"><label>Fórmula'+(prod.desde_stock_existente?' (sale de stock)':'')+'</label><select class="epvi-formula" data-actual="'+escapeHtml(actual)+'"'+(fija?' disabled':'')+'>'+opcionesFormula(pp, actual)+'</select></div>';
         })()+
-        '<div class="inline-field"><label>Cantidad (Kg)</label><input type="number" step="1" min="1" class="epvi-cantidad pill-input" value="'+Math.round(Number(it.cantidad_toneladas)*1000)+'"'+(bloqueada?' disabled':'')+'></div>'+
+        '<div class="inline-field"><label>Cantidad (Kg)</label><input type="number" step="1" min="1" class="epvi-cantidad pill-input" value="'+Math.round(Number(it.cantidad_toneladas)*1000)+'"'+((bloqueada && !adminCant)?' disabled':'')+'></div>'+
         '<div class="inline-field"><label>Precio (Bs/Ton)</label><input type="number" step="0.01" min="0" class="epvi-precio pill-input" value="'+(it.precio_pactado==null?'':it.precio_pactado)+'"></div>'+
         '<button type="button" class="ghost btn-guardar-linea-pv" data-itemid="'+it.id+'">Guardar esta línea</button>'+
       '</div>';
@@ -10935,6 +10942,26 @@ function submitEditarPvLinea(itemId, btn){
   var cantidadTon = cantidadInput.disabled ? null : ((parseFloat(cantidadInput.value)||0)/1000);
   var precio = precioInput.value===''? null : parseFloat(precioInput.value);
   if(!cantidadInput.disabled && (!cantidadTon || cantidadTon<=0)){ toast('La cantidad debe ser mayor a 0'); return; }
+  if(row.getAttribute('data-bloq')==='1'){
+    var kgNuevo = Math.round(parseFloat(cantidadInput.value)||0), kgOrig = Number(row.getAttribute('data-cantorig'))||0;
+    if(kgNuevo !== kgOrig){
+      if(!confirm('¿Cambiar la cantidad de '+kgOrig.toLocaleString('es-BO')+' Kg a '+kgNuevo.toLocaleString('es-BO')+' Kg? Esta línea ya está despachada: se ajustan la orden de producción, el último despacho, la nota de venta y sus cuotas.')) return;
+      btn.disabled = true;
+      sb.rpc('ajustar_cantidad_linea_despachada', {p_item_id:itemId, p_cantidad_toneladas:kgNuevo/1000}).then(function(r0){
+        if(r0.error){ btn.disabled = false; toast('No se pudo cambiar la cantidad: '+errMsg(r0.error)); return; }
+        sb.rpc('editar_pedido_venta_item', {p_item_id:itemId, p_producto_hoja:null, p_cantidad_toneladas:null, p_precio_pactado:precio}).then(function(r1){
+          btn.disabled = false;
+          if(r1.error) toast('Cantidad cambiada, pero no se pudo guardar el precio: '+errMsg(r1.error));
+          else toast('Línea actualizada — '+kgNuevo.toLocaleString('es-BO')+' Kg');
+          renderPedidosVenta(true);
+          fetchProducciones(function(){ if(activeTab()==='ordenes') renderOrdenesRows(); if(activeTab()==='entregados') renderEntregadosRows(); });
+          closeEditarPvModal();
+        });
+      });
+      return;
+    }
+    cantidadTon = null;
+  }
   btn.disabled = true;
   var fSel = row.querySelector('.epvi-formula');
   var cambiaFormula = fSel && !fSel.disabled && productoSel.value===productoSel.getAttribute('data-orig') && fSel.value!==fSel.getAttribute('data-actual');
