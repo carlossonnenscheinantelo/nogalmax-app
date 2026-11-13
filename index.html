@@ -10793,6 +10793,58 @@ function renderEditarOrdModalBody(){
   document.getElementById('eo_producto').addEventListener('change', refrescarFormulaEo);
   refrescarFormulaEo();
   if(necesitaAprobacion()) modoSolicitudEditarOrd();
+  else if(currentProfile && currentProfile.rol==='admin' && !o.desde_stock_existente) renderInsumosUsadosOrd(o);
+}
+/* ---- Insumos realmente usados en la orden (solo admin) ---- */
+function renderInsumosUsadosOrd(o){
+  var body = document.getElementById('editarOrdBody');
+  var nombres = state.insumos.map(function(i){ return i.nombre; }).sort(function(a,b){ return a.localeCompare(b); });
+  function opts(sel){ return '<option value="">— Elegí insumo —</option>'+nombres.map(function(n){ return '<option value="'+escapeHtml(n)+'"'+(n===sel?' selected':'')+'>'+escapeHtml(n)+'</option>'; }).join(''); }
+  function fila(nombre, kg){
+    return '<tr class="iu-row"><td><select class="iu-nombre" style="min-width:220px">'+opts(nombre)+'</select></td>'+
+      '<td><input type="number" step="0.01" min="0" class="iu-kg pill-input" style="width:110px" value="'+(kg==null?'':kg)+'"></td>'+
+      '<td><button type="button" class="ghost danger iu-quitar" title="Quitar este insumo">✖</button></td></tr>';
+  }
+  var ins = o.insumos_requeridos || {};
+  var box = document.createElement('div');
+  box.id = 'iuBox';
+  box.innerHTML = '<div class="section-title">Insumos usados en esta orden</div>'+
+    '<p class="footnote" style="margin-top:0">Si se fabricó con otro insumo (por ejemplo otro fosfato) o con otras cantidades, corregilo acá. Se devuelve al stock lo anterior, se descuenta lo nuevo y queda registrado en el historial.</p>'+
+    '<table class="data-table" style="width:auto"><thead><tr><th>Insumo</th><th>Kg</th><th></th></tr></thead><tbody id="iuBody">'+
+      Object.keys(ins).sort().map(function(k){ return fila(k, Number(ins[k])); }).join('')+
+    '</tbody></table>'+
+    '<div style="margin:8px 0"><button type="button" class="ghost" id="iuAgregar">➕ Agregar insumo</button></div>'+
+    '<div class="inline-field"><label>Motivo (opcional)</label><input type="text" id="iuMotivo" style="min-width:220px" placeholder="Ej.: se usó fosfato OCP porque no había bicálcico"></div>'+
+    '<div style="margin:8px 0 4px"><button type="button" class="primary" id="iuGuardar">Guardar insumos usados</button></div>';
+  var acciones = document.getElementById('btnGuardarEditarOrd').parentNode;
+  acciones.parentNode.insertBefore(box, acciones.nextSibling);
+  function enlazar(){
+    box.querySelectorAll('.iu-quitar').forEach(function(b){ b.onclick = function(){ b.closest('tr').remove(); }; });
+  }
+  enlazar();
+  document.getElementById('iuAgregar').addEventListener('click', function(){
+    document.getElementById('iuBody').insertAdjacentHTML('beforeend', fila('', null)); enlazar();
+  });
+  document.getElementById('iuGuardar').addEventListener('click', function(){
+    var btn = this, mapa = {}, error = null;
+    box.querySelectorAll('.iu-row').forEach(function(tr){
+      var n = tr.querySelector('.iu-nombre').value, kg = parseFloat(tr.querySelector('.iu-kg').value);
+      if(!n && !(kg>0)) return;
+      if(!n){ error = 'Hay una fila con Kg pero sin insumo'; return; }
+      if(!(kg>0)){ error = 'Poné los Kg de '+n+' (o quitá la fila)'; return; }
+      mapa[n] = Math.round(((mapa[n]||0)+kg)*1000)/1000;
+    });
+    if(error){ toast(error); return; }
+    if(!Object.keys(mapa).length){ toast('La orden tiene que tener al menos un insumo'); return; }
+    btn.disabled = true;
+    sb.rpc('editar_insumos_produccion', {p_id:o.id, p_insumos:mapa, p_motivo:(document.getElementById('iuMotivo').value||'').trim()||null}).then(function(res){
+      btn.disabled = false;
+      if(res.error){ toast('No se pudieron guardar los insumos: '+errMsg(res.error)); return; }
+      toast('Insumos de '+o.numero_produccion+' actualizados');
+      closeEditarOrdModal();
+      fetchProducciones(function(){ renderOrdenesRows(); renderStockFabricaRows(); });
+    });
+  });
 }
 function submitEditarOrd(){
   var o = editarOrdState;
