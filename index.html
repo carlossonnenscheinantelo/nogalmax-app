@@ -10025,7 +10025,8 @@ function plantaPlanDesde(d, abiertas, conQr){
   npItems(d).forEach(function(it){ var k = it.producto_catalogo||it.descripcion; porProd[k] = (porProd[k]||0) + (Number(it.kg_total)||0); });
   Object.keys(porProd).forEach(function(prod){
     var kg = porProd[prod];
-    var ords = delCliente.filter(function(o){ return npNorm(o.producto_nombre)===npNorm(prod) || npNorm(o.producto_hoja)===npNorm(prod); });
+    var ords = delCliente.filter(function(o){ return npNorm(o.producto_nombre)===npNorm(prod) || npNorm(o.producto_hoja)===npNorm(prod); })
+      .sort(function(a,b){ return ((b._prio||0)-(a._prio||0)) || String(a.fecha_pedido||'9999').localeCompare(String(b.fecha_pedido||'9999')) || (a.id-b.id); });
     var saldo = ords.reduce(function(t,o){ return t+(Number(o.cantidad_toneladas)||0)-(Number(o.despachado_cantidad)||0); },0)*1000;
     if(!kg) problemas.push('No se sabe cuántos Kg de '+prod+' se llevan');
     else if(!ords.length) problemas.push((conQr ? 'El pedido del QR no incluye ' : delCliente[0].cliente+' no tiene pedido pendiente de ')+prod);
@@ -10073,12 +10074,26 @@ function renderNotasPlanta(){
     '<div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+
       '<label style="font-size:13px">Día <input type="date" id="npFecha" value="'+npState.fecha+'"></label>'+
       '<div style="display:flex;gap:6px">'+[['todas','Todas'],['despacho','📦 Despachos'],['insumo','🚚 Insumos']].map(function(t){ return '<button class="filter-chip'+(npState.tipo===t[0]?' active':'')+'" data-np="'+t[0]+'">'+t[1]+'</button>'; }).join('')+'</div>'+
-      '<span style="flex:1"></span><button class="primary" id="npModo">📷 Abrir modo planta</button>'+
+      '<span style="flex:1"></span>'+(esAdminUsr() ? '<button class="ghost danger" id="npBorrarPruebas" title="Borra los pedidos PV-PRUEBA, sus órdenes, notas y despachos de prueba">🧹 Borrar datos de prueba</button> ' : '')+'<button class="primary" id="npModo">📷 Abrir modo planta</button>'+
     '</div><div id="npInforme" class="np-informe">Cargando…</div><div id="npLista"></div>'+
     '<p class="footnote">Las notas las suben los operarios desde el celular de planta (📷 modo planta). Solo se guardan las que tienen todos los datos y se leen claras. Asigná cada nota de despacho a su pedido de venta y cada ingreso a su compra — un pedido puede tener varias notas (una por viaje).</p>';
   document.getElementById('npFecha').addEventListener('change', function(){ npState.fecha = this.value || npHoyISO(); renderNotasPlanta(); });
   box.querySelectorAll('[data-np]').forEach(function(b){ b.addEventListener('click', function(){ npState.tipo = b.dataset.np; renderNotasPlanta(); }); });
   document.getElementById('npModo').addEventListener('click', function(){ abrirModoPlanta(false); });
+  var bbp = document.getElementById('npBorrarPruebas');
+  if(bbp) bbp.addEventListener('click', function(){
+    if(!confirm('¿Borrar TODOS los datos de prueba? (pedidos PV-PRUEBA-1 y PV-PRUEBA-2, el stock OP-PRUEBA-STOCK, sus órdenes, reposiciones, notas de venta, despachos y notas de planta). Los insumos que hayan descontado vuelven al stock.')) return;
+    bbp.disabled = true;
+    sb.rpc('borrar_datos_prueba').then(function(r){
+      bbp.disabled = false;
+      if(r.error){ toast('No se pudo borrar: '+errMsg(r.error)); return; }
+      var d = r.data||{};
+      toast(d.ordenes||d.pedidos ? 'Pruebas borradas: '+(d.ordenes||0)+' órdenes, '+(d.pedidos||0)+' pedidos, '+(d.notas_planta||0)+' notas de planta' : 'No había datos de prueba');
+      fetchProducciones(function(){ renderOrdenesRows(); renderStockFabricaRows(); });
+      if(ventaState.loaded) renderPedidosVenta(true);
+      renderNotasPlanta();
+    });
+  });
   var r = npRangoDia(npState.fecha);
   sb.from('notas_planta').select('*').gte('creado_en', r[0]).lt('creado_en', r[1]).order('creado_en',{ascending:true}).then(function(res){
     if(res.error){ document.getElementById('npInforme').textContent = 'No se pudieron cargar las notas: '+res.error.message; return; }
@@ -10262,7 +10277,7 @@ function plantaEscanear(){
 /* ---- con el QR leído: mostrar a qué pedido pertenece y su saldo ---- */
 function plantaCargarQR(id){
   plantaSet('<div class="planta-msg"><div class="planta-spin"></div><div class="pm-tit">Buscando el pedido…</div></div>', 'pv-leyendo');
-  sb.from('producciones').select('id,numero_produccion,lote,cliente,producto_nombre,producto_hoja,cantidad_toneladas,despachado_cantidad,despachado,bloqueado,es_stock_fabrica,pedido_venta_id,pedido_venta_numero,origen_stock_id')
+  sb.from('producciones').select('id,numero_produccion,lote,cliente,producto_nombre,producto_hoja,cantidad_toneladas,despachado_cantidad,despachado,bloqueado,es_stock_fabrica,pedido_venta_id,pedido_venta_numero,origen_stock_id,estado,nota')
     .or('id.eq.'+id+',origen_stock_id.eq.'+id).then(function(res){
       if(res.error) throw new Error(res.error.message);
       var rows = res.data||[];
@@ -10275,6 +10290,9 @@ function plantaCargarQR(id){
       return q.then(function(r2){
         var lineas = (r2.data||[]).filter(function(o){ return !o.es_stock_fabrica && !o.bloqueado; });
         var abiertas = lineas.filter(function(o){ return !o.despachado && (Number(o.cantidad_toneladas)||0)-(Number(o.despachado_cantidad)||0) > 0.0005; });
+        var dispBase = Math.max(0, (Number(base.cantidad_toneladas)||0)-(Number(base.despachado_cantidad)||0));
+        var puedeAsig = qrPuedeAsignar() && !base.bloqueado && base.estado==='completada' && dispBase > 0.0005;
+        if(base.es_stock_fabrica && puedeAsig){ qrPantallaStock(base, dispBase, abiertas); return; }
         if(!abiertas.length){
           plantaCancelar({}, {titulo: base.es_stock_fabrica && !cands.length ? 'BOLSA DE STOCK SIN PEDIDO' : 'PEDIDO YA ENTREGADO',
             texto: base.es_stock_fabrica && !cands.length ? 'Este lote ('+(base.lote||'')+') está en Stock en Fábrica y no está asignado a ningún pedido. Oficina tiene que asignarlo antes de despachar.'
@@ -10292,14 +10310,100 @@ function plantaCargarQR(id){
         plantaSet('<div class="planta-res" style="color:var(--ink)"><div class="qr-ok">✔ QR leído — lote '+escapeHtml(base.lote||'')+'</div>'+html+
           '<div class="pr-ayuda">Llená y hacé firmar la Nota de Entrega <b>antes de cargar el camión</b> y sacale la foto.</div>'+
           '<button class="planta-btn planta-btn-verde" id="qrFoto">📷 Foto de la Nota de Entrega</button>'+
+          (puedeAsig && !base.es_stock_fabrica && base.pedido_venta_id ? '<button class="planta-btn sec" id="qrOtroCli" style="border-color:#b5560a;color:#b5560a">⚠️ Este lote se envía a OTRO cliente</button>' : '')+
           '<button class="planta-btn sec" id="qrOtro">Escanear otro QR</button><button class="planta-btn sec" id="prVolver">Volver</button></div>');
         document.getElementById('qrFoto').addEventListener('click', function(){ plantaState.tipo='despacho'; plantaReintentar(); });
+        var bOtro = document.getElementById('qrOtroCli'); if(bOtro) bOtro.addEventListener('click', function(){ qrElegirPedido(base, dispBase, base.pedido_venta_id); });
         document.getElementById('qrOtro').addEventListener('click', plantaEscanear);
         document.getElementById('prVolver').addEventListener('click', plantaHome);
       });
     }).catch(function(e){
       plantaCancelar({}, {titulo:'NO SE PUDO BUSCAR EL PEDIDO', texto:((e&&e.message)||String(e))+'. Revisá internet y escaneá de nuevo.'});
     });
+}
+
+/* ---- QR de Stock en Fábrica o de otro cliente: el jefe de planta asigna lo que se envía ---- */
+function qrPuedeAsignar(){ return !!(currentProfile && ['admin','produccion','planta'].indexOf(currentProfile.rol)!==-1); }
+function qrPantallaStock(base, disp, abiertas){
+  var ya = (abiertas||[]).length ? '<div class="pr-ayuda" style="text-align:left">De este stock ya se asignó a: '+abiertas.map(function(o){ return escapeHtml(o.cliente+' ('+(o.pedido_venta_numero||'')+')'); }).join(', ')+'</div>' : '';
+  plantaSet('<div class="planta-res" style="color:var(--ink)"><div class="qr-ok">✔ QR leído — lote '+escapeHtml(base.lote||'')+'</div>'+
+    '<div class="qr-ped" style="border:3px solid var(--brand)"><div class="qr-ped-h">📦 STOCK EN FÁBRICA<span>'+escapeHtml(base.numero_produccion||'')+'</span></div>'+
+      '<div class="qr-lin"><b>'+escapeHtml(base.producto_nombre)+'</b><span>Disponible: <b>'+npKg(disp*1000)+'</b></span></div></div>'+ya+
+    '<div class="pr-ayuda">Elegí a qué pedido de cliente va y cuántos Kg salen de este stock.</div>'+
+    '<button class="planta-btn planta-btn-verde" id="qrAsig">📋 Asignar a un pedido</button>'+
+    ((abiertas||[]).length ? '<button class="planta-btn sec" id="qrYaAsig">📷 Despachar a un pedido ya asignado (foto de la nota)</button>' : '')+
+    '<button class="planta-btn sec" id="qrOtro">Escanear otro QR</button><button class="planta-btn sec" id="prVolver">Volver</button></div>');
+  document.getElementById('qrAsig').addEventListener('click', function(){ qrElegirPedido(base, disp, null); });
+  var bYa = document.getElementById('qrYaAsig');
+  if(bYa) bYa.addEventListener('click', function(){
+    plantaState.ctx = {qrId: base.id, ids: abiertas.map(function(o){ return o.id; }), lineas: abiertas, clientes: abiertas.map(function(o){ return o.cliente; })};
+    plantaState.tipo='despacho'; plantaReintentar();
+  });
+  document.getElementById('qrOtro').addEventListener('click', plantaEscanear);
+  document.getElementById('prVolver').addEventListener('click', plantaHome);
+}
+function qrElegirPedido(base, disp, excluirPedido){
+  plantaSet('<div class="planta-msg"><div class="planta-spin"></div><div class="pm-tit">Buscando pedidos con saldo…</div></div>', 'pv-leyendo');
+  sb.from('producciones').select('id,pedido_venta_id,pedido_venta_numero,cliente,cantidad_toneladas,despachado_cantidad,despachado,bloqueado,fecha_pedido')
+    .eq('producto_hoja', base.producto_hoja).not('pedido_venta_id','is',null).eq('despachado', false).then(function(res){
+    if(res.error){ plantaCancelar({}, {titulo:'NO SE PUDO BUSCAR', texto:res.error.message}); return; }
+    var porPed = {};
+    (res.data||[]).forEach(function(o){
+      if(o.bloqueado || o.pedido_venta_id===excluirPedido) return;
+      var sal = (Number(o.cantidad_toneladas)||0)-(Number(o.despachado_cantidad)||0); if(sal<=0.0005) return;
+      var k = o.pedido_venta_id; porPed[k] = porPed[k] || {id:k, numero:o.pedido_venta_numero, cliente:o.cliente, saldo:0, fecha:o.fecha_pedido};
+      porPed[k].saldo += sal;
+    });
+    var lista = Object.keys(porPed).map(function(k){ return porPed[k]; }).sort(function(a,b){ return String(a.cliente||'').localeCompare(String(b.cliente||'')); });
+    var aviso = excluirPedido ? '<div class="pr-falta" style="text-align:left">⚠️ Este lote es de <b>'+escapeHtml(base.cliente||'')+'</b> ('+escapeHtml(base.pedido_venta_numero||'')+'). Si lo mandás a otro cliente, a '+escapeHtml(base.cliente||'')+' se le crea automáticamente una orden de producción para <b>reponerle</b> lo que se lleva.</div>' : '';
+    plantaSet('<div class="planta-res" style="color:var(--ink)"><div class="qr-ok">'+escapeHtml(base.producto_nombre)+' — lote '+escapeHtml(base.lote||'')+'</div>'+aviso+
+      '<div class="pr-ayuda">¿A qué cliente se envía? (pedidos con saldo de este producto)</div>'+
+      '<input type="search" id="qrBusca" placeholder="Buscar cliente…" style="width:100%;font-size:18px;padding:10px;border-radius:10px;border:1px solid var(--line)">'+
+      '<div id="qrLista">'+(lista.length ? lista.map(function(p){
+        return '<button class="planta-btn sec qr-elige" data-id="'+p.id+'" data-q="'+escapeHtml(npNorm(p.cliente+' '+p.numero))+'" style="text-align:left"><b>'+escapeHtml(p.cliente||'')+'</b><br><span style="font-size:14px">'+escapeHtml(p.numero||'')+' · saldo '+npKg(p.saldo*1000)+'</span></button>';
+      }).join('') : '<div class="pr-falta">No hay ningún pedido con saldo de '+escapeHtml(base.producto_nombre)+'. Oficina tiene que cargar el pedido primero.</div>')+'</div>'+
+      '<button class="planta-btn sec" id="prVolver">Volver</button></div>');
+    document.getElementById('prVolver').addEventListener('click', plantaHome);
+    document.getElementById('qrBusca').addEventListener('input', function(){
+      var q = npNorm(this.value); document.querySelectorAll('.qr-elige').forEach(function(b){ b.style.display = (!q || b.dataset.q.indexOf(q)!==-1) ? '' : 'none'; });
+    });
+    document.querySelectorAll('.qr-elige').forEach(function(b){ b.addEventListener('click', function(){ qrConfirmarAsignacion(base, disp, porPed[b.dataset.id], !!excluirPedido); }); });
+  });
+}
+function qrConfirmarAsignacion(base, disp, ped, deOtro){
+  var maxKg = Math.round(Math.min(disp, ped.saldo)*1000);
+  plantaSet('<div class="planta-res" style="color:var(--ink)"><div class="qr-ok">Enviar a '+escapeHtml(ped.cliente||'')+'</div>'+
+    '<div class="qr-ped"><div class="qr-lin"><b>'+escapeHtml(base.producto_nombre)+'</b><span>Lote '+escapeHtml(base.lote||'')+' — '+(deOtro?'de '+escapeHtml(base.cliente||''):'Stock en Fábrica')+' · disponible '+npKg(disp*1000)+'</span><span>Pedido '+escapeHtml(ped.numero||'')+' · saldo '+npKg(ped.saldo*1000)+'</span></div></div>'+
+    '<div class="pr-ayuda">¿Cuántos Kg salen de este lote?</div>'+
+    '<input type="number" id="qrKg" inputmode="numeric" min="1" max="'+maxKg+'" value="'+maxKg+'" style="width:100%;font-size:28px;font-weight:800;text-align:center;padding:12px;border-radius:12px;border:2px solid var(--brand)">'+
+    (deOtro ? '<div class="pr-falta" style="text-align:left">Se le pasa esa cantidad a <b>'+escapeHtml(ped.cliente||'')+'</b> y se crea una orden para <b>reponerle a '+escapeHtml(base.cliente||'')+'</b>. Queda registrado con tu nombre.</div>'
+            : '<div class="pr-ayuda">Esos Kg dejan de estar en Stock en Fábrica y pasan al pedido. Lo que el pedido tenía por producir se descuenta.</div>')+
+    '<button class="planta-btn planta-btn-verde" id="qrConf">✔ Confirmar asignación</button><button class="planta-btn sec" id="prVolver">Volver</button></div>');
+  document.getElementById('prVolver').addEventListener('click', function(){ qrElegirPedido(base, disp, deOtro ? base.pedido_venta_id : null); });
+  document.getElementById('qrConf').addEventListener('click', function(){
+    var kg = Math.round(parseFloat(document.getElementById('qrKg').value)||0);
+    if(kg<=0){ toast('Poné los Kg'); return; }
+    if(kg > maxKg){ toast('Máximo '+npKg(maxKg)); return; }
+    var btn = this; btn.disabled = true;
+    sb.rpc('planta_asignar_lote_a_pedido', {p_lote_id: base.id, p_pedido_id: Number(ped.id), p_kg: kg}).then(function(r){
+      if(r.error){ btn.disabled = false; plantaCancelar({}, {titulo:'NO SE PUDO ASIGNAR', texto: errMsg(r.error)}); return; }
+      var res = r.data || {};
+      sb.from('producciones').select('id,cliente,producto_nombre,producto_hoja,cantidad_toneladas,despachado_cantidad,despachado,bloqueado,es_stock_fabrica,pedido_venta_id,pedido_venta_numero,lote,fecha_pedido').in('id', res.ids||[]).then(function(r2){
+        var orden = res.ids||[];
+        var lineas = (r2.data||[]).sort(function(a,b){ return orden.indexOf(a.id)-orden.indexOf(b.id); });
+        lineas.forEach(function(o){ if(o.id===res.produccion_id) o._prio = 1; });
+        plantaState.ctx = {qrId: res.produccion_id, ids: orden, lineas: lineas, clientes: lineas.map(function(o){ return o.cliente; })};
+        plantaSet('<div class="planta-res"><div class="pr-ico">✅</div><div class="pr-tit">ASIGNADO</div>'+
+          '<div class="pr-saldo"><div><b>'+npKg(kg)+'</b> de '+escapeHtml(base.producto_nombre)+' (lote '+escapeHtml(base.lote||'')+') → <b>'+escapeHtml(res.cliente||'')+'</b> · '+escapeHtml(res.pedido||'')+'</div>'+
+          (res.reposicion ? '<div>🔁 Reposición para <b>'+escapeHtml(res.reposicion.cliente)+'</b>: orden <b>'+escapeHtml(res.reposicion.numero)+'</b> de '+npKg(res.reposicion.kg)+' ('+escapeHtml(res.reposicion.pedido)+')</div>' : '')+
+          (res.detalle ? '<div class="muted" style="font-size:13px">'+escapeHtml(res.detalle)+'</div>' : '')+'</div>'+
+          '<div class="pr-ayuda">Ahora llená y hacé firmar la Nota de Entrega y sacale la foto para registrar el despacho.</div>'+
+          '<button class="planta-btn planta-btn-verde" id="qrFoto">📷 Foto de la Nota de Entrega</button><button class="planta-btn sec" id="prVolver">Volver</button></div>', 'pv-verde');
+        document.getElementById('qrFoto').addEventListener('click', function(){ plantaState.tipo='despacho'; plantaReintentar(); });
+        document.getElementById('prVolver').addEventListener('click', plantaHome);
+      });
+    });
+  });
 }
 
 /* ================= DESPACHO (boleta al cliente) ================= */
