@@ -10293,6 +10293,25 @@ function plantaCargarQR(id){
         var dispBase = Math.max(0, (Number(base.cantidad_toneladas)||0)-(Number(base.despachado_cantidad)||0));
         var puedeAsig = qrPuedeAsignar() && !base.bloqueado && base.estado==='completada' && dispBase > 0.0005;
         if(base.es_stock_fabrica && puedeAsig){ qrPantallaStock(base, dispBase, abiertas); return; }
+        if(base.estado!=='completada' && !abiertas.length){
+          plantaSet('<div class="planta-res"><div class="pr-ico">⚠️</div><div class="pr-tit">LOTE SIN MARCAR COMO PRODUCIDO</div>'+
+            '<div class="pr-falta" style="text-align:left">La orden <b>'+escapeHtml(base.numero_produccion||'')+'</b> (lote '+escapeHtml(base.lote||'')+', '+escapeHtml(base.producto_nombre||'')+', '+npKg((Number(base.cantidad_toneladas)||0)*1000)+') todavía figura como <b>PENDIENTE de producir</b>. Si las bolsas ya están hechas, primero hay que marcarla como <b>producida</b>.</div>'+
+            (qrPuedeMarcarProducido() ? '<button class="planta-btn planta-btn-verde" id="qrMarcarProd">✔ Ya está producida — marcarla y seguir</button>'
+              : '<div class="pr-ayuda">No cargar el camión. Avisá a <b>Germán</b> o a <b>Carlos</b> para que la marquen como producida y volvé a escanear.</div>')+
+            '<button class="planta-btn sec" id="qrOtro">Escanear otro QR</button><button class="planta-btn sec" id="prVolver">Volver</button></div>', 'pv-amarillo');
+          var bm = document.getElementById('qrMarcarProd');
+          if(bm) bm.addEventListener('click', function(){
+            if(!confirm('¿Confirmás que '+(base.numero_produccion||'')+' ya está producida?')) return;
+            bm.disabled = true;
+            sb.rpc('marcar_produccion_completada', {p_id: base.id, p_completada: true}).then(function(rr){
+              if(rr.error){ bm.disabled = false; toast('No se pudo marcar: '+errMsg(rr.error)); return; }
+              plantaCargarQR(base.id);
+            });
+          });
+          document.getElementById('qrOtro').addEventListener('click', plantaEscanear);
+          document.getElementById('prVolver').addEventListener('click', plantaHome);
+          return;
+        }
         if(!abiertas.length){
           plantaCancelar({}, {titulo: base.es_stock_fabrica && !cands.length ? 'BOLSA DE STOCK SIN PEDIDO' : 'PEDIDO YA ENTREGADO',
             texto: base.es_stock_fabrica && !cands.length ? 'Este lote ('+(base.lote||'')+') está en Stock en Fábrica y no está asignado a ningún pedido. Oficina tiene que asignarlo antes de despachar.'
@@ -10323,6 +10342,9 @@ function plantaCargarQR(id){
 }
 
 /* ---- QR de Stock en Fábrica o de otro cliente: el jefe de planta asigna lo que se envía ---- */
+/* marcar una orden como producida desde el celular: solo Germán Banegas (jefe de producción) y el administrador */
+var QR_MARCA_PRODUCIDO_IDS = ['969c0b1b-73b3-402d-a9cc-c771081d7047'];
+function qrPuedeMarcarProducido(){ return !!(currentProfile && (currentProfile.rol==='admin' || QR_MARCA_PRODUCIDO_IDS.indexOf(currentProfile.id)!==-1)); }
 function qrPuedeAsignar(){ return !!(currentProfile && ['admin','produccion','planta'].indexOf(currentProfile.rol)!==-1); }
 function qrPantallaStock(base, disp, abiertas){
   var ya = (abiertas||[]).length ? '<div class="pr-ayuda" style="text-align:left">De este stock ya se asignó a: '+abiertas.map(function(o){ return escapeHtml(o.cliente+' ('+(o.pedido_venta_numero||'')+')'); }).join(', ')+'</div>' : '';
