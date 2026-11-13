@@ -10809,7 +10809,8 @@ function renderInsumosUsadosOrd(o){
   var box = document.createElement('div');
   box.id = 'iuBox';
   box.innerHTML = '<div class="section-title">Insumos usados en esta orden</div>'+
-    '<p class="footnote" style="margin-top:0">Si se fabricó con otro insumo (por ejemplo otro fosfato) o con otras cantidades, corregilo acá. Se devuelve al stock lo anterior, se descuenta lo nuevo y queda registrado en el historial.</p>'+
+    '<p class="footnote" style="margin-top:0">Para cambiar de fosfato elegí la <b>Fórmula</b> arriba (ej. Fosfato 18,5): esta tabla se recalcula sola y tocás <b>Guardar cambios</b>. Si se usó algo distinto a cualquier fórmula, corregí los Kg acá y tocá <b>Guardar insumos usados</b>. Todo se descuenta del stock y queda en el historial.</p>'+
+    '<p id="iuAviso" class="footnote" style="display:none;color:var(--brand-dark);margin-top:0">↑ Tabla recalculada con la fórmula elegida — tocá <b>Guardar cambios</b> para aplicarla.</p>'+
     '<table class="data-table" style="width:auto"><thead><tr><th>Insumo</th><th>Kg</th><th></th></tr></thead><tbody id="iuBody">'+
       Object.keys(ins).sort().map(function(k){ return fila(k, Number(ins[k])); }).join('')+
     '</tbody></table>'+
@@ -10822,6 +10823,21 @@ function renderInsumosUsadosOrd(o){
     box.querySelectorAll('.iu-quitar').forEach(function(b){ b.onclick = function(){ b.closest('tr').remove(); }; });
   }
   enlazar();
+  /* al elegir otra fórmula (o cambiar producto/cantidad) la tabla se recalcula sola */
+  function rellenarDesdeFormula(){
+    var hoja = document.getElementById('eo_producto').value;
+    var pp = state.productos.find(function(x){ return x.hoja===hoja; });
+    var fw = document.getElementById('eo_formulaWrap');
+    var variante = (fw && fw.style.display!=='none') ? (document.getElementById('eo_formula').value||'') : '';
+    var f = formulaDeProducto(pp, variante);
+    var ton = (parseFloat(document.getElementById('eo_cantidad').value)||0)/1000;
+    var filas = Object.keys(f||{}).filter(function(k){ return Number(f[k])>0; }).sort().map(function(k){ return fila(k, Math.round(Number(f[k])*ton*1000)/1000); }).join('');
+    document.getElementById('iuBody').innerHTML = filas; enlazar();
+    var aviso = document.getElementById('iuAviso');
+    if(aviso) aviso.style.display = '';
+  }
+  ['eo_formula','eo_producto'].forEach(function(id){ var el = document.getElementById(id); if(el) el.addEventListener('change', rellenarDesdeFormula); });
+  var cantEl = document.getElementById('eo_cantidad'); if(cantEl) cantEl.addEventListener('input', rellenarDesdeFormula);
   document.getElementById('iuAgregar').addEventListener('click', function(){
     document.getElementById('iuBody').insertAdjacentHTML('beforeend', fila('', null)); enlazar();
   });
