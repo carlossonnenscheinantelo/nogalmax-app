@@ -218,6 +218,14 @@ th.num,td.num{text-align:right}
 .nav-badge{display:inline-block;min-width:16px;text-align:center;background:var(--danger);color:#fff;font-size:10px;font-weight:700;line-height:16px;padding:0 5px;border-radius:999px;margin-left:6px;vertical-align:middle}
 .despacho-pend{color:var(--muted);font-size:12px}
 .despacho-parcial{color:var(--accent);font-size:12px;font-weight:700}
+.pd-in{width:90px;text-align:right}
+.pd-nota{width:150px}
+.pd-bar{height:7px;border-radius:5px;background:#eef0f2;overflow:hidden;margin-top:4px;min-width:90px}
+.pd-bar>div{height:100%;background:var(--brand)}
+.pd-arrastre{background:#fff4e0;color:#9a5b00;border-radius:6px;padding:1px 6px;font-size:11px;font-weight:700;white-space:nowrap}
+.pd-row-cargada td{background:#f1f8f3}
+.pd-resumen{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 12px}
+.pd-resumen .stat{min-width:150px}
 tr.ord-row-completada td{background:#fff6cc}
 tr.ord-row-despachado td{background:#d9f2d9}
 tr.ord-row-parcial td{background:#fbe6cc}
@@ -715,6 +723,50 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       <div style="text-align:center;margin-top:10px"><button id="btnStockIngresosMas" style="display:none">Cargar más</button></div>
     </div>
     <p class="footnote">El stock se descuenta automáticamente al generar una orden de producción, según la fórmula del producto (Kg por tonelada). Registrá acá cada ingreso de insumo — opcionalmente podés actualizar también su precio con el mismo movimiento.</p>
+  </section>
+
+  <!-- PRODUCCION DIARIA -->
+  <section id="view-producciondiaria" class="view">
+    <div class="toolbar">
+      <label style="display:flex;align-items:center;gap:6px;font-weight:600">📅 Día de producción <input type="date" id="pdFecha"></label>
+      <input type="search" id="pdSearch" placeholder="Buscar por producto, cliente, lote o N°…">
+      <div class="spacer"></div>
+      <button class="primary" id="btnPdGuardar">💾 Guardar producción del día</button>
+    </div>
+    <div class="pd-resumen" id="pdResumen"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>N° Producción</th>
+          <th>Lote</th>
+          <th>Producto</th>
+          <th>Cliente</th>
+          <th>Fecha pedido</th>
+          <th class="num">Pedido (Kg)</th>
+          <th class="num">Producido (Kg)</th>
+          <th class="num">Merma (Kg)</th>
+          <th class="num">Pendiente (Kg)</th>
+          <th class="num">Producido hoy (Kg)</th>
+          <th class="num">Merma hoy (Kg)</th>
+          <th>Observación</th>
+          <th>¿Terminó?</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="pdBody"></tbody>
+      </table>
+    </div>
+    <h3 style="margin:22px 0 8px">Registros del día <span id="pdFechaLbl" class="muted" style="font-weight:400"></span></h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>N° Producción</th><th>Producto</th><th>Cliente</th>
+          <th class="num">Producido (Kg)</th><th class="num">Merma (Kg)</th>
+          <th>Terminó</th><th>Observación</th><th>Registró</th><th></th>
+        </tr></thead>
+        <tbody id="pdRegsBody"></tbody>
+      </table>
+    </div>
+    <p class="footnote">Acá aparecen <b>solo las órdenes de producción pendientes</b>. Al final de cada día cargá los <b>Kg producidos</b> y la <b>merma</b> (si hubo) de cada orden en la que se trabajó, y tocá «Guardar». Si la orden no se terminó, queda pendiente y pasa sola al día siguiente con el saldo que falta (marcada «⏭️ viene de días anteriores»). Cuando se termina, tildá «¿Terminó?»: la orden se marca <b>Completada</b> y sale de esta lista (se tilda sola cuando lo producido llega al pedido). Si te equivocaste, borrá el registro con 🗑️ — si era el que terminó la orden, vuelve a pendiente.</p>
   </section>
 
   <!-- ORDENES DE PRODUCCION -->
@@ -1264,6 +1316,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     <div class="nav-group-items">
       <button data-tab="stock" class="nav-item">📦 Stock de Insumos</button>
       <button data-tab="ordenes" class="nav-item">🧾 Órdenes de Producción <span id="navBadgeOrdenes" class="nav-badge" hidden>0</span></button>
+      <button data-tab="producciondiaria" class="nav-item">📅 Producción Diaria</button>
       <button data-tab="stockfabrica" class="nav-item">🏷️ Stock en Fábrica</button>
       <button data-tab="entregados" class="nav-item">📬 Productos Entregados</button>
       <button data-tab="notasplanta" class="nav-item">📷 Notas de planta</button>
@@ -1441,6 +1494,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       <button class="close-x" id="btnCerrarIngreso">✕</button>
     </div>
     <div id="ingresoBody" class="ocr-body"></div>
+  </div>
+</div>
+
+<div id="pdHistModalOverlay" class="overlay2">
+  <div class="ocr-box" style="max-width:640px">
+    <div class="ocr-head">
+      <h3 id="pdHistTitulo">Historial de producción diaria</h3>
+      <button class="close-x" id="btnCerrarPdHist">✕</button>
+    </div>
+    <div id="pdHistBody" class="ocr-body"></div>
   </div>
 </div>
 
@@ -2027,6 +2090,7 @@ document.querySelectorAll('.nav-item').forEach(function(btn){
     if(btn.dataset.tab==='historial') renderHistorial(true);
     if(btn.dataset.tab==='stock'){ renderStock(); renderStockIngresos(!stockIngState.loaded); }
     if(btn.dataset.tab==='ordenes') renderOrdenes(!ordenesState.loaded);
+    if(btn.dataset.tab==='producciondiaria') renderProdDiaria(true);
     if(btn.dataset.tab==='pedidosventa') renderPedidosVenta(!ventaState.loaded);
     if(btn.dataset.tab==='proformas') renderProformas(!proformaState.loaded);
     if(btn.dataset.tab==='aprobaciones') renderAprobaciones(true);
@@ -3617,6 +3681,169 @@ function submitIngreso(){
     // el stock (y el precio, si se marcó) llegan también por realtime a state.insumos
   });
 }
+
+
+/* ================= PRODUCCION DIARIA ================= */
+var pdState = { loaded:false, regs:[] };
+function pdHoyISO(){ var d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
+function pdNum(v){ v = String(v==null?'':v).trim().replace(/\s/g,''); if(!v) return 0; if(v.indexOf(',')!==-1){ v=v.replace(/\./g,'').replace(',','.'); } var n=Number(v); return isNaN(n)?0:n; }
+function fetchProdDiaria(cb){
+  sb.from('produccion_diaria').select('*').order('fecha',{ascending:false}).order('id',{ascending:false}).then(function(res){
+    if(res.error){ toast('No se pudo cargar la producción diaria: '+errMsg(res.error)); cb(); return; }
+    pdState.regs = res.data || []; pdState.loaded = true; cb();
+  });
+}
+function renderProdDiaria(force){
+  var fe = document.getElementById('pdFecha');
+  if(fe && !fe.value) fe.value = pdHoyISO();
+  if(force || !ordenesState.loaded || !pdState.loaded){
+    var n=2, done=function(){ if(--n===0) renderProdDiariaRows(); };
+    fetchProducciones(done); fetchProdDiaria(done);
+    return;
+  }
+  renderProdDiariaRows();
+}
+function pdAcumulado(prodId){
+  var a={kg:0, merma:0, dias:{}, n:0};
+  pdState.regs.forEach(function(r){ if(r.produccion_id===prodId){ a.kg+=Number(r.kg_producido)||0; a.merma+=Number(r.kg_merma)||0; a.dias[r.fecha]=1; a.n++; } });
+  a.ndias = Object.keys(a.dias).length;
+  return a;
+}
+function renderProdDiariaRows(){
+  var fecha = document.getElementById('pdFecha').value || pdHoyISO();
+  var q = (document.getElementById('pdSearch').value||'').toLowerCase();
+  var puede = currentProfile && (currentProfile.rol==='admin' || currentProfile.rol==='produccion');
+  document.getElementById('btnPdGuardar').style.display = puede ? '' : 'none';
+  var pend = ordenesState.rows.filter(function(o){ return o.estado!=='completada'; });
+  if(q) pend = pend.filter(function(o){ return (o.producto_nombre+' '+(o.cliente||'')+' '+o.numero_produccion+' '+o.lote).toLowerCase().indexOf(q)!==-1; });
+  pend.sort(function(a,b){ return String(a.fecha_pedido||'').localeCompare(String(b.fecha_pedido||'')) || (a.id-b.id); });
+  var totPend=0, totKgPend=0, totArr=0;
+  document.getElementById('pdBody').innerHTML = pend.map(function(o){
+    var ac = pdAcumulado(o.id);
+    var pedidoKg = (Number(o.cantidad_toneladas)||0)*1000;
+    var saldo = Math.max(0, pedidoKg - ac.kg);
+    var pct = pedidoKg>0 ? Math.min(100, Math.round(ac.kg/pedidoKg*100)) : 0;
+    var arrastre = pdState.regs.some(function(r){ return r.produccion_id===o.id && r.fecha < fecha; });
+    totPend++; totKgPend+=saldo; if(arrastre) totArr++;
+    var cliente = o.es_stock_fabrica ? '<span class="tag">Stock fábrica</span>' : escapeHtml(o.cliente||'—');
+    var dis = puede ? '' : ' disabled';
+    return '<tr data-id="'+o.id+'" data-saldo="'+saldo+'">'+
+      '<td><b>'+escapeHtml(o.numero_produccion)+'</b>'+(arrastre?'<br><span class="pd-arrastre" title="Ya se trabajó en días anteriores ('+ac.ndias+' día/s) y no se terminó">⏭️ viene de días anteriores</span>':'')+'</td>'+
+      '<td>'+escapeHtml(o.lote)+'</td>'+
+      '<td>'+escapeHtml(o.producto_nombre)+varianteTag(o.variante)+'</td>'+
+      '<td>'+cliente+'</td>'+
+      '<td>'+fmtFecha(o.fecha_pedido)+(o.fecha_entrega?'<br><span class="muted" style="font-size:11px">Entrega '+fmtFecha(o.fecha_entrega)+'</span>':'')+'</td>'+
+      '<td class="num">'+fmt(pedidoKg,0)+'</td>'+
+      '<td class="num">'+fmt(ac.kg,0)+'<div class="pd-bar"><div style="width:'+pct+'%"></div></div></td>'+
+      '<td class="num">'+(ac.merma>0?fmt(ac.merma,0):'—')+'</td>'+
+      '<td class="num"><b>'+fmt(saldo,0)+'</b></td>'+
+      '<td class="num"><input class="pd-in pd-kg" inputmode="decimal" placeholder="0"'+dis+'></td>'+
+      '<td class="num"><input class="pd-in pd-merma" inputmode="decimal" placeholder="0"'+dis+'></td>'+
+      '<td><input class="pd-nota" placeholder="Opcional"'+dis+'></td>'+
+      '<td style="text-align:center"><input type="checkbox" class="pd-term"'+dis+'></td>'+
+      '<td><button class="ghost btn-pd-hist" title="Ver historial diario de esta orden">📜</button></td>'+
+    '</tr>';
+  }).join('') || '<tr><td colspan="14" class="empty">No hay producciones pendientes 🎉</td></tr>';
+
+  var regsDia = pdState.regs.filter(function(r){ return r.fecha===fecha; });
+  var kgDia=0, mermaDia=0, termDia=0;
+  regsDia.forEach(function(r){ kgDia+=Number(r.kg_producido)||0; mermaDia+=Number(r.kg_merma)||0; if(r.terminada) termDia++; });
+  document.getElementById('pdResumen').innerHTML =
+    statCard(totPend,'Órdenes pendientes')+statCard(fmt(totKgPend,0)+' Kg','Kg por producir')+
+    statCard(totArr,'Vienen de días anteriores')+statCard(fmt(kgDia,0)+' Kg','Producido el '+fmtFecha(fecha))+
+    statCard(fmt(mermaDia,0)+' Kg','Merma el '+fmtFecha(fecha))+statCard(termDia,'Órdenes terminadas ese día');
+  document.getElementById('pdFechaLbl').textContent = '— '+fmtFecha(fecha);
+  var byId = {}; ordenesState.rows.forEach(function(o){ byId[o.id]=o; });
+  document.getElementById('pdRegsBody').innerHTML = regsDia.map(function(r){
+    var o = byId[r.produccion_id] || {};
+    return '<tr data-rid="'+r.id+'">'+
+      '<td><b>'+escapeHtml(o.numero_produccion||'—')+'</b></td><td>'+escapeHtml(o.producto_nombre||'')+'</td>'+
+      '<td>'+(o.es_stock_fabrica?'<span class="tag">Stock fábrica</span>':escapeHtml(o.cliente||'—'))+'</td>'+
+      '<td class="num">'+fmt(r.kg_producido,0)+'</td><td class="num">'+(Number(r.kg_merma)>0?fmt(r.kg_merma,0):'—')+'</td>'+
+      '<td>'+(r.terminada?'<span class="tag">✅ Terminó</span>':'<span class="despacho-pend">Sigue pendiente</span>')+'</td>'+
+      '<td>'+escapeHtml(r.nota||'')+'</td><td>'+escapeHtml(r.registrado_por_nombre||'')+'</td>'+
+      '<td>'+(puede?'<button class="ghost danger btn-pd-del" title="Borrar este registro">🗑️</button>':'')+'</td>'+
+    '</tr>';
+  }).join('') || '<tr><td colspan="9" class="empty">Todavía no se cargó producción para este día</td></tr>';
+
+  document.querySelectorAll('#pdBody tr[data-id]').forEach(function(tr){
+    var kg = tr.querySelector('.pd-kg'), me = tr.querySelector('.pd-merma'), te = tr.querySelector('.pd-term'), no = tr.querySelector('.pd-nota');
+    var saldo = Number(tr.dataset.saldo)||0;
+    var marcar = function(){ var v=pdNum(kg.value); var hay = v>0 || pdNum(me.value)>0 || te.checked || (no.value||'').trim(); tr.classList.toggle('pd-row-cargada', !!hay); };
+    if(kg){ kg.addEventListener('input', function(){ var v=pdNum(kg.value); if(!te.dataset.manual) te.checked = saldo>0 && v>=saldo-0.0001; marcar(); }); }
+    if(me) me.addEventListener('input', marcar);
+    if(no) no.addEventListener('input', marcar);
+    if(te) te.addEventListener('change', function(){ te.dataset.manual='1'; marcar(); });
+    tr.querySelector('.btn-pd-hist').addEventListener('click', function(){ openPdHist(Number(tr.dataset.id)); });
+  });
+  document.querySelectorAll('.btn-pd-del').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var rid = Number(btn.closest('tr').dataset.rid);
+      var r = pdState.regs.find(function(x){ return x.id===rid; });
+      if(!r) return;
+      if(!confirm('¿Borrar este registro de producción ('+fmt(r.kg_producido,0)+' Kg)?'+(r.terminada?'\n\nEste registro terminó la orden: la orden vuelve a quedar PENDIENTE.':''))) return;
+      btn.disabled = true;
+      sb.rpc('eliminar_produccion_diaria',{p_id:rid}).then(function(res){
+        if(res.error){ btn.disabled=false; toast('No se pudo borrar: '+errMsg(res.error)); return; }
+        toast('Registro borrado'); renderProdDiaria(true);
+      });
+    });
+  });
+}
+function guardarProdDiaria(){
+  var fecha = document.getElementById('pdFecha').value || pdHoyISO();
+  var items = [];
+  var errores = [];
+  document.querySelectorAll('#pdBody tr[data-id]').forEach(function(tr){
+    var kg = pdNum(tr.querySelector('.pd-kg').value), me = pdNum(tr.querySelector('.pd-merma').value);
+    var te = tr.querySelector('.pd-term').checked, no = (tr.querySelector('.pd-nota').value||'').trim();
+    if(kg<0||me<0){ errores.push('Valores negativos'); return; }
+    if(kg>0 || me>0 || te) items.push({id:Number(tr.dataset.id), kg:kg, merma:me, term:te, nota:no, saldo:Number(tr.dataset.saldo)||0});
+  });
+  if(!items.length){ toast('Cargá al menos los Kg producidos de una orden'); return; }
+  var excede = items.filter(function(it){ return it.kg > it.saldo + 0.0001; });
+  var msg = '¿Guardar la producción del '+fmtFecha(fecha)+'?\n\n'+items.map(function(it){
+    var o = ordenesState.rows.find(function(x){ return x.id===it.id; }) || {};
+    return '• '+(o.numero_produccion||'')+' '+(o.producto_nombre||'')+': '+fmt(it.kg,0)+' Kg'+(it.merma>0?' (merma '+fmt(it.merma,0)+' Kg)':'')+(it.term?' — TERMINADA':' — sigue pendiente');
+  }).join('\n')+(excede.length?'\n\n⚠️ '+excede.length+' orden/es superan lo pendiente del pedido.':'');
+  if(!confirm(msg)) return;
+  var btn = document.getElementById('btnPdGuardar'); btn.disabled = true;
+  var ok=0, fallas=[];
+  (function sig(i){
+    if(i>=items.length){
+      btn.disabled = false;
+      toast(ok+' registro/s guardado/s'+(fallas.length?' — errores: '+fallas.join(' | '):''));
+      renderProdDiaria(true);
+      if(typeof refreshPendientesCount==='function') refreshPendientesCount();
+      return;
+    }
+    var it = items[i];
+    sb.rpc('registrar_produccion_diaria',{p_produccion_id:it.id, p_fecha:fecha, p_kg:it.kg, p_merma:it.merma, p_terminada:it.term, p_nota:it.nota||null}).then(function(res){
+      if(res.error) fallas.push(errMsg(res.error)); else ok++;
+      sig(i+1);
+    });
+  })(0);
+}
+function openPdHist(prodId){
+  var o = ordenesState.rows.find(function(x){ return x.id===prodId; }) || {};
+  var regs = pdState.regs.filter(function(r){ return r.produccion_id===prodId; }).slice().sort(function(a,b){ return String(a.fecha).localeCompare(String(b.fecha)) || a.id-b.id; });
+  var pedidoKg = (Number(o.cantidad_toneladas)||0)*1000, acum=0, merma=0;
+  document.getElementById('pdHistTitulo').textContent = 'Historial diario — '+(o.numero_produccion||'')+' · '+(o.producto_nombre||'');
+  document.getElementById('pdHistBody').innerHTML =
+    '<p class="muted" style="margin-top:0">Lote '+escapeHtml(o.lote||'—')+' · Cliente '+escapeHtml(o.es_stock_fabrica?'Stock fábrica':(o.cliente||'—'))+' · Pedido '+fmt(pedidoKg,0)+' Kg</p>'+
+    '<div class="table-wrap"><table><thead><tr><th>Fecha</th><th class="num">Producido (Kg)</th><th class="num">Merma (Kg)</th><th class="num">Acumulado (Kg)</th><th class="num">Pendiente (Kg)</th><th>Observación</th><th>Registró</th></tr></thead><tbody>'+
+    (regs.map(function(r){
+      acum += Number(r.kg_producido)||0; merma += Number(r.kg_merma)||0;
+      return '<tr><td>'+fmtFecha(r.fecha)+(r.terminada?' <span class="tag">✅</span>':'')+'</td><td class="num">'+fmt(r.kg_producido,0)+'</td><td class="num">'+(Number(r.kg_merma)>0?fmt(r.kg_merma,0):'—')+'</td><td class="num">'+fmt(acum,0)+'</td><td class="num">'+fmt(Math.max(0,pedidoKg-acum),0)+'</td><td>'+escapeHtml(r.nota||'')+'</td><td>'+escapeHtml(r.registrado_por_nombre||'')+'</td></tr>';
+    }).join('') || '<tr><td colspan="7" class="empty">Todavía no hay registros diarios para esta orden</td></tr>')+
+    '</tbody></table></div>'+
+    (regs.length?'<p><b>Total producido:</b> '+fmt(acum,0)+' Kg · <b>Merma total:</b> '+fmt(merma,0)+' Kg'+(acum+merma>0?' ('+fmt(merma/(acum+merma)*100,2)+'%)':'')+' · <b>Días trabajados:</b> '+Object.keys(regs.reduce(function(m,r){m[r.fecha]=1;return m;},{})).length+'</p>':'');
+  document.getElementById('pdHistModalOverlay').classList.add('active');
+}
+document.getElementById('btnCerrarPdHist').addEventListener('click', function(){ document.getElementById('pdHistModalOverlay').classList.remove('active'); });
+document.getElementById('btnPdGuardar').addEventListener('click', guardarProdDiaria);
+document.getElementById('pdFecha').addEventListener('change', function(){ renderProdDiariaRows(); });
+document.getElementById('pdSearch').addEventListener('input', function(){ renderProdDiariaRows(); });
 
 /* ================= ORDENES DE PRODUCCION ================= */
 function fetchProducciones(cb){
