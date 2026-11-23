@@ -743,11 +743,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <th>Cliente</th>
           <th>Fecha pedido</th>
           <th class="num">Pedido (Kg)</th>
+          <th class="num">Avance (Kg)</th>
+          <th class="num">Merma total (Kg)</th>
+          <th class="num">Pendiente (Kg)</th>
+          <th>📅 Fecha</th>
           <th class="num">Producido (Kg)</th>
           <th class="num">Merma (Kg)</th>
-          <th class="num">Pendiente (Kg)</th>
-          <th class="num">Producido hoy (Kg)</th>
-          <th class="num">Merma hoy (Kg)</th>
+          <th class="num" title="Kg que se entregan de producto que ya estaba hecho en stock (no se fabrican). Devuelve los insumos al stock.">📦 Salió de stock (Kg)</th>
           <th>Observación</th>
           <th>¿Terminó?</th>
           <th></th>
@@ -3704,8 +3706,8 @@ function renderProdDiaria(force){
   renderProdDiariaRows();
 }
 function pdAcumulado(prodId){
-  var a={kg:0, merma:0, dias:{}, n:0};
-  pdState.regs.forEach(function(r){ if(r.produccion_id===prodId){ a.kg+=Number(r.kg_producido)||0; a.merma+=Number(r.kg_merma)||0; a.dias[r.fecha]=1; a.n++; } });
+  var a={kg:0, merma:0, stock:0, dias:{}, n:0};
+  pdState.regs.forEach(function(r){ if(r.produccion_id===prodId){ a.kg+=Number(r.kg_producido)||0; a.merma+=Number(r.kg_merma)||0; a.stock+=Number(r.kg_stock)||0; a.dias[r.fecha]=1; a.n++; } });
   a.ndias = Object.keys(a.dias).length;
   return a;
 }
@@ -3721,8 +3723,8 @@ function renderProdDiariaRows(){
   document.getElementById('pdBody').innerHTML = pend.map(function(o){
     var ac = pdAcumulado(o.id);
     var pedidoKg = (Number(o.cantidad_toneladas)||0)*1000;
-    var saldo = Math.max(0, pedidoKg - ac.kg);
-    var pct = pedidoKg>0 ? Math.min(100, Math.round(ac.kg/pedidoKg*100)) : 0;
+    var saldo = Math.max(0, pedidoKg - ac.kg - ac.stock);
+    var pct = pedidoKg>0 ? Math.min(100, Math.round((ac.kg+ac.stock)/pedidoKg*100)) : 0;
     var arrastre = pdState.regs.some(function(r){ return r.produccion_id===o.id && r.fecha < fecha; });
     totPend++; totKgPend+=saldo; if(arrastre) totArr++;
     var cliente = o.es_stock_fabrica ? '<span class="tag">Stock fábrica</span>' : escapeHtml(o.cliente||'—');
@@ -3734,16 +3736,18 @@ function renderProdDiariaRows(){
       '<td>'+cliente+'</td>'+
       '<td>'+fmtFecha(o.fecha_pedido)+(o.fecha_entrega?'<br><span class="muted" style="font-size:11px">Entrega '+fmtFecha(o.fecha_entrega)+'</span>':'')+'</td>'+
       '<td class="num">'+fmt(pedidoKg,0)+'</td>'+
-      '<td class="num">'+fmt(ac.kg,0)+'<div class="pd-bar"><div style="width:'+pct+'%"></div></div></td>'+
+      '<td class="num">'+fmt(ac.kg,0)+(ac.stock>0?'<br><span class="muted" style="font-size:11px">+ '+fmt(ac.stock,0)+' de stock</span>':'')+'<div class="pd-bar"><div style="width:'+pct+'%"></div></div></td>'+
       '<td class="num">'+(ac.merma>0?fmt(ac.merma,0):'—')+'</td>'+
       '<td class="num"><b>'+fmt(saldo,0)+'</b></td>'+
+      '<td><input type="date" class="pd-fecha" value="'+fecha+'" style="width:130px"'+dis+'></td>'+
       '<td class="num"><input class="pd-in pd-kg" inputmode="decimal" placeholder="0"'+dis+'></td>'+
       '<td class="num"><input class="pd-in pd-merma" inputmode="decimal" placeholder="0"'+dis+'></td>'+
+      '<td class="num"><input class="pd-in pd-stock" inputmode="decimal" placeholder="0" title="Kg que salen de stock (no se producen)"'+dis+'>'+(puede&&saldo>0?'<br><button type="button" class="ghost pd-stock-todo" style="font-size:11px;padding:2px 6px" title="Todo lo pendiente sale de stock">📦 todo</button>':'')+'</td>'+
       '<td><input class="pd-nota" placeholder="Opcional"'+dis+'></td>'+
       '<td style="text-align:center"><input type="checkbox" class="pd-term"'+dis+'></td>'+
       '<td><button class="ghost btn-pd-hist" title="Ver historial diario de esta orden">📜</button></td>'+
     '</tr>';
-  }).join('') || '<tr><td colspan="14" class="empty">No hay producciones pendientes 🎉</td></tr>';
+  }).join('') || '<tr><td colspan="16" class="empty">No hay producciones pendientes 🎉</td></tr>';
 
   var regsDia = pdState.regs.filter(function(r){ return r.fecha===fecha; });
   var kgDia=0, mermaDia=0, termDia=0;
@@ -3759,18 +3763,22 @@ function renderProdDiariaRows(){
     return '<tr data-rid="'+r.id+'">'+
       '<td><b>'+escapeHtml(o.numero_produccion||'—')+'</b></td><td>'+escapeHtml(o.producto_nombre||'')+'</td>'+
       '<td>'+(o.es_stock_fabrica?'<span class="tag">Stock fábrica</span>':escapeHtml(o.cliente||'—'))+'</td>'+
-      '<td class="num">'+fmt(r.kg_producido,0)+'</td><td class="num">'+(Number(r.kg_merma)>0?fmt(r.kg_merma,0):'—')+'</td>'+
+      '<td class="num">'+(r.desde_stock?'<span class="tag">📦 '+fmt(r.kg_stock,0)+' de stock</span>':fmt(r.kg_producido,0))+'</td><td class="num">'+(Number(r.kg_merma)>0?fmt(r.kg_merma,0):'—')+'</td>'+
       '<td>'+(r.terminada?'<span class="tag">✅ Terminó</span>':'<span class="despacho-pend">Sigue pendiente</span>')+'</td>'+
       '<td>'+escapeHtml(r.nota||'')+'</td><td>'+escapeHtml(r.registrado_por_nombre||'')+'</td>'+
-      '<td>'+(puede?'<button class="ghost danger btn-pd-del" title="Borrar este registro">🗑️</button>':'')+'</td>'+
+      '<td>'+(puede&&!r.desde_stock?'<button class="ghost danger btn-pd-del" title="Borrar este registro">🗑️</button>':'')+'</td>'+
     '</tr>';
   }).join('') || '<tr><td colspan="9" class="empty">Todavía no se cargó producción para este día</td></tr>';
 
   document.querySelectorAll('#pdBody tr[data-id]').forEach(function(tr){
-    var kg = tr.querySelector('.pd-kg'), me = tr.querySelector('.pd-merma'), te = tr.querySelector('.pd-term'), no = tr.querySelector('.pd-nota');
+    var kg = tr.querySelector('.pd-kg'), me = tr.querySelector('.pd-merma'), te = tr.querySelector('.pd-term'), no = tr.querySelector('.pd-nota'), st = tr.querySelector('.pd-stock');
     var saldo = Number(tr.dataset.saldo)||0;
-    var marcar = function(){ var v=pdNum(kg.value); var hay = v>0 || pdNum(me.value)>0 || te.checked || (no.value||'').trim(); tr.classList.toggle('pd-row-cargada', !!hay); };
-    if(kg){ kg.addEventListener('input', function(){ var v=pdNum(kg.value); if(!te.dataset.manual) te.checked = saldo>0 && v>=saldo-0.0001; marcar(); }); }
+    var marcar = function(){ var v=pdNum(kg.value); var hay = v>0 || pdNum(me.value)>0 || pdNum(st.value)>0 || te.checked || (no.value||'').trim(); tr.classList.toggle('pd-row-cargada', !!hay); };
+    var auto = function(){ var v=pdNum(kg.value)+pdNum(st.value); if(!te.dataset.manual) te.checked = saldo>0 && v>=saldo-0.0001; marcar(); };
+    if(kg){ kg.addEventListener('input', auto); }
+    if(st){ st.addEventListener('input', auto); }
+    var stTodo = tr.querySelector('.pd-stock-todo');
+    if(stTodo) stTodo.addEventListener('click', function(){ st.value = Math.max(0, saldo - pdNum(kg.value)); auto(); });
     if(me) me.addEventListener('input', marcar);
     if(no) no.addEventListener('input', marcar);
     if(te) te.addEventListener('change', function(){ te.dataset.manual='1'; marcar(); });
@@ -3797,14 +3805,19 @@ function guardarProdDiaria(){
   document.querySelectorAll('#pdBody tr[data-id]').forEach(function(tr){
     var kg = pdNum(tr.querySelector('.pd-kg').value), me = pdNum(tr.querySelector('.pd-merma').value);
     var te = tr.querySelector('.pd-term').checked, no = (tr.querySelector('.pd-nota').value||'').trim();
-    if(kg<0||me<0){ errores.push('Valores negativos'); return; }
-    if(kg>0 || me>0 || te) items.push({id:Number(tr.dataset.id), kg:kg, merma:me, term:te, nota:no, saldo:Number(tr.dataset.saldo)||0});
+    var stk = pdNum(tr.querySelector('.pd-stock').value), fe = tr.querySelector('.pd-fecha').value || fecha;
+    if(kg<0||me<0||stk<0){ errores.push('Valores negativos'); return; }
+    if(kg>0 || me>0 || stk>0 || te) items.push({id:Number(tr.dataset.id), kg:kg, merma:me, stock:stk, fecha:fe, term:te, nota:no, saldo:Number(tr.dataset.saldo)||0});
   });
+  if(errores.length){ toast('No se aceptan valores negativos'); return; }
   if(!items.length){ toast('Cargá al menos los Kg producidos de una orden'); return; }
+  var stockDeMas = items.filter(function(it){ return it.stock > 0 && it.kg + it.stock > it.saldo + 0.5; });
+  if(stockDeMas.length){ toast('Lo producido + lo que sale de stock supera lo pendiente de la orden'); return; }
   var excede = items.filter(function(it){ return it.kg > it.saldo + 0.0001; });
-  var msg = '¿Guardar la producción del '+fmtFecha(fecha)+'?\n\n'+items.map(function(it){
+  var msg = '¿Guardar la producción?\n\n'+items.map(function(it){
     var o = ordenesState.rows.find(function(x){ return x.id===it.id; }) || {};
-    return '• '+(o.numero_produccion||'')+' '+(o.producto_nombre||'')+': '+fmt(it.kg,0)+' Kg'+(it.merma>0?' (merma '+fmt(it.merma,0)+' Kg)':'')+(it.term?' — TERMINADA':' — sigue pendiente');
+    var fin = it.term || (it.saldo>0 && it.kg+it.stock >= it.saldo-0.5);
+    return '• '+fmtFecha(it.fecha)+' — '+(o.numero_produccion||'')+' '+(o.producto_nombre||'')+': '+fmt(it.kg,0)+' Kg producidos'+(it.merma>0?' (merma '+fmt(it.merma,0)+' Kg)':'')+(it.stock>0?' + '+fmt(it.stock,0)+' Kg DE STOCK':'')+(fin?' — TERMINADA':' — sigue pendiente');
   }).join('\n')+(excede.length?'\n\n⚠️ '+excede.length+' orden/es superan lo pendiente del pedido.':'');
   if(!confirm(msg)) return;
   var btn = document.getElementById('btnPdGuardar'); btn.disabled = true;
@@ -3818,9 +3831,16 @@ function guardarProdDiaria(){
       return;
     }
     var it = items[i];
-    sb.rpc('registrar_produccion_diaria',{p_produccion_id:it.id, p_fecha:fecha, p_kg:it.kg, p_merma:it.merma, p_terminada:it.term, p_nota:it.nota||null}).then(function(res){
-      if(res.error) fallas.push(errMsg(res.error)); else ok++;
-      sig(i+1);
+    var paso1 = (it.kg>0 || it.merma>0 || (it.term && !(it.stock>0)))
+      ? sb.rpc('registrar_produccion_diaria',{p_produccion_id:it.id, p_fecha:it.fecha, p_kg:it.kg, p_merma:it.merma, p_terminada:(it.stock>0 ? false : it.term), p_nota:it.nota||null})
+      : Promise.resolve({});
+    paso1.then(function(res){
+      if(res.error){ fallas.push(errMsg(res.error)); sig(i+1); return; }
+      if(!(it.stock>0)){ ok++; sig(i+1); return; }
+      sb.rpc('produccion_diaria_salio_de_stock',{p_produccion_id:it.id, p_fecha:it.fecha, p_kg:it.stock, p_terminar:it.term, p_nota:it.nota||null}).then(function(r2){
+        if(r2.error) fallas.push(errMsg(r2.error)); else ok++;
+        sig(i+1);
+      });
     });
   })(0);
 }
@@ -3833,8 +3853,8 @@ function openPdHist(prodId){
     '<p class="muted" style="margin-top:0">Lote '+escapeHtml(o.lote||'—')+' · Cliente '+escapeHtml(o.es_stock_fabrica?'Stock fábrica':(o.cliente||'—'))+' · Pedido '+fmt(pedidoKg,0)+' Kg</p>'+
     '<div class="table-wrap"><table><thead><tr><th>Fecha</th><th class="num">Producido (Kg)</th><th class="num">Merma (Kg)</th><th class="num">Acumulado (Kg)</th><th class="num">Pendiente (Kg)</th><th>Observación</th><th>Registró</th></tr></thead><tbody>'+
     (regs.map(function(r){
-      acum += Number(r.kg_producido)||0; merma += Number(r.kg_merma)||0;
-      return '<tr><td>'+fmtFecha(r.fecha)+(r.terminada?' <span class="tag">✅</span>':'')+'</td><td class="num">'+fmt(r.kg_producido,0)+'</td><td class="num">'+(Number(r.kg_merma)>0?fmt(r.kg_merma,0):'—')+'</td><td class="num">'+fmt(acum,0)+'</td><td class="num">'+fmt(Math.max(0,pedidoKg-acum),0)+'</td><td>'+escapeHtml(r.nota||'')+'</td><td>'+escapeHtml(r.registrado_por_nombre||'')+'</td></tr>';
+      acum += (Number(r.kg_producido)||0) + (Number(r.kg_stock)||0); merma += Number(r.kg_merma)||0;
+      return '<tr><td>'+fmtFecha(r.fecha)+(r.terminada?' <span class="tag">✅</span>':'')+'</td><td class="num">'+(r.desde_stock?'<span class="tag">📦 '+fmt(r.kg_stock,0)+' de stock</span>':fmt(r.kg_producido,0))+'</td><td class="num">'+(Number(r.kg_merma)>0?fmt(r.kg_merma,0):'—')+'</td><td class="num">'+fmt(acum,0)+'</td><td class="num">'+fmt(Math.max(0,pedidoKg-acum),0)+'</td><td>'+escapeHtml(r.nota||'')+'</td><td>'+escapeHtml(r.registrado_por_nombre||'')+'</td></tr>';
     }).join('') || '<tr><td colspan="7" class="empty">Todavía no hay registros diarios para esta orden</td></tr>')+
     '</tbody></table></div>'+
     (regs.length?'<p><b>Total producido:</b> '+fmt(acum,0)+' Kg · <b>Merma total:</b> '+fmt(merma,0)+' Kg'+(acum+merma>0?' ('+fmt(merma/(acum+merma)*100,2)+'%)':'')+' · <b>Días trabajados:</b> '+Object.keys(regs.reduce(function(m,r){m[r.fecha]=1;return m;},{})).length+'</p>':'');
