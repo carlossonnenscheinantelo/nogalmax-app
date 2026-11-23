@@ -726,6 +726,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <tbody id="stockBody"></tbody>
       </table>
     </div>
+    <div class="section-title">🐂 Stock confinamiento <span class="muted" style="font-size:12px;font-weight:400">— insumos que paga el confinamiento; no interviene en producción</span></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Insumo</th><th class="num">Total ingresado (Kg)</th><th>Último ingreso</th><th>Proveedor</th></tr></thead>
+        <tbody id="stockConfiBody"><tr><td colspan="4" class="empty">Cargando…</td></tr></tbody>
+      </table>
+    </div>
     <div class="section-title">Historial de ingresos</div>
     <div class="card">
       <div id="stockIngresosList"></div>
@@ -3605,6 +3612,13 @@ function renderStock(){
       '<td class="num'+(low?' stock-low':'')+'">'+fmt(ins.stockActual,2)+'</td>'+
       '<td class="muted">'+escapeHtml(ins.unidad||'')+'</td></tr>';
   }).join('') || '<tr><td colspan="4" class="empty">Sin resultados</td></tr>';
+  sb.from('stock_confinamiento').select('*').order('fecha',{ascending:false}).order('id',{ascending:false}).then(function(res){
+    var body = document.getElementById('stockConfiBody'); if(!body) return;
+    if(res.error){ body.innerHTML = '<tr><td colspan="4" class="empty">No se pudo cargar: '+escapeHtml(errMsg(res.error))+'</td></tr>'; return; }
+    var g = {}; (res.data||[]).forEach(function(r){ var k = r.insumo_nombre; var x = g[k] || (g[k] = {kg:0, fecha:r.fecha, prov:r.proveedor}); x.kg += Number(r.cantidad)||0; });
+    var ks = Object.keys(g).filter(function(k){ return !q || k.toLowerCase().indexOf(q)!==-1; }).sort();
+    body.innerHTML = ks.map(function(k){ return '<tr><td>'+escapeHtml(k)+'</td><td class="num">'+fmt(g[k].kg,0)+'</td><td>'+fmtFecha(g[k].fecha)+'</td><td class="muted">'+escapeHtml(g[k].prov||'')+'</td></tr>'; }).join('') || '<tr><td colspan="4" class="empty">Todavía no hay ingresos de confinamiento</td></tr>';
+  });
 }
 document.getElementById('stockSearch').addEventListener('input', renderStock);
 
@@ -10208,9 +10222,10 @@ function plantaProcesar(file){
         return;
       }
       var plan = null;
-      var paso = tipo==='despacho' ? plantaPlanDespacho(d) : Promise.resolve(null);
+      var paso = tipo==='despacho' ? plantaPlanDespacho(d) : plantaElegirDestino(d);
       return paso.then(function(pl){
         plan = pl;
+        if(tipo==='insumo' && !plan){ plantaHome(); return; }
         if(plan && plan.error){ plantaCancelar(d, plan.error); return; }
         return plantaConfirmarKgSiQr(tipo, plan, d).then(function(pl2){ if(!pl2) return; plan = pl2;
         var bucket = tipo==='despacho' ? 'boletas-despacho' : 'notas-planta';
@@ -10232,7 +10247,14 @@ function plantaProcesar(file){
               if(String(ins.error.code)==='23505') throw new Error('Esta nota N° '+d.numero+' ya fue subida.');
               throw new Error('No se pudo guardar: '+ins.error.message);
             }
+            var destinoP = (tipo==='insumo' && plan && plan.destino) ? sb.rpc('planta_ingreso_nota', {p_nota_id: ins.data.id, p_destino: plan.destino}) : Promise.resolve(null);
+            return destinoP.then(function(rd){
             var saldoHtml = '';
+            if(rd && rd.error){ saldoHtml = '<div class="pr-falta">⚠️ La nota se guardó pero no se pudo cargar al stock: '+escapeHtml(errMsg(rd.error))+'. Avisá a oficina.</div>'; }
+            else if(rd && rd.data){
+              saldoHtml = '<div class="pr-saldo">'+(rd.data.destino==='confinamiento' ? '🐂 <b>Stock CONFINAMIENTO</b>' : '🏭 <b>Stock PLANTA</b>')+
+                (rd.data.items||[]).map(function(it){ return '<div>'+escapeHtml(it.insumo)+': '+npKg(it.kg)+(it.destino==='planta' ? (it.stock ? ' — <b>sumado al stock</b>' : ' — se suma cuando oficina cargue la compra') : '')+'</div>'; }).join('')+'</div>';
+            }
             if(desp){
               saldoHtml = '<div class="pr-saldo">'+(desp.items||[]).map(function(it){
                 return '<div><b>'+escapeHtml(it.producto)+'</b>: despachado '+npKg(it.kg)+' — '+(Number(it.saldo_kg)>0 ? 'le quedan <b>'+npKg(it.saldo_kg)+'</b> por despachar' : '<b>pedido entregado completo</b>')+'</div>';
@@ -10242,6 +10264,7 @@ function plantaProcesar(file){
               '<button class="planta-btn" id="prListo">Listo</button></div>', 'pv-verde');
             document.getElementById('prListo').addEventListener('click', plantaHome);
             plantaState.timer = setTimeout(plantaHome, 25000);
+            });
           });
         });
         });
@@ -10417,6 +10440,21 @@ function plantaProdCargar(g){
       document.getElementById('ppOtra').addEventListener('click', plantaProdLista);
       document.getElementById('prListo').addEventListener('click', plantaHome);
     });
+  });
+}
+/* Llegó insumo: ¿lo paga Planta o Confinamiento? */
+function plantaElegirDestino(d){
+  return new Promise(function(ok){
+    var its = npItems(d);
+    plantaSet('<div class="planta-res" style="color:var(--ink)"><div class="qr-ok">¿De quién es este insumo?</div>'+
+      '<div class="qr-ped">'+its.map(function(it){ return '<div class="qr-lin"><b>'+escapeHtml(it.insumo_catalogo||it.descripcion||it.detalle||'')+'</b><span>'+npKg(it.kg_total)+'</span></div>'; }).join('')+
+      '<div class="qr-lin"><span>Proveedor: '+escapeHtml(d.proveedor||'—')+'</span></div></div>'+
+      '<button class="planta-big planta-desp" id="dstPlanta" style="min-height:14vh"><span class="pb-ico">🏭</span><span class="pb-tit">PLANTA</span><span class="pb-sub">Lo paga la planta — va al stock de producción</span></button>'+
+      '<button class="planta-big planta-ins" id="dstConfi" style="min-height:14vh"><span class="pb-ico">🐂</span><span class="pb-tit">CONFINAMIENTO</span><span class="pb-sub">Lo paga el confinamiento — va al stock de confinamiento</span></button>'+
+      '<button class="planta-btn sec" id="dstCancel">Cancelar</button></div>');
+    document.getElementById('dstPlanta').addEventListener('click', function(){ ok({destino:'planta'}); });
+    document.getElementById('dstConfi').addEventListener('click', function(){ ok({destino:'confinamiento'}); });
+    document.getElementById('dstCancel').addEventListener('click', function(){ ok(null); });
   });
 }
 function plantaErrorDespacho(err){
