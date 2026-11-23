@@ -437,6 +437,9 @@ tr.ord-row-parcial:hover td{background:#f6d6a8}
 body.planta-on{overflow:hidden}
 .planta-ov{position:fixed;inset:0;z-index:9000;background:#f3f5f4;display:flex;flex-direction:column;overflow:auto}
 .planta-ov[hidden]{display:none}
+@media (min-width:600px){
+  .planta-ov.planta-preview{left:50%;right:auto;width:400px;top:12px;bottom:12px;transform:translateX(-50%);border-radius:28px;border:10px solid #1d1d1f;box-shadow:0 0 0 100vmax rgba(0,0,0,.55)}
+}
 .planta-top{display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;background:#fff;border-bottom:1px solid var(--line)}
 .planta-top img{height:30px}
 .planta-top .pt-user{flex:1;text-align:right;font-size:13px;color:var(--muted)}
@@ -552,7 +555,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   <button id="btnMenuMovil" type="button" aria-label="Abrir menú">☰</button>
   <div class="brand"><img id="topbarLogoImg" class="brand-logo" alt="NOGALMAX"><span class="sub">Precios &amp; Fórmulas</span></div>
   <div class="spacer"></div>
-  <div class="user-badge"><span class="dot"></span><span id="userBadgeName">—</span><button id="btnLogout" class="ghost" style="padding:3px 8px;color:#fff">Salir</button></div>
+  <div class="user-badge"><span class="dot"></span><span id="userBadgeName">—</span><button id="btnVerPlanta" class="ghost" style="padding:3px 8px;color:#fff;display:none" title="Ver la app como la ve el celular de planta">📱 Celular de planta</button><button id="btnLogout" class="ghost" style="padding:3px 8px;color:#fff">Salir</button></div>
   <button id="btnExcel">📊 Exportar a Excel</button>
 </div>
 <div id="appBody">
@@ -10102,8 +10105,9 @@ function npResumen(tipo, d){
 }
 
 /* ---------- pantalla del celular de planta ---------- */
-function abrirModoPlanta(fijo){
+function abrirModoPlanta(fijo, vista){
   plantaState.fijo = !!fijo;
+  plantaState.preview = !!vista;
   document.getElementById('plantaOverlay').hidden = false;
   document.body.classList.add('planta-on');
   plantaHome();
@@ -10117,7 +10121,7 @@ function cerrarModoPlanta(){
 }
 function plantaSet(html, clase){
   var ov = document.getElementById('plantaOverlay');
-  ov.className = 'planta-ov'+(clase?' '+clase:'');
+  ov.className = 'planta-ov'+(plantaState.preview?' planta-preview':'')+(clase?' '+clase:'');
   document.getElementById('plantaBody').innerHTML = html;
 }
 function plantaHome(){
@@ -10252,6 +10256,7 @@ function plantaProcesar(file){
 }
 document.getElementById('plantaFile').addEventListener('change', function(){ if(this.files && this.files[0]) plantaProcesar(this.files[0]); });
 document.getElementById('plantaCerrar').addEventListener('click', cerrarModoPlanta);
+document.getElementById('btnVerPlanta').addEventListener('click', function(){ abrirModoPlanta(false, true); toast('Vista del celular de planta: lo que cargues acá se guarda de verdad, con tu usuario'); });
 document.getElementById('plantaSalir').addEventListener('click', function(){ if(confirm('¿Cerrar la sesión de este celular?')){ var b=document.getElementById('btnLogout'); if(b) b.click(); } });
 document.getElementById('plantaLogo').src = LOGO_DATA_URI;
 
@@ -13895,7 +13900,8 @@ function onSignedIn(session){
   currentUser = session.user;
   document.getElementById('userBadgeName').textContent = currentUser.email;
   sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle().then(function(res){
-    if(res.data){ currentProfile = res.data; document.getElementById('userBadgeName').textContent = res.data.nombre || res.data.email; }
+    if(res.data){ currentProfile = res.data; document.getElementById('userBadgeName').textContent = res.data.nombre || res.data.email;
+      var bvp = document.getElementById('btnVerPlanta'); if(bvp) bvp.style.display = (res.data.rol==='admin' || QR_MARCA_PRODUCIDO_IDS.indexOf(res.data.id)!==-1) ? '' : 'none'; }
     aplicarPermisosRol();
   });
   showApp();
