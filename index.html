@@ -3993,9 +3993,8 @@ function renderOrdenesRows(){
   document.getElementById('ordenesBody').innerHTML = rows.map(function(o){
     var clienteLabel = o.es_stock_fabrica ? '<span class="tag">Stock fábrica</span>' : (escapeHtml(o.cliente||'—')+(o.desde_stock_existente?' <span class="tag" title="Esta producción salió de un lote que ya estaba en stock">📦 desde stock</span>':''));
     if(ordSinPedido(o)) clienteLabel += ' <span class="tag" style="background:#fde3e3;color:#b91c1c" title="Esta orden no tiene pedido de venta ni nota de venta">⚠ sin pedido</span>'+(puedeCrearPvOrd?' <button class="ghost btn-crear-pv-ord" title="Crear el pedido y la nota de venta de esta orden">🧾 Crear pedido</button> <button class="ghost btn-vinc-ord" title="Vincular esta orden a una nota de venta que ya existe">🔗 Vincular a nota</button>':'');
-    var estadoCell = puedeCompletar
-      ? '<label class="ord-estado-chk"><input type="checkbox" class="ord-check" '+(o.estado==='completada'?'checked':'')+'> '+(o.estado==='completada'?'Completada':'Pendiente')+'</label>'
-      : (o.estado==='completada' ? '<span class="tag">Completada</span>' : '<span class="despacho-pend">Pendiente</span>');
+    var estadoCell = o.estado==='completada' ? '<span class="tag">Completada</span>'
+      : (puedeCompletar ? '<span class="despacho-pend">Pendiente</span><br><button class="ghost btn-ir-pd" title="Las órdenes se completan cargando los Kg producidos en Producción Diaria">📅 Cargar en Producción Diaria</button>' : '<span class="despacho-pend">Pendiente</span>');
     var despCant = Number(o.despachado_cantidad)||0;
     var saldoDesp = Math.max(0, (Number(o.cantidad_toneladas)||0) - despCant);
     var despachoCell = o.despachado
@@ -4046,6 +4045,7 @@ function renderOrdenesRows(){
       });
     });
   });
+  document.querySelectorAll('.btn-ir-pd').forEach(function(b){ b.addEventListener('click', function(){ irATab('producciondiaria'); }); });
   document.querySelectorAll('.ord-formula-sel').forEach(function(sel){
     sel.addEventListener('change', function(){
       var id = Number(sel.closest('tr').dataset.id);
@@ -10572,8 +10572,7 @@ function plantaCargarQR(id){
         if(base.estado!=='completada' && !abiertas.length){
           plantaSet('<div class="planta-res"><div class="pr-ico">⚠️</div><div class="pr-tit">LOTE SIN MARCAR COMO PRODUCIDO</div>'+
             '<div class="pr-falta" style="text-align:left">La orden <b>'+escapeHtml(base.numero_produccion||'')+'</b> (lote '+escapeHtml(base.lote||'')+', '+escapeHtml(base.producto_nombre||'')+', '+npKg((Number(base.cantidad_toneladas)||0)*1000)+') todavía figura como <b>PENDIENTE de producir</b>. Si las bolsas ya están hechas, primero hay que marcarla como <b>producida</b>.</div>'+
-            (qrPuedeMarcarProducido() ? '<button class="planta-btn planta-btn-verde" id="qrMarcarProd">✔ Ya está producida — marcarla y seguir</button>'
-              : '<div class="pr-ayuda">No cargar el camión. Avisá a <b>Germán</b> o a <b>Carlos</b> para que la marquen como producida y volvé a escanear.</div>')+
+            '<div class="pr-ayuda">No cargar el camión. <b>Germán</b> tiene que cargar los Kg producidos en <b>Producción → Producción Diaria</b> y tildar <b>«¿Terminó?»</b>. Después volvé a escanear.</div>'+
             '<button class="planta-btn sec" id="qrOtro">Escanear otro QR</button><button class="planta-btn sec" id="prVolver">Volver</button></div>', 'pv-amarillo');
           var bm = document.getElementById('qrMarcarProd');
           if(bm) bm.addEventListener('click', function(){
