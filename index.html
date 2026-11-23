@@ -446,6 +446,12 @@ body.planta-on{overflow:hidden}
 .planta-big:active{transform:scale(.98)}
 .planta-desp{background:linear-gradient(160deg,#2f6f4f,#1e4a34)}
 .planta-ins{background:linear-gradient(160deg,#b5651d,#8a4a12)}
+.planta-prod{background:linear-gradient(160deg,#1f5e8a,#143f5e)}
+#plantaBody .planta-big{min-height:19vh}
+.pp-card{display:block;width:100%;text-align:left;border:0;border-radius:14px;background:#fff;color:var(--ink);padding:14px 16px;margin:0 0 10px;box-shadow:var(--shadow-sm);cursor:pointer;font-size:16px}
+.pp-card b{font-size:18px;display:block}
+.pp-card .pp-sal{font-size:20px;font-weight:900;color:#1f5e8a}
+.pp-in{width:100%;box-sizing:border-box;font-size:30px;font-weight:800;text-align:center;padding:12px;border-radius:12px;border:2px solid #1f5e8a}
 .pb-ico{font-size:64px;line-height:1}
 .pb-tit{font-size:30px;font-weight:800;letter-spacing:.5px}
 .pb-sub{font-size:15px;opacity:.9}
@@ -10124,10 +10130,11 @@ function plantaHome(){
   plantaSet(
     '<button class="planta-big planta-desp" data-t="despacho"><span class="pb-ico">📦</span><span class="pb-tit">DESPACHO</span><span class="pb-sub">Escanear el QR de la bolsa y foto de la Nota de Entrega</span></button>'+
     '<button class="planta-big planta-ins" data-t="insumo"><span class="pb-ico">🚚</span><span class="pb-tit">LLEGÓ INSUMO</span><span class="pb-sub">Foto del Ingreso de Insumos firmado</span></button>'+
+    '<button class="planta-big planta-prod" data-t="produccion"><span class="pb-ico">🏭</span><span class="pb-tit">PRODUCCIÓN DEL DÍA</span><span class="pb-sub">Cargar los Kg que se produjeron y para qué cliente</span></button>'+
     '<div class="planta-hoy" id="plantaHoy">Cargando lo subido hoy…</div>'
   );
   document.querySelectorAll('#plantaBody .planta-big').forEach(function(b){
-    b.addEventListener('click', function(){ plantaState.tipo = b.dataset.t; if(b.dataset.t==='despacho'){ plantaEscanear(); return; } var f=document.getElementById('plantaFile'); f.value=''; f.click(); });
+    b.addEventListener('click', function(){ plantaState.tipo = b.dataset.t; if(b.dataset.t==='despacho'){ plantaEscanear(); return; } if(b.dataset.t==='produccion'){ plantaProdLista(); return; } var f=document.getElementById('plantaFile'); f.value=''; f.click(); });
   });
   var r = npRangoDia(npHoyISO());
   sb.from('notas_planta').select('tipo,numero,resumen,creado_en').gte('creado_en', r[0]).lt('creado_en', r[1]).neq('estado','descartada').order('creado_en',{ascending:false}).then(function(res){
@@ -10329,6 +10336,81 @@ function plantaConfirmarKgSiQr(tipo, plan, d){
       this.disabled = true;
       plantaSet('<div class="planta-msg"><div class="planta-spin"></div><div class="pm-tit">Registrando el despacho…</div></div>', 'pv-leyendo');
       ok(Object.assign({}, plan, {items: nuevos}));
+    });
+  });
+}
+/* ---- Celular de planta: cargar producción del día (el sistema reparte los Kg entre las órdenes pendientes) ---- */
+function plantaProdLista(){
+  clearTimeout(plantaState.timer);
+  plantaSet('<div class="planta-msg"><div class="planta-spin"></div><div class="pm-tit">Buscando órdenes pendientes…</div></div>', 'pv-leyendo');
+  sb.from('producciones').select('id,cliente,producto_nombre,cantidad_toneladas,fecha_pedido,es_stock_fabrica,bloqueado,estado').neq('estado','completada').then(function(res){
+    if(res.error){ plantaCancelar({}, {titulo:'NO SE PUDIERON CARGAR LAS ÓRDENES', texto: errMsg(res.error)}); return; }
+    var ords = (res.data||[]).filter(function(o){ return !o.bloqueado; });
+    var ids = ords.map(function(o){ return o.id; });
+    (ids.length ? sb.from('produccion_diaria').select('produccion_id,kg_producido,kg_stock').in('produccion_id', ids) : Promise.resolve({data:[]})).then(function(r2){
+      var hecho = {}; (r2.data||[]).forEach(function(r){ hecho[r.produccion_id] = (hecho[r.produccion_id]||0) + (Number(r.kg_producido)||0) + (Number(r.kg_stock)||0); });
+      var grupos = {};
+      ords.forEach(function(o){
+        var sal = Math.max(0, (Number(o.cantidad_toneladas)||0)*1000 - (hecho[o.id]||0)); if(sal <= 0.5) return;
+        var k = (o.cliente||'')+'|'+o.producto_nombre;
+        var g = grupos[k] || (grupos[k] = {cliente:o.cliente||'', producto:o.producto_nombre, stock:!o.cliente, saldo:0, n:0, desde:o.fecha_pedido});
+        g.saldo += sal; g.n++; if(String(o.fecha_pedido||'') < String(g.desde||'9999')) g.desde = o.fecha_pedido;
+      });
+      var lista = Object.keys(grupos).map(function(k){ return grupos[k]; }).sort(function(a,b){ return String(a.desde||'').localeCompare(String(b.desde||'')); });
+      plantaState.ppGrupos = lista;
+      plantaSet('<div class="planta-res" style="color:var(--ink);text-align:left"><div class="qr-ok">🏭 ¿Qué se produjo?</div>'+
+        '<input type="search" id="ppBusca" placeholder="Buscar cliente o producto…" style="width:100%;box-sizing:border-box;font-size:18px;padding:12px;border-radius:12px;border:1px solid #ccc">'+
+        '<div id="ppLista">'+(lista.length ? lista.map(function(g,i){
+          return '<button class="pp-card" data-i="'+i+'" data-q="'+escapeHtml(npNorm(g.cliente+' '+g.producto))+'"><b>'+escapeHtml(g.producto)+'</b>'+
+            (g.stock?'<span class="tag">Stock fábrica</span>':escapeHtml(g.cliente))+'<br>Pendiente: <span class="pp-sal">'+npKg(g.saldo)+'</span>'+(g.n>1?' <span class="muted">('+g.n+' órdenes)</span>':'')+'</button>';
+        }).join('') : '<div class="pr-ayuda">No hay órdenes pendientes de producir.</div>')+'</div>'+
+        '<button class="planta-btn sec" id="prVolver">Volver</button></div>');
+      document.getElementById('ppBusca').addEventListener('input', function(){ var q = npNorm(this.value); document.querySelectorAll('.pp-card').forEach(function(b){ b.style.display = (!q || b.dataset.q.indexOf(q)!==-1) ? '' : 'none'; }); });
+      document.querySelectorAll('.pp-card').forEach(function(b){ b.addEventListener('click', function(){ plantaProdCargar(plantaState.ppGrupos[Number(b.dataset.i)]); }); });
+      document.getElementById('prVolver').addEventListener('click', plantaHome);
+    });
+  });
+}
+function plantaProdCargar(g){
+  var hoy = npHoyISO();
+  plantaSet('<div class="planta-res" style="color:var(--ink);text-align:left"><div class="qr-ok">🏭 '+escapeHtml(g.producto)+'</div>'+
+    '<div class="qr-ped"><div class="qr-lin qr-lin-act"><b>'+(g.stock?'Stock fábrica':escapeHtml(g.cliente))+'</b><span>Pendiente de producir: <b>'+npKg(g.saldo)+'</b>'+(g.n>1?' en '+g.n+' órdenes':'')+'</span></div></div>'+
+    '<div class="pr-ayuda">¿Cuántos Kg se produjeron?</div><input type="number" id="ppKg" class="pp-in" inputmode="decimal" min="1" placeholder="0">'+
+    '<div class="pr-ayuda">Merma (Kg) — si hubo</div><input type="number" id="ppMerma" class="pp-in" style="font-size:22px" inputmode="decimal" min="0" placeholder="0">'+
+    '<div class="pr-ayuda">Día de producción</div><input type="date" id="ppFecha" class="pp-in" style="font-size:20px" value="'+hoy+'" max="'+hoy+'">'+
+    '<div id="ppRes" class="pr-ayuda" style="font-weight:700"></div>'+
+    '<button class="planta-btn planta-btn-verde" id="ppOk">✔ Guardar producción</button><button class="planta-btn sec" id="prVolver">Volver</button></div>');
+  var inKg = document.getElementById('ppKg'), inMe = document.getElementById('ppMerma'), res = document.getElementById('ppRes');
+  function pintar(){ var kg = parseFloat(inKg.value)||0, me = parseFloat(inMe.value)||0;
+    if(kg<=0){ res.textContent=''; return; }
+    if(kg > g.saldo + 0.5){ res.style.color='#c0392b'; res.textContent='Es más que lo pendiente ('+npKg(g.saldo)+'). Si sobró producto, avisá a oficina.'; return; }
+    var q = g.saldo - kg - me; res.style.color = q > 0.5 ? '#b5560a' : '#1f5e3b';
+    res.textContent = q > 0.5 ? 'Quedan '+npKg(q)+' por producir' : 'Se termina lo pendiente ✅'; }
+  inKg.addEventListener('input', pintar); inMe.addEventListener('input', pintar); inKg.focus();
+  document.getElementById('prVolver').addEventListener('click', plantaProdLista);
+  document.getElementById('ppOk').addEventListener('click', function(){
+    var kg = parseFloat(inKg.value)||0, me = parseFloat(inMe.value)||0, fe = document.getElementById('ppFecha').value || hoy;
+    if(kg<=0){ toast('Poné los Kg producidos'); return; }
+    if(me<0){ toast('La merma no puede ser negativa'); return; }
+    if(kg > g.saldo + 0.5){ toast('Máximo '+npKg(g.saldo)); return; }
+    if(!confirm('¿Guardar '+npKg(kg)+' de '+g.producto+' para '+(g.stock?'Stock fábrica':g.cliente)+(me>0?' (merma '+npKg(me)+')':'')+' — '+fmtFecha(fe)+'?')) return;
+    this.disabled = true;
+    plantaSet('<div class="planta-msg"><div class="planta-spin"></div><div class="pm-tit">Guardando…</div></div>', 'pv-leyendo');
+    sb.rpc('planta_produccion_dia', {p_cliente: g.cliente||null, p_producto: g.producto, p_kg: kg, p_merma: me, p_fecha: fe}).then(function(r){
+      if(r.error){
+        var m = errMsg(r.error), p = m.split('|');
+        plantaCancelar({}, {titulo:'NO SE GUARDÓ', texto: p[0].indexOf('EXCEDE')!==-1 ? 'Se cargaron '+npKg(p[1])+' pero lo pendiente es '+npKg(p[2])+'. Avisá a oficina.' : m});
+        return;
+      }
+      var d = r.data || {};
+      plantaSet('<div class="planta-res"><div class="pr-ico">✅</div><div class="pr-tit">PRODUCCIÓN CARGADA</div>'+
+        '<div class="pr-saldo">'+(d.items||[]).map(function(it){
+          return '<div><b>'+escapeHtml(it.orden)+'</b>: '+npKg(it.kg)+(it.merma>0?' (merma '+npKg(it.merma)+')':'')+' — '+(it.terminada ? '<b>orden terminada</b>' : 'quedan <b>'+npKg(it.saldo)+'</b>')+'</div>';
+        }).join('')+'</div>'+
+        '<div class="pr-sub">'+escapeHtml(g.producto)+' — '+(g.stock?'Stock fábrica':escapeHtml(g.cliente))+(Number(d.saldo_total)>0?'<br>Falta producir en total: <b>'+npKg(d.saldo_total)+'</b>':'<br><b>Pedido completo</b>')+'</div>'+
+        '<button class="planta-btn" id="ppOtra">🏭 Cargar otra producción</button><button class="planta-btn sec" id="prListo">Listo</button></div>', 'pv-verde');
+      document.getElementById('ppOtra').addEventListener('click', plantaProdLista);
+      document.getElementById('prListo').addEventListener('click', plantaHome);
     });
   });
 }
