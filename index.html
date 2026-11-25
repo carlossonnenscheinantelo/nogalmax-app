@@ -515,6 +515,52 @@ body.planta-on{overflow:hidden}
 .qr-lin{display:flex;flex-direction:column;padding:8px 0;border-top:1px solid var(--line);font-size:15px}
 .qr-lin-act{background:var(--brand-light);margin:0 -14px;padding:8px 14px}
 .planta-btn-verde{background:var(--brand);color:#fff}
+.pm-paso{font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--brand);margin-top:14px}
+.rv-wrap{display:flex;flex-direction:column;gap:10px;padding-bottom:20px}
+.rv-foto{position:sticky;top:0;z-index:3;background:#222;border-radius:12px;overflow:auto;max-height:30vh;box-shadow:var(--shadow);-webkit-overflow-scrolling:touch}
+.rv-foto img{display:block;width:100%;height:auto}
+.rv-foto.rv-zoom{max-height:62vh}
+.rv-foto.rv-zoom img{width:240%;max-width:none}
+.rv-lupa{position:sticky;left:0;bottom:0;display:block;background:rgba(0,0,0,.6);color:#fff;font-size:12px;padding:4px 8px}
+.rv-tit{font-size:21px;font-weight:800;margin-top:4px}
+.rv-ayuda{font-size:14px;color:var(--muted)}
+.rv-chip-r,.rv-chip-a{display:inline-block;padding:0 6px;border-radius:6px;font-weight:700}
+.rv-chip-r{background:#fde3e3;color:#b91c1c}.rv-chip-a{background:#fff4cc;color:#8a6100}
+.rv-sec{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-top:8px}
+.rv-item{background:#fff;border:2px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.rv-item.rv-dudoso{border-color:#f0c419;background:#fffbea}
+.rv-leido{font-size:13px;color:var(--muted)}
+.rv-aviso{font-size:13px;font-weight:700;color:#8a6100}
+.rv-item select,.rv-campo input{width:100%;box-sizing:border-box;font-size:18px;padding:11px;border-radius:10px;border:1px solid #bbb;background:#fff}
+.rv-kgrow{display:flex;align-items:center;gap:8px}
+.rv-kgrow input{flex:1;min-width:0;font-size:24px;font-weight:800;padding:8px 10px;border-radius:10px;border:1px solid #bbb;text-align:right}
+.rv-kgrow span{font-weight:800}
+.rv-del{border:0;background:#eee;border-radius:10px;font-size:18px;padding:10px 14px;cursor:pointer}
+.rv-campo{display:flex;flex-direction:column;gap:4px;background:#fff;border:2px solid var(--line);border-radius:12px;padding:8px 10px}
+.rv-campo span{font-size:13px;font-weight:700;color:var(--muted)}
+.rv-campo em,.rv-firma em{font-size:12px;color:#b91c1c;font-style:normal;font-weight:700}
+.rv-firma{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fff;border:2px solid var(--line);border-radius:12px;padding:12px;font-size:16px;font-weight:700}
+.rv-firma input{width:26px;height:26px}
+.rv-falta{border-color:#e57373!important;background:#fff5f5!important}
+.rv-error{border-color:#c62828!important;box-shadow:0 0 0 3px rgba(198,40,40,.25)}
+.np-corr{margin-top:6px;background:#fff8e1;border:1px solid #f0c419;border-radius:8px;padding:6px 8px;font-size:12px}
+.np-corr ul{margin:4px 0 0;padding-left:18px}
+.imp-wrap{margin:6px 0 2px}
+.imp-btn{font-size:12px;padding:4px 10px}
+.imp-ov{position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:12px}
+.imp-ov.active{display:flex}
+.imp-box{background:#fff;border-radius:14px;max-width:680px;width:100%;max-height:94vh;overflow:auto;box-shadow:var(--shadow-lg)}
+.imp-head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}
+.imp-cuerpo{display:flex;gap:16px;padding:16px;flex-wrap:wrap}
+.imp-prev{flex:1 1 260px;display:flex;align-items:center;justify-content:center;background:#e9ecea;border-radius:10px;padding:12px;min-height:200px}
+.imp-hoja{background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.25);display:flex;justify-content:center;align-items:flex-start;overflow:hidden}
+.imp-hoja img{object-fit:contain;outline:1px dashed #9aa}
+.imp-opc{flex:1 1 220px;display:flex;flex-direction:column;gap:10px;font-size:13px}
+.imp-opc label{display:flex;flex-direction:column;gap:4px;font-weight:600}
+.imp-opc select{padding:7px;font-size:14px}
+.imp-opc .imp-chk{flex-direction:row;align-items:center;gap:8px}
+.imp-medida{background:#f3f7f4;border-radius:8px;padding:8px 10px}
+.imp-nota{font-size:12px;color:var(--muted)}
 </style>
 <script>/* qrcode-generator 1.4.4 (MIT, Kazuhiko Arase) */
 var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],f={},c=function(t,r){o=function(t){for(var r=new Array(t),e=0;e<t;e+=1){r[e]=new Array(t);for(var n=0;n<t;n+=1)r[e][n]=null}return r}(i=4*e+17),l(0,0),l(i-7,0),l(0,i-7),s(),h(),d(t,r),e>=7&&v(t),null==a&&(a=p(e,n,u)),w(a,r)},l=function(t,r){for(var e=-1;e<=7;e+=1)if(!(t+e<=-1||i<=t+e))for(var n=-1;n<=7;n+=1)r+n<=-1||i<=r+n||(o[t+e][r+n]=0<=e&&e<=6&&(0==n||6==n)||0<=n&&n<=6&&(0==e||6==e)||2<=e&&e<=4&&2<=n&&n<=4)},h=function(){for(var t=8;t<i-8;t+=1)null==o[t][6]&&(o[t][6]=t%2==0);for(var r=8;r<i-8;r+=1)null==o[6][r]&&(o[6][r]=r%2==0)},s=function(){for(var t=B.getPatternPosition(e),r=0;r<t.length;r+=1)for(var n=0;n<t.length;n+=1){var i=t[r],a=t[n];if(null==o[i][a])for(var u=-2;u<=2;u+=1)for(var f=-2;f<=2;f+=1)o[i+u][a+f]=-2==u||2==u||-2==f||2==f||0==u&&0==f}},v=function(t){for(var r=B.getBCHTypeNumber(e),n=0;n<18;n+=1){var a=!t&&1==(r>>n&1);o[Math.floor(n/3)][n%3+i-8-3]=a}for(n=0;n<18;n+=1){a=!t&&1==(r>>n&1);o[n%3+i-8-3][Math.floor(n/3)]=a}},d=function(t,r){for(var e=n<<3|r,a=B.getBCHTypeInfo(e),u=0;u<15;u+=1){var f=!t&&1==(a>>u&1);u<6?o[u][8]=f:u<8?o[u+1][8]=f:o[i-15+u][8]=f}for(u=0;u<15;u+=1){f=!t&&1==(a>>u&1);u<8?o[8][i-u-1]=f:u<9?o[8][15-u-1+1]=f:o[8][15-u-1]=f}o[i-8][8]=!t},w=function(t,r){for(var e=-1,n=i-1,a=7,u=0,f=B.getMaskFunction(r),c=i-1;c>0;c-=2)for(6==c&&(c-=1);;){for(var g=0;g<2;g+=1)if(null==o[n][c-g]){var l=!1;u<t.length&&(l=1==(t[u]>>>a&1)),f(n,c-g)&&(l=!l),o[n][c-g]=l,-1==(a-=1)&&(u+=1,a=7)}if((n+=e)<0||i<=n){n-=e,e=-e;break}}},p=function(t,r,e){for(var n=A.getRSBlocks(t,r),o=b(),i=0;i<e.length;i+=1){var a=e[i];o.put(a.getMode(),4),o.put(a.getLength(),B.getLengthInBits(a.getMode(),t)),a.write(o)}var u=0;for(i=0;i<n.length;i+=1)u+=n[i].dataCount;if(o.getLengthInBits()>8*u)throw"code length overflow. ("+o.getLengthInBits()+">"+8*u+")";for(o.getLengthInBits()+4<=8*u&&o.put(0,4);o.getLengthInBits()%8!=0;)o.putBit(!1);for(;!(o.getLengthInBits()>=8*u||(o.put(236,8),o.getLengthInBits()>=8*u));)o.put(17,8);return function(t,r){for(var e=0,n=0,o=0,i=new Array(r.length),a=new Array(r.length),u=0;u<r.length;u+=1){var f=r[u].dataCount,c=r[u].totalCount-f;n=Math.max(n,f),o=Math.max(o,c),i[u]=new Array(f);for(var g=0;g<i[u].length;g+=1)i[u][g]=255&t.getBuffer()[g+e];e+=f;var l=B.getErrorCorrectPolynomial(c),h=k(i[u],l.getLength()-1).mod(l);for(a[u]=new Array(l.getLength()-1),g=0;g<a[u].length;g+=1){var s=g+h.getLength()-a[u].length;a[u][g]=s>=0?h.getAt(s):0}}var v=0;for(g=0;g<r.length;g+=1)v+=r[g].totalCount;var d=new Array(v),w=0;for(g=0;g<n;g+=1)for(u=0;u<r.length;u+=1)g<i[u].length&&(d[w]=i[u][g],w+=1);for(g=0;g<o;g+=1)for(u=0;u<r.length;u+=1)g<a[u].length&&(d[w]=a[u][g],w+=1);return d}(o,n)};f.addData=function(t,r){var e=null;switch(r=r||"Byte"){case"Numeric":e=M(t);break;case"Alphanumeric":e=x(t);break;case"Byte":e=m(t);break;case"Kanji":e=L(t);break;default:throw"mode:"+r}u.push(e),a=null},f.isDark=function(t,r){if(t<0||i<=t||r<0||i<=r)throw t+","+r;return o[t][r]},f.getModuleCount=function(){return i},f.make=function(){if(e<1){for(var t=1;t<40;t++){for(var r=A.getRSBlocks(t,n),o=b(),i=0;i<u.length;i++){var a=u[i];o.put(a.getMode(),4),o.put(a.getLength(),B.getLengthInBits(a.getMode(),t)),a.write(o)}var g=0;for(i=0;i<r.length;i++)g+=r[i].dataCount;if(o.getLengthInBits()<=8*g)break}e=t}c(!1,function(){for(var t=0,r=0,e=0;e<8;e+=1){c(!0,e);var n=B.getLostPoint(f);(0==e||t>n)&&(t=n,r=e)}return r}())},f.createTableTag=function(t,r){t=t||2;var e="";e+='<table style="',e+=" border-width: 0px; border-style: none;",e+=" border-collapse: collapse;",e+=" padding: 0px; margin: "+(r=void 0===r?4*t:r)+"px;",e+='">',e+="<tbody>";for(var n=0;n<f.getModuleCount();n+=1){e+="<tr>";for(var o=0;o<f.getModuleCount();o+=1)e+='<td style="',e+=" border-width: 0px; border-style: none;",e+=" border-collapse: collapse;",e+=" padding: 0px; margin: 0px;",e+=" width: "+t+"px;",e+=" height: "+t+"px;",e+=" background-color: ",e+=f.isDark(n,o)?"#000000":"#ffffff",e+=";",e+='"/>';e+="</tr>"}return e+="</tbody>",e+="</table>"},f.createSvgTag=function(t,r,e,n){var o={};"object"==typeof arguments[0]&&(t=(o=arguments[0]).cellSize,r=o.margin,e=o.alt,n=o.title),t=t||2,r=void 0===r?4*t:r,(e="string"==typeof e?{text:e}:e||{}).text=e.text||null,e.id=e.text?e.id||"qrcode-description":null,(n="string"==typeof n?{text:n}:n||{}).text=n.text||null,n.id=n.text?n.id||"qrcode-title":null;var i,a,u,c,g=f.getModuleCount()*t+2*r,l="";for(c="l"+t+",0 0,"+t+" -"+t+",0 0,-"+t+"z ",l+='<svg version="1.1" xmlns="http://www.w3.org/2000/svg"',l+=o.scalable?"":' width="'+g+'px" height="'+g+'px"',l+=' viewBox="0 0 '+g+" "+g+'" ',l+=' preserveAspectRatio="xMinYMin meet"',l+=n.text||e.text?' role="img" aria-labelledby="'+y([n.id,e.id].join(" ").trim())+'"':"",l+=">",l+=n.text?'<title id="'+y(n.id)+'">'+y(n.text)+"</title>":"",l+=e.text?'<description id="'+y(e.id)+'">'+y(e.text)+"</description>":"",l+='<rect width="100%" height="100%" fill="white" cx="0" cy="0"/>',l+='<path d="',a=0;a<f.getModuleCount();a+=1)for(u=a*t+r,i=0;i<f.getModuleCount();i+=1)f.isDark(a,i)&&(l+="M"+(i*t+r)+","+u+c);return l+='" stroke="transparent" fill="black"/>',l+="</svg>"},f.createDataURL=function(t,r){t=t||2,r=void 0===r?4*t:r;var e=f.getModuleCount()*t+2*r,n=r,o=e-r;return I(e,e,function(r,e){if(n<=r&&r<o&&n<=e&&e<o){var i=Math.floor((r-n)/t),a=Math.floor((e-n)/t);return f.isDark(a,i)?0:1}return 1})},f.createImgTag=function(t,r,e){t=t||2,r=void 0===r?4*t:r;var n=f.getModuleCount()*t+2*r,o="";return o+="<img",o+=' src="',o+=f.createDataURL(t,r),o+='"',o+=' width="',o+=n,o+='"',o+=' height="',o+=n,o+='"',e&&(o+=' alt="',o+=y(e),o+='"'),o+="/>"};var y=function(t){for(var r="",e=0;e<t.length;e+=1){var n=t.charAt(e);switch(n){case"<":r+="&lt;";break;case">":r+="&gt;";break;case"&":r+="&amp;";break;case'"':r+="&quot;";break;default:r+=n}}return r};return f.createASCII=function(t,r){if((t=t||1)<2)return function(t){t=void 0===t?2:t;var r,e,n,o,i,a=1*f.getModuleCount()+2*t,u=t,c=a-t,g={"██":"█","█ ":"▀"," █":"▄","  ":" "},l={"██":"▀","█ ":"▀"," █":" ","  ":" "},h="";for(r=0;r<a;r+=2){for(n=Math.floor((r-u)/1),o=Math.floor((r+1-u)/1),e=0;e<a;e+=1)i="█",u<=e&&e<c&&u<=r&&r<c&&f.isDark(n,Math.floor((e-u)/1))&&(i=" "),u<=e&&e<c&&u<=r+1&&r+1<c&&f.isDark(o,Math.floor((e-u)/1))?i+=" ":i+="█",h+=t<1&&r+1>=c?l[i]:g[i];h+="\n"}return a%2&&t>0?h.substring(0,h.length-a-1)+Array(a+1).join("▀"):h.substring(0,h.length-1)}(r);t-=1,r=void 0===r?2*t:r;var e,n,o,i,a=f.getModuleCount()*t+2*r,u=r,c=a-r,g=Array(t+1).join("██"),l=Array(t+1).join("  "),h="",s="";for(e=0;e<a;e+=1){for(o=Math.floor((e-u)/t),s="",n=0;n<a;n+=1)i=1,u<=n&&n<c&&u<=e&&e<c&&f.isDark(o,Math.floor((n-u)/t))&&(i=0),s+=i?g:l;for(o=0;o<t;o+=1)h+=s+"\n"}return h.substring(0,h.length-1)},f.renderTo2dContext=function(t,r){r=r||2;for(var e=f.getModuleCount(),n=0;n<e;n++)for(var o=0;o<e;o++)t.fillStyle=f.isDark(n,o)?"black":"white",t.fillRect(n*r,o*r,r,r)},f};t.stringToBytes=(t.stringToBytesFuncs={default:function(t){for(var r=[],e=0;e<t.length;e+=1){var n=t.charCodeAt(e);r.push(255&n)}return r}}).default,t.createStringToBytes=function(t,r){var e=function(){for(var e=S(t),n=function(){var t=e.read();if(-1==t)throw"eof";return t},o=0,i={};;){var a=e.read();if(-1==a)break;var u=n(),f=n()<<8|n();i[String.fromCharCode(a<<8|u)]=f,o+=1}if(o!=r)throw o+" != "+r;return i}(),n="?".charCodeAt(0);return function(t){for(var r=[],o=0;o<t.length;o+=1){var i=t.charCodeAt(o);if(i<128)r.push(i);else{var a=e[t.charAt(o)];"number"==typeof a?(255&a)==a?r.push(a):(r.push(a>>>8),r.push(255&a)):r.push(n)}}return r}};var r,e,n,o,i,a=1,u=2,f=4,c=8,g={L:1,M:0,Q:3,H:2},l=0,h=1,s=2,v=3,d=4,w=5,p=6,y=7,B=(r=[[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50],[6,30,54],[6,32,58],[6,34,62],[6,26,46,66],[6,26,48,70],[6,26,50,74],[6,30,54,78],[6,30,56,82],[6,30,58,86],[6,34,62,90],[6,28,50,72,94],[6,26,50,74,98],[6,30,54,78,102],[6,28,54,80,106],[6,32,58,84,110],[6,30,58,86,114],[6,34,62,90,118],[6,26,50,74,98,122],[6,30,54,78,102,126],[6,26,52,78,104,130],[6,30,56,82,108,134],[6,34,60,86,112,138],[6,30,58,86,114,142],[6,34,62,90,118,146],[6,30,54,78,102,126,150],[6,24,50,76,102,128,154],[6,28,54,80,106,132,158],[6,32,58,84,110,136,162],[6,26,54,82,110,138,166],[6,30,58,86,114,142,170]],e=1335,n=7973,i=function(t){for(var r=0;0!=t;)r+=1,t>>>=1;return r},(o={}).getBCHTypeInfo=function(t){for(var r=t<<10;i(r)-i(e)>=0;)r^=e<<i(r)-i(e);return 21522^(t<<10|r)},o.getBCHTypeNumber=function(t){for(var r=t<<12;i(r)-i(n)>=0;)r^=n<<i(r)-i(n);return t<<12|r},o.getPatternPosition=function(t){return r[t-1]},o.getMaskFunction=function(t){switch(t){case l:return function(t,r){return(t+r)%2==0};case h:return function(t,r){return t%2==0};case s:return function(t,r){return r%3==0};case v:return function(t,r){return(t+r)%3==0};case d:return function(t,r){return(Math.floor(t/2)+Math.floor(r/3))%2==0};case w:return function(t,r){return t*r%2+t*r%3==0};case p:return function(t,r){return(t*r%2+t*r%3)%2==0};case y:return function(t,r){return(t*r%3+(t+r)%2)%2==0};default:throw"bad maskPattern:"+t}},o.getErrorCorrectPolynomial=function(t){for(var r=k([1],0),e=0;e<t;e+=1)r=r.multiply(k([1,C.gexp(e)],0));return r},o.getLengthInBits=function(t,r){if(1<=r&&r<10)switch(t){case a:return 10;case u:return 9;case f:case c:return 8;default:throw"mode:"+t}else if(r<27)switch(t){case a:return 12;case u:return 11;case f:return 16;case c:return 10;default:throw"mode:"+t}else{if(!(r<41))throw"type:"+r;switch(t){case a:return 14;case u:return 13;case f:return 16;case c:return 12;default:throw"mode:"+t}}},o.getLostPoint=function(t){for(var r=t.getModuleCount(),e=0,n=0;n<r;n+=1)for(var o=0;o<r;o+=1){for(var i=0,a=t.isDark(n,o),u=-1;u<=1;u+=1)if(!(n+u<0||r<=n+u))for(var f=-1;f<=1;f+=1)o+f<0||r<=o+f||0==u&&0==f||a==t.isDark(n+u,o+f)&&(i+=1);i>5&&(e+=3+i-5)}for(n=0;n<r-1;n+=1)for(o=0;o<r-1;o+=1){var c=0;t.isDark(n,o)&&(c+=1),t.isDark(n+1,o)&&(c+=1),t.isDark(n,o+1)&&(c+=1),t.isDark(n+1,o+1)&&(c+=1),0!=c&&4!=c||(e+=3)}for(n=0;n<r;n+=1)for(o=0;o<r-6;o+=1)t.isDark(n,o)&&!t.isDark(n,o+1)&&t.isDark(n,o+2)&&t.isDark(n,o+3)&&t.isDark(n,o+4)&&!t.isDark(n,o+5)&&t.isDark(n,o+6)&&(e+=40);for(o=0;o<r;o+=1)for(n=0;n<r-6;n+=1)t.isDark(n,o)&&!t.isDark(n+1,o)&&t.isDark(n+2,o)&&t.isDark(n+3,o)&&t.isDark(n+4,o)&&!t.isDark(n+5,o)&&t.isDark(n+6,o)&&(e+=40);var g=0;for(o=0;o<r;o+=1)for(n=0;n<r;n+=1)t.isDark(n,o)&&(g+=1);return e+=Math.abs(100*g/r/r-50)/5*10},o),C=function(){for(var t=new Array(256),r=new Array(256),e=0;e<8;e+=1)t[e]=1<<e;for(e=8;e<256;e+=1)t[e]=t[e-4]^t[e-5]^t[e-6]^t[e-8];for(e=0;e<255;e+=1)r[t[e]]=e;var n={glog:function(t){if(t<1)throw"glog("+t+")";return r[t]},gexp:function(r){for(;r<0;)r+=255;for(;r>=256;)r-=255;return t[r]}};return n}();function k(t,r){if(void 0===t.length)throw t.length+"/"+r;var e=function(){for(var e=0;e<t.length&&0==t[e];)e+=1;for(var n=new Array(t.length-e+r),o=0;o<t.length-e;o+=1)n[o]=t[o+e];return n}(),n={getAt:function(t){return e[t]},getLength:function(){return e.length},multiply:function(t){for(var r=new Array(n.getLength()+t.getLength()-1),e=0;e<n.getLength();e+=1)for(var o=0;o<t.getLength();o+=1)r[e+o]^=C.gexp(C.glog(n.getAt(e))+C.glog(t.getAt(o)));return k(r,0)},mod:function(t){if(n.getLength()-t.getLength()<0)return n;for(var r=C.glog(n.getAt(0))-C.glog(t.getAt(0)),e=new Array(n.getLength()),o=0;o<n.getLength();o+=1)e[o]=n.getAt(o);for(o=0;o<t.getLength();o+=1)e[o]^=C.gexp(C.glog(t.getAt(o))+r);return k(e,0).mod(t)}};return n}var A=function(){var t=[[1,26,19],[1,26,16],[1,26,13],[1,26,9],[1,44,34],[1,44,28],[1,44,22],[1,44,16],[1,70,55],[1,70,44],[2,35,17],[2,35,13],[1,100,80],[2,50,32],[2,50,24],[4,25,9],[1,134,108],[2,67,43],[2,33,15,2,34,16],[2,33,11,2,34,12],[2,86,68],[4,43,27],[4,43,19],[4,43,15],[2,98,78],[4,49,31],[2,32,14,4,33,15],[4,39,13,1,40,14],[2,121,97],[2,60,38,2,61,39],[4,40,18,2,41,19],[4,40,14,2,41,15],[2,146,116],[3,58,36,2,59,37],[4,36,16,4,37,17],[4,36,12,4,37,13],[2,86,68,2,87,69],[4,69,43,1,70,44],[6,43,19,2,44,20],[6,43,15,2,44,16],[4,101,81],[1,80,50,4,81,51],[4,50,22,4,51,23],[3,36,12,8,37,13],[2,116,92,2,117,93],[6,58,36,2,59,37],[4,46,20,6,47,21],[7,42,14,4,43,15],[4,133,107],[8,59,37,1,60,38],[8,44,20,4,45,21],[12,33,11,4,34,12],[3,145,115,1,146,116],[4,64,40,5,65,41],[11,36,16,5,37,17],[11,36,12,5,37,13],[5,109,87,1,110,88],[5,65,41,5,66,42],[5,54,24,7,55,25],[11,36,12,7,37,13],[5,122,98,1,123,99],[7,73,45,3,74,46],[15,43,19,2,44,20],[3,45,15,13,46,16],[1,135,107,5,136,108],[10,74,46,1,75,47],[1,50,22,15,51,23],[2,42,14,17,43,15],[5,150,120,1,151,121],[9,69,43,4,70,44],[17,50,22,1,51,23],[2,42,14,19,43,15],[3,141,113,4,142,114],[3,70,44,11,71,45],[17,47,21,4,48,22],[9,39,13,16,40,14],[3,135,107,5,136,108],[3,67,41,13,68,42],[15,54,24,5,55,25],[15,43,15,10,44,16],[4,144,116,4,145,117],[17,68,42],[17,50,22,6,51,23],[19,46,16,6,47,17],[2,139,111,7,140,112],[17,74,46],[7,54,24,16,55,25],[34,37,13],[4,151,121,5,152,122],[4,75,47,14,76,48],[11,54,24,14,55,25],[16,45,15,14,46,16],[6,147,117,4,148,118],[6,73,45,14,74,46],[11,54,24,16,55,25],[30,46,16,2,47,17],[8,132,106,4,133,107],[8,75,47,13,76,48],[7,54,24,22,55,25],[22,45,15,13,46,16],[10,142,114,2,143,115],[19,74,46,4,75,47],[28,50,22,6,51,23],[33,46,16,4,47,17],[8,152,122,4,153,123],[22,73,45,3,74,46],[8,53,23,26,54,24],[12,45,15,28,46,16],[3,147,117,10,148,118],[3,73,45,23,74,46],[4,54,24,31,55,25],[11,45,15,31,46,16],[7,146,116,7,147,117],[21,73,45,7,74,46],[1,53,23,37,54,24],[19,45,15,26,46,16],[5,145,115,10,146,116],[19,75,47,10,76,48],[15,54,24,25,55,25],[23,45,15,25,46,16],[13,145,115,3,146,116],[2,74,46,29,75,47],[42,54,24,1,55,25],[23,45,15,28,46,16],[17,145,115],[10,74,46,23,75,47],[10,54,24,35,55,25],[19,45,15,35,46,16],[17,145,115,1,146,116],[14,74,46,21,75,47],[29,54,24,19,55,25],[11,45,15,46,46,16],[13,145,115,6,146,116],[14,74,46,23,75,47],[44,54,24,7,55,25],[59,46,16,1,47,17],[12,151,121,7,152,122],[12,75,47,26,76,48],[39,54,24,14,55,25],[22,45,15,41,46,16],[6,151,121,14,152,122],[6,75,47,34,76,48],[46,54,24,10,55,25],[2,45,15,64,46,16],[17,152,122,4,153,123],[29,74,46,14,75,47],[49,54,24,10,55,25],[24,45,15,46,46,16],[4,152,122,18,153,123],[13,74,46,32,75,47],[48,54,24,14,55,25],[42,45,15,32,46,16],[20,147,117,4,148,118],[40,75,47,7,76,48],[43,54,24,22,55,25],[10,45,15,67,46,16],[19,148,118,6,149,119],[18,75,47,31,76,48],[34,54,24,34,55,25],[20,45,15,61,46,16]],r=function(t,r){var e={};return e.totalCount=t,e.dataCount=r,e},e={};return e.getRSBlocks=function(e,n){var o=function(r,e){switch(e){case g.L:return t[4*(r-1)+0];case g.M:return t[4*(r-1)+1];case g.Q:return t[4*(r-1)+2];case g.H:return t[4*(r-1)+3];default:return}}(e,n);if(void 0===o)throw"bad rs block @ typeNumber:"+e+"/errorCorrectionLevel:"+n;for(var i=o.length/3,a=[],u=0;u<i;u+=1)for(var f=o[3*u+0],c=o[3*u+1],l=o[3*u+2],h=0;h<f;h+=1)a.push(r(c,l));return a},e}(),b=function(){var t=[],r=0,e={getBuffer:function(){return t},getAt:function(r){var e=Math.floor(r/8);return 1==(t[e]>>>7-r%8&1)},put:function(t,r){for(var n=0;n<r;n+=1)e.putBit(1==(t>>>r-n-1&1))},getLengthInBits:function(){return r},putBit:function(e){var n=Math.floor(r/8);t.length<=n&&t.push(0),e&&(t[n]|=128>>>r%8),r+=1}};return e},M=function(t){var r=a,e=t,n={getMode:function(){return r},getLength:function(t){return e.length},write:function(t){for(var r=e,n=0;n+2<r.length;)t.put(o(r.substring(n,n+3)),10),n+=3;n<r.length&&(r.length-n==1?t.put(o(r.substring(n,n+1)),4):r.length-n==2&&t.put(o(r.substring(n,n+2)),7))}},o=function(t){for(var r=0,e=0;e<t.length;e+=1)r=10*r+i(t.charAt(e));return r},i=function(t){if("0"<=t&&t<="9")return t.charCodeAt(0)-"0".charCodeAt(0);throw"illegal char :"+t};return n},x=function(t){var r=u,e=t,n={getMode:function(){return r},getLength:function(t){return e.length},write:function(t){for(var r=e,n=0;n+1<r.length;)t.put(45*o(r.charAt(n))+o(r.charAt(n+1)),11),n+=2;n<r.length&&t.put(o(r.charAt(n)),6)}},o=function(t){if("0"<=t&&t<="9")return t.charCodeAt(0)-"0".charCodeAt(0);if("A"<=t&&t<="Z")return t.charCodeAt(0)-"A".charCodeAt(0)+10;switch(t){case" ":return 36;case"$":return 37;case"%":return 38;case"*":return 39;case"+":return 40;case"-":return 41;case".":return 42;case"/":return 43;case":":return 44;default:throw"illegal char :"+t}};return n},m=function(r){var e=f,n=t.stringToBytes(r),o={getMode:function(){return e},getLength:function(t){return n.length},write:function(t){for(var r=0;r<n.length;r+=1)t.put(n[r],8)}};return o},L=function(r){var e=c,n=t.stringToBytesFuncs.SJIS;if(!n)throw"sjis not supported.";!function(){var t=n("友");if(2!=t.length||38726!=(t[0]<<8|t[1]))throw"sjis not supported."}();var o=n(r),i={getMode:function(){return e},getLength:function(t){return~~(o.length/2)},write:function(t){for(var r=o,e=0;e+1<r.length;){var n=(255&r[e])<<8|255&r[e+1];if(33088<=n&&n<=40956)n-=33088;else{if(!(57408<=n&&n<=60351))throw"illegal char at "+(e+1)+"/"+n;n-=49472}n=192*(n>>>8&255)+(255&n),t.put(n,13),e+=2}if(e<r.length)throw"illegal char at "+(e+1)}};return i},D=function(){var t=[],r={writeByte:function(r){t.push(255&r)},writeShort:function(t){r.writeByte(t),r.writeByte(t>>>8)},writeBytes:function(t,e,n){e=e||0,n=n||t.length;for(var o=0;o<n;o+=1)r.writeByte(t[o+e])},writeString:function(t){for(var e=0;e<t.length;e+=1)r.writeByte(t.charCodeAt(e))},toByteArray:function(){return t},toString:function(){var r="";r+="[";for(var e=0;e<t.length;e+=1)e>0&&(r+=","),r+=t[e];return r+="]"}};return r},S=function(t){var r=t,e=0,n=0,o=0,i={read:function(){for(;o<8;){if(e>=r.length){if(0==o)return-1;throw"unexpected end of file./"+o}var t=r.charAt(e);if(e+=1,"="==t)return o=0,-1;t.match(/^\s$/)||(n=n<<6|a(t.charCodeAt(0)),o+=6)}var i=n>>>o-8&255;return o-=8,i}},a=function(t){if(65<=t&&t<=90)return t-65;if(97<=t&&t<=122)return t-97+26;if(48<=t&&t<=57)return t-48+52;if(43==t)return 62;if(47==t)return 63;throw"c:"+t};return i},I=function(t,r,e){for(var n=function(t,r){var e=t,n=r,o=new Array(t*r),i={setPixel:function(t,r,n){o[r*e+t]=n},write:function(t){t.writeString("GIF87a"),t.writeShort(e),t.writeShort(n),t.writeByte(128),t.writeByte(0),t.writeByte(0),t.writeByte(0),t.writeByte(0),t.writeByte(0),t.writeByte(255),t.writeByte(255),t.writeByte(255),t.writeString(","),t.writeShort(0),t.writeShort(0),t.writeShort(e),t.writeShort(n),t.writeByte(0);var r=a(2);t.writeByte(2);for(var o=0;r.length-o>255;)t.writeByte(255),t.writeBytes(r,o,255),o+=255;t.writeByte(r.length-o),t.writeBytes(r,o,r.length-o),t.writeByte(0),t.writeString(";")}},a=function(t){for(var r=1<<t,e=1+(1<<t),n=t+1,i=u(),a=0;a<r;a+=1)i.add(String.fromCharCode(a));i.add(String.fromCharCode(r)),i.add(String.fromCharCode(e));var f,c,g,l=D(),h=(f=l,c=0,g=0,{write:function(t,r){if(t>>>r!=0)throw"length over";for(;c+r>=8;)f.writeByte(255&(t<<c|g)),r-=8-c,t>>>=8-c,g=0,c=0;g|=t<<c,c+=r},flush:function(){c>0&&f.writeByte(g)}});h.write(r,n);var s=0,v=String.fromCharCode(o[s]);for(s+=1;s<o.length;){var d=String.fromCharCode(o[s]);s+=1,i.contains(v+d)?v+=d:(h.write(i.indexOf(v),n),i.size()<4095&&(i.size()==1<<n&&(n+=1),i.add(v+d)),v=d)}return h.write(i.indexOf(v),n),h.write(e,n),h.flush(),l.toByteArray()},u=function(){var t={},r=0,e={add:function(n){if(e.contains(n))throw"dup key:"+n;t[n]=r,r+=1},size:function(){return r},indexOf:function(r){return t[r]},contains:function(r){return void 0!==t[r]}};return e};return i}(t,r),o=0;o<r;o+=1)for(var i=0;i<t;i+=1)n.setPixel(i,o,e(i,o));var a=D();n.write(a);for(var u=function(){var t=0,r=0,e=0,n="",o={},i=function(t){n+=String.fromCharCode(a(63&t))},a=function(t){if(t<0);else{if(t<26)return 65+t;if(t<52)return t-26+97;if(t<62)return t-52+48;if(62==t)return 43;if(63==t)return 47}throw"n:"+t};return o.writeByte=function(n){for(t=t<<8|255&n,r+=8,e+=1;r>=6;)i(t>>>r-6),r-=6},o.flush=function(){if(r>0&&(i(t<<6-r),t=0,r=0),e%3!=0)for(var o=3-e%3,a=0;a<o;a+=1)n+="="},o.toString=function(){return n},o}(),f=a.toByteArray(),c=0;c<f.length;c+=1)u.writeByte(f[c]);return u.flush(),"data:image/gif;base64,"+u};return t}();qrcode.stringToBytesFuncs["UTF-8"]=function(t){return function(t){for(var r=[],e=0;e<t.length;e++){var n=t.charCodeAt(e);n<128?r.push(n):n<2048?r.push(192|n>>6,128|63&n):n<55296||n>=57344?r.push(224|n>>12,128|n>>6&63,128|63&n):(e++,n=65536+((1023&n)<<10|1023&t.charCodeAt(e)),r.push(240|n>>18,128|n>>12&63,128|n>>6&63,128|63&n))}return r}(t)},function(t){"function"==typeof define&&define.amd?define([],t):"object"==typeof exports&&(module.exports=t())}(function(){return qrcode});
@@ -3919,7 +3965,7 @@ function subirNotaEntrega(eventoIds, carpeta, onDone){
       var f = files[hechas];
       toast('Subiendo nota de entrega '+(hechas+1)+' de '+files.length+'…');
       var pth = (carpeta||'despacho')+'/'+Date.now()+'-'+hechas+'.'+extArchivo(f);
-      sb.storage.from('boletas-despacho').upload(pth, f, {upsert:false}).then(function(res){
+      subirFoto('boletas-despacho', pth, f, {upsert:false}).then(function(res){
         if(res.error){ toast('No se pudo subir la imagen '+(hechas+1)+': '+errMsg(res.error)); if(hechas>0) terminar(); return; }
         sb.rpc('adjuntar_boleta_despacho', {p_evento_ids: eventoIds, p_boleta_path: pth}).then(function(r2){
           if(r2.error){ toast('No se pudo guardar la nota de entrega: '+errMsg(r2.error)); if(hechas>0) terminar(); return; }
@@ -4701,7 +4747,10 @@ function infVer(bucket, path){
   if(!path) return;
   sb.storage.from(bucket).createSignedUrl(path, 3600).then(function(res){
     if(res.error || !res.data){ toast('No se pudo abrir el archivo: '+errMsg(res.error)); return; }
-    window.open(res.data.signedUrl, '_blank');
+    if(/\.pdf$/i.test(path)){ window.open(res.data.signedUrl, '_blank'); return; }
+    document.getElementById('compraImgTitle').textContent = 'Foto';
+    document.getElementById('compraImgBody').innerHTML = '<img src="'+res.data.signedUrl+'" style="max-width:100%;border-radius:8px;border:1px solid var(--line)">';
+    document.getElementById('compraImgModalOverlay').classList.add('active');
   });
 }
 function renderInformesRows(){
@@ -6924,7 +6973,7 @@ function submitPago(){
   if(!pagoFile){ conArchivo(null); return; }
   var ext = ((pagoFile.name||'').split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
   var path = 'pago_'+nota.id+'_'+Date.now()+'.'+ext;
-  sb.storage.from('comprobantes-pagos-venta').upload(path, pagoFile, {upsert:false}).then(function(res){
+  subirFoto('comprobantes-pagos-venta', path, pagoFile, {upsert:false}).then(function(res){
     if(res.error){ toast('No se pudo subir el comprobante: '+errMsg(res.error)); btn.disabled=false; return; }
     conArchivo(path);
   });
@@ -7297,7 +7346,7 @@ function submitNuevoRecibo(){
   if(!nrState.file){ conArchivo(null); return; }
   var ext = ((nrState.file.name||'').split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
   var path = 'pago_multi_'+items[0].nota_venta_id+'_'+Date.now()+'.'+ext;
-  sb.storage.from('comprobantes-pagos-venta').upload(path, nrState.file, {upsert:false}).then(function(res){
+  subirFoto('comprobantes-pagos-venta', path, nrState.file, {upsert:false}).then(function(res){
     if(res.error){ toast('No se pudo subir el comprobante: '+errMsg(res.error)); btn.disabled=false; return; }
     conArchivo(path);
   });
@@ -10101,8 +10150,8 @@ document.head.insertAdjacentHTML('beforeend','<style id="etqCss">'+ETQ_CSS+'</st
 
 /* ================= NOTAS DE PLANTA (celular de planta: despacho e ingreso de insumos) ================= */
 // El operario saca la foto de la NOTA DE ENTREGA o del INGRESO DE INSUMOS. La función «leer-nota»
-// (Claude) la lee: si tiene todos los datos obligatorios → pantalla VERDE «AUTORIZADO» y queda guardada;
-// si falta algo o no se lee claro → pantalla ROJA con lo que falta y hay que sacar la foto de nuevo.
+// (Claude) la lee y el operario REVISA/CORRIGE los datos comparando con la foto (letra fea); recién ahí se registra.
+// La foto se achica y se sube una sola vez; el servidor la lee desde Storage.
 // Un mismo pedido puede tener varias notas (una por viaje). En oficina se ven en «📷 Notas de planta».
 var plantaState = {tipo:null, fijo:false, timer:null, ultimo:null};
 function npPad(n){ return ('0'+n).slice(-2); }
@@ -10164,22 +10213,6 @@ function plantaHome(){
       (rows.length ? '<ul>'+rows.slice(0,6).map(function(x){ return '<li>'+(x.tipo==='insumo'?'🚚':'📦')+' '+npHora(x.creado_en)+' — '+escapeHtml(x.resumen||('N° '+(x.numero||'')))+'</li>'; }).join('')+'</ul>' : '');
   });
 }
-function plantaComprimir(file){
-  return new Promise(function(resolve, reject){
-    var url = URL.createObjectURL(file);
-    var img = new Image();
-    img.onload = function(){
-      var max = 2000, w = img.naturalWidth, h = img.naturalHeight, s = Math.min(1, max/Math.max(w,h));
-      var c = document.createElement('canvas'); c.width = Math.round(w*s); c.height = Math.round(h*s);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(url);
-      var dataUrl = c.toDataURL('image/jpeg', 0.82);
-      c.toBlob(function(blob){ resolve({dataUrl:dataUrl, blob:blob}); }, 'image/jpeg', 0.82);
-    };
-    img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error('No se pudo abrir la foto')); };
-    img.src = url;
-  });
-}
 function plantaTitulo(tipo, ok){ return tipo==='insumo' ? (ok?'RECEPCIÓN AUTORIZADA':'RECEPCIÓN NO AUTORIZADA') : (ok?'DESPACHO AUTORIZADO':'DESPACHO NO AUTORIZADO'); }
 function plantaDetalle(tipo, d){
   var filas = [];
@@ -10193,26 +10226,449 @@ function plantaDetalle(tipo, d){
   return '<table class="planta-det">'+filas.map(function(f){ return '<tr><td>'+escapeHtml(f[0])+'</td><td>'+escapeHtml(f[1]||'—')+'</td></tr>'; }).join('')+'</table>';
 }
 function plantaReintentar(){ var f=document.getElementById('plantaFile'); f.value=''; f.click(); }
+/* ---- Fotos livianas: la lectura usa como máximo ~1568 px del lado largo; una foto de celular (4000 px, 4-8 MB)
+   solo hace lenta la subida. Se achica a JPG antes de subir (≈200-500 KB). PDF y otros archivos pasan sin tocar. ---- */
+function comprimirFoto(file, max, q){
+  max = max || 2000; q = q || 0.82;
+  if(!file || !/^image\//.test(file.type||'') || /gif|svg/i.test(file.type||'')) return Promise.resolve(file);
+  return new Promise(function(resolve){
+    var url = URL.createObjectURL(file), img = new Image();
+    img.onload = function(){
+      var w = img.naturalWidth, h = img.naturalHeight, s = Math.min(1, max/Math.max(w,h));
+      var c = document.createElement('canvas'); c.width = Math.round(w*s); c.height = Math.round(h*s);
+      var cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0,0,c.width,c.height); cx.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(function(b){
+        if(!b || (s===1 && b.size >= file.size)){ resolve(file); return; }
+        var nom = String(file.name||'foto').replace(/\.[^.]+$/,'')+'.jpg';
+        try{ resolve(new File([b], nom, {type:'image/jpeg'})); }catch(e){ b.name = nom; resolve(b); }
+      }, 'image/jpeg', q);
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+/* sube a Storage achicando la foto antes (mismas opciones que .upload) */
+function subirFoto(bucket, path, file, opts){
+  return comprimirFoto(file).then(function(f){
+    var o = Object.assign({}, opts||{});
+    if(f!==file) o.contentType = 'image/jpeg';
+    return sb.storage.from(bucket).upload(path, f, o);
+  });
+}
+function plantaComprimir(file){
+  return comprimirFoto(file, 1568, 0.8).then(function(f){ return {blob:f, url:URL.createObjectURL(f)}; });
+}
+function npEsperar(ms){ return new Promise(function(ok){ setTimeout(ok, ms); }); }
+/* subida con reintentos (señal débil en planta). Si un intento anterior sí llegó, «ya existe» cuenta como subido */
+function plantaSubir(bucket, path, blob, intentos){
+  intentos = intentos || 3;
+  function otraVez(err){
+    if(intentos>1) return npEsperar(1500).then(function(){ return plantaSubir(bucket, path, blob, intentos-1); });
+    throw new Error('No se pudo subir la foto ('+((err&&err.message)||err||'sin internet')+')');
+  }
+  return sb.storage.from(bucket).upload(path, blob, {contentType:'image/jpeg', upsert:false}).then(function(r){
+    if(!r.error) return path;
+    if(/exist|duplicate|409/i.test(String(r.error.message||'')+String(r.error.statusCode||''))) return path;
+    return otraVez(r.error);
+  }, otraVez);
+}
+function plantaLeer(tipo, bucket, path, intentos){
+  intentos = intentos || 2;
+  var catalogo = tipo==='insumo' ? Object.keys(insumoIndex||{}) : (state.productos||[]).map(function(p){ return p.nombre; });
+  return sb.functions.invoke('leer-nota', {body:{tipo:tipo, bucket:bucket, path:path, catalogo:catalogo}}).then(function(res){
+    if(res.error || !res.data || res.data.error){
+      var msg = (res.data&&res.data.error) || (res.error&&res.error.message) || 'sin respuesta';
+      if(intentos>1 && !/sin_sesion|Falta configurar/.test(msg)) return npEsperar(1200).then(function(){ return plantaLeer(tipo, bucket, path, intentos-1); });
+      throw new Error(msg);
+    }
+    return res.data;
+  }, function(e){
+    if(intentos>1) return npEsperar(1200).then(function(){ return plantaLeer(tipo, bucket, path, intentos-1); });
+    throw e;
+  });
+}
+function plantaBorrarFoto(up){ try{ if(up && up.bucket==='boletas-despacho') sb.storage.from(up.bucket).remove([up.path]).then(function(){}, function(){}); }catch(e){} }
+function plantaPaso(n, tit, sub){
+  plantaSet('<div class="planta-msg"><div class="planta-spin"></div><div class="pm-paso">Paso '+n+' de 2</div><div class="pm-tit">'+tit+'</div><div class="pm-sub">'+(sub||'')+'</div></div>', 'pv-leyendo');
+}
+
 function plantaProcesar(file){
   var tipo = plantaState.tipo || 'despacho';
-  plantaSet('<div class="planta-msg"><div class="planta-spin"></div><div class="pm-tit">Leyendo la nota…</div><div class="pm-sub">No cierres la app. Tarda unos segundos.</div></div>', 'pv-leyendo');
-  var foto;
+  var bucket = tipo==='despacho' ? 'boletas-despacho' : 'notas-planta';
+  var path = (tipo==='despacho' ? 'planta/' : '')+npHoyISO().slice(0,7)+'/'+tipo+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,6)+'.jpg';
+  var foto, up = {bucket:bucket, path:path};
+  plantaPaso(1, 'Subiendo la foto…', 'No cierres la app.');
   plantaComprimir(file).then(function(f){
     foto = f;
-    var catalogo = tipo==='insumo' ? Object.keys(insumoIndex||{}) : (state.productos||[]).map(function(p){ return p.nombre; });
-    return sb.functions.invoke('leer-nota', {body:{tipo:tipo, imagen:f.dataUrl, catalogo:catalogo}});
-  }).then(function(res){
-    if(res.error || !res.data || res.data.error){ throw new Error((res.data&&res.data.error) || (res.error&&res.error.message) || 'sin respuesta'); }
-    var r = res.data, d = r.datos||{};
-    if(!r.completo){
-      plantaSet('<div class="planta-res"><div class="pr-ico">❌</div><div class="pr-tit">'+plantaTitulo(tipo,false)+'</div>'+
-        '<div class="pr-falta"><b>Falta o no se lee claro:</b><ul>'+(r.faltantes||[]).map(function(x){ return '<li>'+escapeHtml(x)+'</li>'; }).join('')+'</ul>'+(r.motivo?'<div class="pr-motivo">'+escapeHtml(r.motivo)+'</div>':'')+'</div>'+
-        '<div class="pr-ayuda">Completá la nota con letra clara y sacá la foto de nuevo: derecha, con buena luz y que se vea la hoja entera.</div>'+
-        '<button class="planta-btn" id="prOtra">📷 Sacar la foto de nuevo</button><button class="planta-btn sec" id="prVolver">Volver</button></div>', 'pv-rojo');
-      document.getElementById('prOtra').addEventListener('click', plantaReintentar);
-      document.getElementById('prVolver').addEventListener('click', plantaHome);
+    plantaPaso(1, 'Subiendo la foto…', 'No cierres la app. ('+fmt((f.blob.size||0)/1024,0)+' KB)');
+    // la foto se sube UNA sola vez: el servidor la lee desde ahí (antes se mandaba dos veces)
+    return plantaSubir(bucket, path, f.blob);
+  }).then(function(){
+    plantaPaso(2, 'Leyendo la nota…', 'Tarda unos 10 segundos.');
+    return plantaLeer(tipo, bucket, path);
+  }).then(function(r){
+    var d = r.datos||{};
+    if(r.ok===false || d.es_formulario_correcto===false || d.legible===false){
+      var malForm = d.es_formulario_correcto===false;
+      plantaSet('<div class="planta-res"><div class="pr-ico">❌</div><div class="pr-tit">'+(malForm?'NO ES EL FORMULARIO CORRECTO':'NO SE PUDO LEER LA FOTO')+'</div>'+
+        '<div class="pr-falta">'+escapeHtml(r.motivo||(r.faltantes||[]).join(', ')||'La foto no se lee bien')+'</div>'+
+        '<div class="pr-ayuda">Sacá la foto de nuevo: derecha, con buena luz y que se vea la hoja entera.</div>'+
+        '<button class="planta-btn" id="prOtra">📷 Sacar la foto de nuevo</button>'+
+        (malForm ? '' : '<button class="planta-btn sec" id="prMano">✍️ Completar los datos a mano</button>')+
+        '<button class="planta-btn sec" id="prVolver">Volver</button></div>', 'pv-rojo');
+      document.getElementById('prOtra').addEventListener('click', function(){ plantaBorrarFoto(up); plantaReintentar(); });
+      document.getElementById('prVolver').addEventListener('click', function(){ plantaBorrarFoto(up); plantaHome(); });
+      var bm = document.getElementById('prMano');
+      if(bm) bm.addEventListener('click', function(){ plantaRevisarYSeguir(tipo, {datos:{items:[]}, faltantes:[]}, foto, up); });
       return;
     }
+    plantaRevisarYSeguir(tipo, r, foto, up);
+  }).catch(function(e){
+    plantaSet('<div class="planta-res"><div class="pr-ico">📶</div><div class="pr-tit">NO SE PUDO SUBIR / LEER</div><div class="pr-sub">'+escapeHtml((e&&e.message)||String(e))+'<br>Revisá que haya internet (señal o WiFi) y probá de nuevo.</div>'+
+      (foto ? '<button class="planta-btn" id="prMismo">🔁 Reintentar con la misma foto</button>' : '')+
+      '<button class="planta-btn'+(foto?' sec':'')+'" id="prOtra">📷 Sacar otra foto</button><button class="planta-btn sec" id="prVolver">Volver</button></div>', 'pv-amarillo');
+    var bmi = document.getElementById('prMismo');
+    if(bmi) bmi.addEventListener('click', function(){ plantaProcesar(foto.blob); });
+    document.getElementById('prOtra').addEventListener('click', plantaReintentar);
+    document.getElementById('prVolver').addEventListener('click', plantaHome);
+  });
+}
+function plantaRevisarYSeguir(tipo, r, foto, up){
+  plantaRevisar(tipo, r, foto).then(function(d){
+    if(d===null){ plantaBorrarFoto(up); plantaHome(); return; }
+    if(d==='otra'){ plantaBorrarFoto(up); plantaReintentar(); return; }
+    plantaSet('<div class="planta-msg"><div class="planta-spin"></div><div class="pm-tit">Revisando el pedido…</div></div>', 'pv-leyendo');
+    var registrado = {v:false};
+    plantaContinuar(tipo, d, up, registrado).then(function(){ if(!registrado.v) plantaBorrarFoto(up); }, function(e){ if(!registrado.v) plantaBorrarFoto(up); throw e; }).catch(function(e){
+      plantaSet('<div class="planta-res"><div class="pr-ico">📶</div><div class="pr-tit">NO SE PUDO GUARDAR</div><div class="pr-sub">'+escapeHtml((e&&e.message)||String(e))+'<br>Revisá que haya internet y probá de nuevo.</div>'+
+        '<button class="planta-btn" id="prOtra">📷 Probar de nuevo</button><button class="planta-btn sec" id="prVolver">Volver</button></div>', 'pv-amarillo');
+      document.getElementById('prOtra').addEventListener('click', plantaReintentar);
+      document.getElementById('prVolver').addEventListener('click', plantaHome);
+    });
+  });
+}
+
+/* ---- REVISIÓN: el operario compara lo que leyó el sistema con la foto y corrige (letra fea / ortografía).
+   Rojo = no se pudo leer (hay que completarlo). Amarillo = se leyó con dudas (revisarlo).
+   Todo lo que se corrige queda anotado en la nota (datos._corregido) para que oficina lo vea. ---- */
+function plantaRevisar(tipo, r, foto){
+  return new Promise(function(done){
+    var d0 = r.datos || {};
+    var esIns = tipo==='insumo';
+    var campoCat = esIns ? 'insumo_catalogo' : 'producto_catalogo';
+    var catalogo = (esIns ? Object.keys(insumoIndex||{}) : (state.productos||[]).map(function(p){ return p.nombre; }))
+      .filter(function(v,i,a){ return v && a.indexOf(v)===i; }).sort(function(a,b){ return a.localeCompare(b); });
+    var placa0 = d0.placa || d0.recibido_placa || d0.entregado_placa || '';
+    var campos = esIns ? [
+      ['numero','N° de nota',true,'numeric'], ['fecha','Fecha (dd/mm/aaaa)',true,''], ['proveedor','Proveedor',true,''],
+      ['placa','Placa',true,''], ['recibido_nombre','Recibió — Nombre',true,''], ['recibido_ci','Recibió — C.I.',true,'numeric'],
+      ['entregado_nombre','Entregó — Nombre',true,''], ['entregado_ci','Entregó — C.I.',true,'numeric'], ['observacion','Observación',false,'']
+    ] : [
+      ['numero','N° de nota',true,'numeric'], ['fecha','Fecha (dd/mm/aaaa)',true,''], ['cliente','Cliente',true,''],
+      ['transportista','Transportista',true,''], ['placa','Placa',true,''], ['recibido_nombre','Recibió — Nombre',true,''],
+      ['recibido_ci','Recibió — C.I.',true,'numeric'], ['entregado_nombre','Entregó — Nombre',true,''], ['entregado_ci','Entregó — C.I.',false,'numeric'],
+      ['observacion','Observación',false,'']
+    ];
+    var firmas = esIns ? [] : [['recibido_firma','Tiene la firma de quien RECIBE'], ['entregado_firma','Tiene la firma de quien ENTREGA']];
+    function val0(k){ return k==='placa' ? placa0 : (d0[k]==null ? '' : String(d0[k])); }
+    function leidoTxt(i){
+      var p = esIns ? [i.cantidad, i.detalle, i.observaciones] : [i.cantidad, i.unidad, i.peso, i.descripcion];
+      return p.filter(function(x){ return x!=null && String(x).trim()!==''; }).join(' · ');
+    }
+    var items = npItems(d0).map(function(i){ return Object.assign({}, i); });
+    if(!items.length) items.push({claro:false, _nuevo:true});
+    function opciones(sel){
+      var enCat = !sel || catalogo.indexOf(sel)!==-1;
+      return '<option value="">— elegí '+(esIns?'el insumo':'el producto')+' —</option>'+
+        (enCat ? '' : '<option value="'+escapeHtml(sel)+'" selected>'+escapeHtml(sel)+'</option>')+
+        catalogo.map(function(c){ return '<option value="'+escapeHtml(c)+'"'+(c===sel?' selected':'')+'>'+escapeHtml(c)+'</option>'; }).join('');
+    }
+    function itemHtml(it, i){
+      var dud = !it.claro || !it[campoCat] || !(Number(it.kg_total)>0);
+      var lt = leidoTxt(it);
+      return '<div class="rv-item'+(dud?' rv-dudoso':'')+'" data-i="'+i+'">'+
+        (lt ? '<div class="rv-leido">En la nota dice: <b>'+escapeHtml(lt)+'</b></div>' : '')+
+        '<select class="rv-cat">'+opciones(it[campoCat]||'')+'</select>'+
+        '<div class="rv-kgrow"><input type="number" class="rv-kg" inputmode="decimal" min="0" placeholder="Kg totales" value="'+(Number(it.kg_total)>0?Math.round(Number(it.kg_total)*100)/100:'')+'"><span>Kg</span>'+
+        '<button type="button" class="rv-del" title="Quitar esta línea">✕</button></div>'+
+        (dud ? '<div class="rv-aviso">⚠ Revisá '+(esIns?'el insumo':'el producto')+' y los Kg mirando la foto</div>' : '')+
+      '</div>';
+    }
+    var html = '<div class="rv-wrap">'+
+      '<div class="rv-foto" id="rvFoto"><img src="'+foto.url+'" alt="foto de la nota"><span class="rv-lupa">🔍 Tocá la foto para agrandar</span></div>'+
+      '<div class="rv-tit">Revisá lo que leyó el sistema</div>'+
+      '<div class="rv-ayuda">Compará cada dato con la foto y corregí lo que esté mal. <span class="rv-chip-r">Rojo</span> = no se pudo leer, completalo. <span class="rv-chip-a">Amarillo</span> = revisalo.</div>'+
+      '<div class="rv-sec">'+(esIns?'Insumos que llegaron':'Productos que salen')+'</div>'+
+      '<div id="rvItems">'+items.map(itemHtml).join('')+'</div>'+
+      '<button type="button" class="planta-btn sec" id="rvAddItem" style="font-size:15px;padding:10px">➕ Agregar otra línea</button>'+
+      '<div class="rv-sec">Datos de la nota</div>'+
+      campos.map(function(c){
+        var v = val0(c[0]), falta = c[2] && v.trim()==='';
+        return '<label class="rv-campo'+(falta?' rv-falta':'')+'" data-k="'+c[0]+'"><span>'+escapeHtml(c[1])+(c[2]?' *':'')+'</span>'+
+          '<input type="text" class="rv-in" data-k="'+c[0]+'"'+(c[3]?' inputmode="'+c[3]+'"':'')+' value="'+escapeHtml(v)+'" autocomplete="off" autocapitalize="characters">'+
+          (falta ? '<em>No se leyó — completalo mirando la foto</em>' : '')+'</label>';
+      }).join('')+
+      firmas.map(function(f){
+        var ok = !!d0[f[0]];
+        return '<label class="rv-firma'+(ok?'':' rv-falta')+'"><input type="checkbox" class="rv-fi" data-k="'+f[0]+'"'+(ok?' checked':'')+'> '+escapeHtml(f[1])+(ok?'':' <em>(el sistema no vio la firma — verificá en la foto)</em>')+'</label>';
+      }).join('')+
+      '<button class="planta-btn planta-btn-verde" id="rvOk">✔ Los datos están bien — continuar</button>'+
+      '<button class="planta-btn sec" id="rvOtra">📷 Sacar la foto de nuevo</button>'+
+      '<button class="planta-btn sec" id="rvCancel">Cancelar</button>'+
+    '</div>';
+    plantaSet('<div class="planta-res" style="color:var(--ink);text-align:left">'+html+'</div>');
+    var body = document.getElementById('plantaBody');
+    document.getElementById('rvFoto').addEventListener('click', function(){ this.classList.toggle('rv-zoom'); });
+    function leerItems(){
+      return Array.prototype.map.call(body.querySelectorAll('.rv-item'), function(el){
+        var i = Number(el.dataset.i);
+        return {i:i, cat:el.querySelector('.rv-cat').value, kg:parseFloat(el.querySelector('.rv-kg').value)||0};
+      });
+    }
+    function cablearItems(){
+      body.querySelectorAll('.rv-del').forEach(function(b){ b.onclick = function(){
+        var el = b.closest('.rv-item');
+        if(body.querySelectorAll('.rv-item').length<=1){ toast('Tiene que quedar al menos una línea'); return; }
+        el.parentNode.removeChild(el);
+      }; });
+      body.querySelectorAll('.rv-cat, .rv-kg').forEach(function(inp){ inp.oninput = inp.onchange = function(){ inp.closest('.rv-item').classList.remove('rv-error'); }; });
+    }
+    cablearItems();
+    document.getElementById('rvAddItem').addEventListener('click', function(){
+      items.push({claro:false, _nuevo:true});
+      var tmp = document.createElement('div'); tmp.innerHTML = itemHtml(items[items.length-1], items.length-1);
+      document.getElementById('rvItems').appendChild(tmp.firstChild); cablearItems();
+    });
+    body.querySelectorAll('.rv-in').forEach(function(inp){ inp.addEventListener('input', function(){
+      var lab = inp.closest('.rv-campo'); lab.classList.remove('rv-error'); if(inp.value.trim()!==''){ lab.classList.remove('rv-falta'); var em = lab.querySelector('em'); if(em) em.remove(); }
+    }); });
+    body.querySelectorAll('.rv-fi').forEach(function(ch){ ch.addEventListener('change', function(){ ch.closest('.rv-firma').classList.remove('rv-error'); }); });
+    document.getElementById('rvCancel').addEventListener('click', function(){ done(null); });
+    document.getElementById('rvOtra').addEventListener('click', function(){ done('otra'); });
+    document.getElementById('rvOk').addEventListener('click', function(){
+      var faltan = [];
+      var d = JSON.parse(JSON.stringify(d0)); delete d.es_formulario_correcto; delete d.legible; delete d.motivo;
+      campos.forEach(function(c){
+        var v = body.querySelector('.rv-in[data-k="'+c[0]+'"]').value.trim();
+        d[c[0]] = v==='' ? null : v;
+        if(c[2] && v===''){ faltan.push(c[1]); body.querySelector('.rv-campo[data-k="'+c[0]+'"]').classList.add('rv-error'); }
+      });
+      if(d.fecha && /^\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2}$/.test(d.fecha)){ var pf = d.fecha.split(/[\/\-.]/); d.fecha = pf[0]+'/'+pf[1]+'/20'+pf[2]; }
+      if(d.fecha && !/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(d.fecha.replace(/[\-.]/g,'/'))){ faltan.push('Fecha con formato dd/mm/aaaa'); body.querySelector('.rv-campo[data-k="fecha"]').classList.add('rv-error'); }
+      else if(d.fecha) d.fecha = d.fecha.replace(/[\-.]/g,'/');
+      firmas.forEach(function(f){
+        var ch = body.querySelector('.rv-fi[data-k="'+f[0]+'"]'); d[f[0]] = ch.checked;
+        if(!ch.checked){ faltan.push(f[1].replace('Tiene la f','F')); ch.closest('.rv-firma').classList.add('rv-error'); }
+      });
+      var nuevos = [];
+      leerItems().forEach(function(x){
+        var el = body.querySelector('.rv-item[data-i="'+x.i+'"]');
+        if(!x.cat || !(x.kg>0)){ faltan.push((esIns?'Insumo':'Producto')+' y Kg de cada línea'); el.classList.add('rv-error'); return; }
+        var base = items[x.i] || {};
+        var it = Object.assign({}, base, {kg_total:x.kg, claro:true}); it[campoCat] = x.cat; delete it._nuevo;
+        nuevos.push(it);
+      });
+      if(!body.querySelector('.rv-item')) faltan.push('Al menos una línea con '+(esIns?'insumo':'producto')+' y Kg');
+      if(faltan.length){
+        toast('Falta completar: '+faltan.filter(function(v,i,a){ return a.indexOf(v)===i; }).join(', '));
+        var e1 = body.querySelector('.rv-error'); if(e1) e1.scrollIntoView({behavior:'smooth', block:'center'});
+        return;
+      }
+      d.items = nuevos;
+      if(esIns && d.placa){ d.recibido_placa = d.recibido_placa || d.placa; }
+      // qué se corrigió respecto de lo que leyó el sistema
+      var corr = [];
+      campos.forEach(function(c){ var a = val0(c[0]).trim(), b = d[c[0]]==null ? '' : String(d[c[0]]); if(a!==b) corr.push({campo:c[1], leido:a||null, corregido:b||null}); });
+      firmas.forEach(function(f){ if(!!d0[f[0]]!==!!d[f[0]]) corr.push({campo:f[1], leido:d0[f[0]]?'sí':'no', corregido:d[f[0]]?'sí':'no'}); });
+      var its0 = npItems(d0);
+      leerItems().forEach(function(x){
+        var o = its0[x.i];
+        if(!o){ corr.push({campo:'Línea agregada', leido:null, corregido:x.cat+' '+npKg(x.kg)}); return; }
+        if((o[campoCat]||'')!==x.cat) corr.push({campo:(esIns?'Insumo':'Producto'), leido:o[campoCat]||leidoTxt(o)||null, corregido:x.cat});
+        if(Math.abs((Number(o.kg_total)||0)-x.kg)>0.01) corr.push({campo:'Kg de '+x.cat, leido:o.kg_total!=null?String(o.kg_total):null, corregido:String(x.kg)});
+      });
+      its0.forEach(function(o, k){ if(!body.querySelector('.rv-item[data-i="'+k+'"]')) corr.push({campo:'Línea quitada', leido:(o[campoCat]||leidoTxt(o)||'')+(o.kg_total?' '+npKg(o.kg_total):''), corregido:null}); });
+      d._revisado = true;
+      d._revisado_por = currentProfile ? (currentProfile.nombre||currentProfile.email||null) : null;
+      if(corr.length) d._corregido = corr;
+      done(d);
+    });
+  });
+}
+/* ================= IMPRIMIR FOTOS (notas de entrega, ingresos de insumos, facturas, comprobantes) A TAMAÑO REAL =================
+   Junto a cada foto guardada aparece «🖨️ Imprimir tamaño real». Se elige el tamaño del papel ORIGINAL de la nota
+   (media carta, carta, etc.); la foto se recorta sola (saca la mesa/fondo), se gira si hace falta y se imprime
+   con esas medidas exactas en mm. La elección queda recordada para la próxima vez. */
+var IMP_FORMATOS = {
+  mc:{n:'Media carta (14 × 21,6 cm)', w:140, h:216},
+  ca:{n:'Carta (21,6 × 27,9 cm)', w:216, h:279},
+  of:{n:'Oficio (21,6 × 33 cm)', w:216, h:330},
+  a4:{n:'A4 (21 × 29,7 cm)', w:210, h:297},
+  a5:{n:'A5 (14,8 × 21 cm)', w:148, h:210},
+  tk:{n:'Comprobante angosto (8 cm de ancho)', w:80, h:0},
+  hoja:{n:'Que ocupe toda la hoja', w:0, h:0}
+};
+var IMP_PAPEL = { ca:{n:'Carta', w:216, h:279}, of:{n:'Oficio', w:216, h:330}, a4:{n:'A4', w:210, h:297} };
+function impCategoria(url){ url = String(url||''); if(/boletas-despacho|notas-planta/.test(url)) return 'nota'; if(/comprobantes-compras/.test(url)) return 'factura'; return 'comprobante'; }
+function impPref(cat){
+  var def = {nota:{fmt:'mc', papel:'ca', recorte:true}, factura:{fmt:'ca', papel:'ca', recorte:true}, comprobante:{fmt:'tk', papel:'ca', recorte:false}}[cat] || {fmt:'mc', papel:'ca', recorte:true};
+  try{ var j = JSON.parse(localStorage.getItem('nx_imp_'+cat)||'null'); if(j && IMP_FORMATOS[j.fmt] && IMP_PAPEL[j.papel]) return j; }catch(e){}
+  return def;
+}
+function impGuardarPref(cat, p){ try{ localStorage.setItem('nx_imp_'+cat, JSON.stringify(p)); }catch(e){} }
+/* busca la hoja de papel (lo claro) dentro de la foto y devuelve el rectángulo a recortar */
+function impDetectarHoja(img){
+  var W = img.naturalWidth||img.width, H = img.naturalHeight||img.height, s = Math.min(1, 400/Math.max(W,H));
+  var w = Math.max(1, Math.round(W*s)), h = Math.max(1, Math.round(H*s));
+  var c = document.createElement('canvas'); c.width = w; c.height = h;
+  var x = c.getContext('2d'); x.drawImage(img, 0, 0, w, h);
+  var px = x.getImageData(0, 0, w, h).data, lum = new Uint8Array(w*h), hist = new Array(256).fill(0);
+  for(var i=0;i<w*h;i++){ var l = (px[i*4]*0.299 + px[i*4+1]*0.587 + px[i*4+2]*0.114)|0; lum[i] = l; hist[l]++; }
+  // umbral de Otsu
+  var tot = w*h, sum = 0; for(var t=0;t<256;t++) sum += t*hist[t];
+  var sB = 0, wB = 0, best = 0, thr = 128;
+  for(t=0;t<256;t++){ wB += hist[t]; if(!wB) continue; var wF = tot-wB; if(!wF) break; sB += t*hist[t];
+    var mB = sB/wB, mF = (sum-sB)/wF, v = wB*wF*(mB-mF)*(mB-mF); if(v>best){ best = v; thr = t; } }
+  function franja(n, frac){ // tramo continuo más largo donde la fracción clara supera el 45%
+    var ini=-1, mejor=[0,n-1], largo=0;
+    for(var k=0;k<=n;k++){ var ok = k<n && frac(k) > 0.45;
+      if(ok && ini<0) ini = k;
+      if(!ok && ini>=0){ if(k-ini > largo){ largo = k-ini; mejor = [ini, k-1]; } ini = -1; } }
+    return largo ? mejor : null;
+  }
+  var filas = franja(h, function(r){ var c2=0; for(var q=0;q<w;q++) if(lum[r*w+q]>thr) c2++; return c2/w; });
+  if(!filas) return null;
+  var cols = franja(w, function(q){ var c2=0; for(var r=filas[0];r<=filas[1];r++) if(lum[r*w+q]>thr) c2++; return c2/(filas[1]-filas[0]+1); });
+  if(!cols) return null;
+  var bx = cols[0]/s, by = filas[0]/s, bw = (cols[1]-cols[0]+1)/s, bh = (filas[1]-filas[0]+1)/s;
+  if(bw*bh < W*H*0.25 || bw*bh > W*H*0.97) return null;   // no encontró una hoja clara, o la foto ya es solo la hoja
+  var m = Math.round(Math.min(bw,bh)*0.005);
+  return {x:Math.round(bx+m), y:Math.round(by+m), w:Math.round(bw-2*m), h:Math.round(bh-2*m)};
+}
+var impState = null;
+function abrirImpresion(url, cat){
+  cat = cat || impCategoria(url);
+  var ov = document.getElementById('impOverlay');
+  if(!ov){
+    ov = document.createElement('div'); ov.id = 'impOverlay'; ov.className = 'imp-ov';
+    ov.innerHTML = '<div class="imp-box"><div class="imp-head"><b>🖨️ Imprimir a tamaño real</b><button class="close-x" id="impCerrar">✕</button></div>'+
+      '<div class="imp-cuerpo"><div class="imp-prev" id="impPrev"><span class="muted">Cargando la foto…</span></div>'+
+      '<div class="imp-opc">'+
+        '<label>Tamaño del papel ORIGINAL<select id="impFmt">'+Object.keys(IMP_FORMATOS).map(function(k){ return '<option value="'+k+'">'+IMP_FORMATOS[k].n+'</option>'; }).join('')+'</select></label>'+
+        '<label>Papel de la impresora<select id="impPapel">'+Object.keys(IMP_PAPEL).map(function(k){ return '<option value="'+k+'">'+IMP_PAPEL[k].n+'</option>'; }).join('')+'</select></label>'+
+        '<label class="imp-chk"><input type="checkbox" id="impRecorte"> Recortar el fondo (mesa, bordes)</label>'+
+        '<button type="button" class="ghost" id="impGirar">⟳ Girar la foto</button>'+
+        '<div class="imp-medida" id="impMedida"></div>'+
+        '<div class="imp-nota">En la ventana de impresión elegí <b>Escala 100%</b> / <b>Tamaño real</b> (no «Ajustar a la página») y márgenes <b>Ninguno</b>.</div>'+
+        '<button type="button" class="primary" id="impOk" disabled>🖨️ Imprimir</button>'+
+      '</div></div></div>';
+    document.body.appendChild(ov);
+    document.getElementById('impCerrar').addEventListener('click', function(){ ov.classList.remove('active'); if(impState && impState.blobUrl) URL.revokeObjectURL(impState.blobUrl); impState = null; });
+    ['impFmt','impPapel','impRecorte'].forEach(function(id){ document.getElementById(id).addEventListener('change', function(){ if(!impState) return; impLeerOpciones(); impPintar(); }); });
+    document.getElementById('impGirar').addEventListener('click', function(){ if(!impState) return; impState.rot = (impState.rot+90)%360; impState.rotManual = true; impPintar(); });
+    document.getElementById('impOk').addEventListener('click', impImprimir);
+  }
+  var p = impPref(cat);
+  impState = {cat:cat, url:url, img:null, rot:0, rotManual:false, fmt:p.fmt, papel:p.papel, recorte:p.recorte!==false, caja:null};
+  document.getElementById('impFmt').value = p.fmt; document.getElementById('impPapel').value = p.papel; document.getElementById('impRecorte').checked = impState.recorte;
+  document.getElementById('impPrev').innerHTML = '<span class="muted">Cargando la foto…</span>';
+  document.getElementById('impOk').disabled = true;
+  ov.classList.add('active');
+  // se baja como archivo (así se puede recortar sin problemas de permisos del navegador)
+  fetch(url).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.blob(); }).then(function(b){
+    var st = impState; if(!st || st.url!==url) return;
+    st.blobUrl = URL.createObjectURL(b);
+    var im = new Image();
+    im.onload = function(){ if(impState!==st) return; st.img = im; try{ st.caja = impDetectarHoja(im); }catch(e){ st.caja = null; } impPintar(); document.getElementById('impOk').disabled = false; };
+    im.onerror = function(){ document.getElementById('impPrev').innerHTML = '<p class="k-warn">No se pudo abrir la foto.</p>'; };
+    im.src = st.blobUrl;
+  }).catch(function(e){ document.getElementById('impPrev').innerHTML = '<p class="k-warn">No se pudo cargar la foto ('+escapeHtml(e.message||String(e))+'). Cerrá y volvé a abrir.</p>'; });
+}
+function impLeerOpciones(){
+  impState.fmt = document.getElementById('impFmt').value;
+  impState.papel = document.getElementById('impPapel').value;
+  impState.recorte = document.getElementById('impRecorte').checked;
+  impGuardarPref(impState.cat, {fmt:impState.fmt, papel:impState.papel, recorte:impState.recorte});
+}
+/* arma la imagen final (recortada y girada) y calcula las medidas en mm */
+function impArmar(){
+  var st = impState, im = st.img, caja = (st.recorte && st.caja) ? st.caja : {x:0, y:0, w:im.naturalWidth, h:im.naturalHeight};
+  var rot = st.rot;
+  var f = IMP_FORMATOS[st.fmt], pap = IMP_PAPEL[st.papel];
+  // la orientación (vertical/horizontal) de la nota sale de la forma de la foto; «Girar» la corrige si salió de costado
+  var girada = rot===90 || rot===270, ancho = girada ? caja.h : caja.w, alto = girada ? caja.w : caja.h;
+  var esc = Math.min(1, 3000/Math.max(ancho, alto));
+  var c = document.createElement('canvas'); c.width = Math.round(ancho*esc); c.height = Math.round(alto*esc);
+  var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0,0,c.width,c.height);
+  x.translate(c.width/2, c.height/2); x.rotate(rot*Math.PI/180);
+  var dw = caja.w*esc, dh = caja.h*esc;
+  x.drawImage(im, caja.x, caja.y, caja.w, caja.h, -dw/2, -dh/2, dw, dh);
+  // medidas en mm de la nota impresa
+  var aspecto = ancho/alto, wmm, hmm;
+  if(st.fmt==='hoja'){ var mw = pap.w-12, mh = pap.h-12; wmm = mw; hmm = mw/aspecto; if(hmm>mh){ hmm = mh; wmm = mh*aspecto; } }
+  else if(!f.h){ wmm = f.w; hmm = f.w/aspecto; }
+  else { var lado1 = Math.max(f.w,f.h), lado2 = Math.min(f.w,f.h); if(aspecto>=1){ wmm = lado1; hmm = lado2; } else { wmm = lado2; hmm = lado1; } }
+  // papel de la impresora: vertical u horizontal según lo que entra
+  var pw = pap.w, ph = pap.h, horizontal = false;
+  if((wmm > pw+0.5 || hmm > ph+0.5) && wmm <= ph+0.5 && hmm <= pw+0.5){ pw = pap.h; ph = pap.w; horizontal = true; }
+  var noEntra = wmm > pw+0.5 || hmm > ph+0.5;
+  return {canvas:c, wmm:wmm, hmm:hmm, pw:pw, ph:ph, horizontal:horizontal, noEntra:noEntra};
+}
+function impPintar(){
+  var st = impState; if(!st || !st.img) return;
+  var a = impArmar(); st.armado = a;
+  var prev = document.getElementById('impPrev');
+  // vista previa: la hoja de la impresora con la nota en su tamaño, a escala
+  var esc = Math.min(260/a.pw, 330/a.ph);
+  prev.innerHTML = '<div class="imp-hoja" style="width:'+(a.pw*esc)+'px;height:'+(a.ph*esc)+'px"><img src="'+a.canvas.toDataURL('image/jpeg', 0.7)+'" style="width:'+(a.wmm*esc)+'px;height:'+(a.hmm*esc)+'px"></div>';
+  var cm = function(v){ return fmt(v/10, 1); };
+  document.getElementById('impMedida').innerHTML = 'Se imprime de <b>'+cm(a.wmm)+' × '+cm(a.hmm)+' cm</b> en hoja '+IMP_PAPEL[st.papel].n+(a.horizontal?' (horizontal)':'')+'.'+
+    (st.recorte && !st.caja ? '<br><span class="muted">No se encontró el borde de la hoja: se imprime la foto entera.</span>' : '')+
+    (a.noEntra ? '<br><span class="k-warn">No entra en ese papel: elegí un papel más grande.</span>' : '');
+  document.getElementById('impOk').disabled = a.noEntra;
+}
+function impImprimir(){
+  var st = impState; if(!st || !st.armado) return;
+  var a = st.armado, src = a.canvas.toDataURL('image/jpeg', 0.92);
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Imprimir</title><style>'+
+    '@page{size:'+a.pw+'mm '+a.ph+'mm;margin:0}html,body{margin:0;padding:0}'+
+    '.pg{width:'+a.pw+'mm;height:'+a.ph+'mm;display:flex;align-items:flex-start;justify-content:center;overflow:hidden}'+
+    'img{display:block;width:'+a.wmm.toFixed(2)+'mm;height:'+a.hmm.toFixed(2)+'mm;object-fit:contain}'+
+    '</style></head><body><div class="pg"><img src="'+src+'"></div></body></html>';
+  var fr = document.getElementById('impFrame');
+  if(fr) fr.parentNode.removeChild(fr);
+  fr = document.createElement('iframe'); fr.id = 'impFrame';
+  fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(fr);
+  var dc = fr.contentWindow.document; dc.open(); dc.write(html); dc.close();
+  var im = dc.querySelector('img');
+  function go(){ try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(e){ toast('No se pudo abrir la impresión: '+e.message); } }
+  if(im.complete) setTimeout(go, 150); else im.onload = function(){ setTimeout(go, 150); };
+}
+/* agrega el botón «Imprimir» junto a cada foto guardada que se muestre en la app */
+function impEnganchar(img){
+  if(!img || img.dataset.impOk) return;
+  var src = img.getAttribute('src')||'';
+  if(src.indexOf('/storage/v1/object/sign/')===-1) return;
+  if(img.closest('#plantaOverlay, .imp-ov')) return;
+  img.dataset.impOk = '1';
+  var b = document.createElement('button'); b.type = 'button'; b.className = 'ghost imp-btn'; b.textContent = '🖨️ Imprimir tamaño real';
+  b.addEventListener('click', function(ev){ ev.preventDefault(); ev.stopPropagation(); abrirImpresion(img.src); });
+  var thumb = img.closest('.np-thumb');
+  if(thumb){ var info = thumb.parentNode.querySelector('.np-info'); (info||thumb.parentNode).appendChild(b); return; }
+  var ref = (img.parentNode && img.parentNode.tagName==='A') ? img.parentNode : img;
+  var wrap = document.createElement('div'); wrap.className = 'imp-wrap'; wrap.appendChild(b);
+  ref.parentNode.insertBefore(wrap, ref.nextSibling);
+}
+new MutationObserver(function(ms){
+  ms.forEach(function(m){
+    if(m.type==='attributes'){ if(m.target.tagName==='IMG') impEnganchar(m.target); return; }
+    m.addedNodes.forEach(function(n){ if(n.nodeType!==1) return; if(n.tagName==='IMG') impEnganchar(n); else if(n.querySelectorAll) n.querySelectorAll('img').forEach(impEnganchar); });
+  });
+}).observe(document.body, {childList:true, subtree:true, attributes:true, attributeFilter:['src']});
+
+function plantaContinuar(tipo, d, fotoUp, registrado){
     var numero = String(d.numero||'').replace(/\D/g,'').replace(/^0+/,'') || String(d.numero||'').trim();
     return sb.from('notas_planta').select('id,creado_en,usuario_nombre').eq('tipo',tipo).eq('numero',numero).neq('estado','descartada').limit(1).then(function(dup){
       if(dup.data && dup.data.length){
@@ -10228,10 +10684,9 @@ function plantaProcesar(file){
         if(tipo==='insumo' && !plan){ plantaHome(); return; }
         if(plan && plan.error){ plantaCancelar(d, plan.error); return; }
         return plantaConfirmarKgSiQr(tipo, plan, d).then(function(pl2){ if(!pl2) return; plan = pl2;
-        var bucket = tipo==='despacho' ? 'boletas-despacho' : 'notas-planta';
-        var path = (tipo==='despacho' ? 'planta/' : '')+npHoyISO().slice(0,7)+'/'+tipo+'_'+numero+'_'+Date.now()+'.jpg';
-        return sb.storage.from(bucket).upload(path, foto.blob, {contentType:'image/jpeg'}).then(function(up){
-          if(up.error) throw new Error('No se pudo guardar la foto: '+up.error.message);
+        var bucket = fotoUp.bucket, path = fotoUp.path;   // la foto ya se subió antes de leerla
+        registrado.v = true;
+        return Promise.resolve().then(function(){
           if(tipo!=='despacho') return null;
           return sb.rpc('despachar_desde_nota', {p_items: plan.items, p_boleta_path: path, p_nota: 'Nota de entrega N° '+(d.numero||numero)+' (celular de planta)'}).then(function(rr){
             if(rr.error) throw {cancelar: plantaErrorDespacho(rr.error)};
@@ -10270,12 +10725,6 @@ function plantaProcesar(file){
         });
       }).catch(function(e){ if(e && e.cancelar){ plantaCancelar(d, e.cancelar); return; } throw e; });
     });
-  }).catch(function(e){
-    plantaSet('<div class="planta-res"><div class="pr-ico">📶</div><div class="pr-tit">NO SE PUDO LEER</div><div class="pr-sub">'+escapeHtml((e&&e.message)||String(e))+'<br>Revisá que haya internet y probá de nuevo.</div>'+
-      '<button class="planta-btn" id="prOtra">📷 Probar de nuevo</button><button class="planta-btn sec" id="prVolver">Volver</button></div>', 'pv-amarillo');
-    document.getElementById('prOtra').addEventListener('click', plantaReintentar);
-    document.getElementById('prVolver').addEventListener('click', plantaHome);
-  });
 }
 document.getElementById('plantaFile').addEventListener('change', function(){ if(this.files && this.files[0]) plantaProcesar(this.files[0]); });
 document.getElementById('plantaCerrar').addEventListener('click', cerrarModoPlanta);
@@ -10578,6 +11027,7 @@ function npTarjeta(n){
     '<div class="np-info">'+
       '<div class="np-head">'+(t==='insumo'?'🚚 Ingreso de insumo':'📦 Nota de entrega')+' <b>N° '+escapeHtml(d.numero||n.numero||'—')+'</b> '+estado+'<span class="muted" style="margin-left:auto;font-size:12px">'+npHora(n.creado_en)+(n.usuario_nombre?' · '+escapeHtml(n.usuario_nombre):'')+'</span></div>'+
       plantaDetalle(t, d)+
+      (Array.isArray(d._corregido) && d._corregido.length ? '<div class="np-corr">✏️ <b>Corregido en planta</b>'+(d._revisado_por?' por '+escapeHtml(d._revisado_por):'')+' ('+d._corregido.length+'):<ul>'+d._corregido.map(function(c){ return '<li>'+escapeHtml(c.campo)+': <s>'+escapeHtml(c.leido==null?'(no se leyó)':c.leido)+'</s> → <b>'+escapeHtml(c.corregido==null?'(quitado)':c.corregido)+'</b></li>'; }).join('')+'</ul></div>' : (d._revisado ? '<div class="np-corr" style="background:#eef8f1;border-color:#9fd3b1">✔ Revisado en planta sin cambios</div>' : ''))+
       (n.estado==='asignada'
         ? '<div class="np-asig">✔ '+escapeHtml(asignadoA)+(n.asignado_por_nombre?' <span class="muted">('+escapeHtml(n.asignado_por_nombre)+')</span>':'')+(d._despacho?'':' <button class="ghost np-quitar" data-id="'+n.id+'">Cambiar</button>')+'</div>'
         : (n.estado==='descartada' ? '' :
@@ -11065,7 +11515,7 @@ function submitDespacho(){
   }
   if(despachoFile){
     var path = o.numero_produccion+'/'+Date.now()+'.'+extArchivo(despachoFile);
-    sb.storage.from('boletas-despacho').upload(path, despachoFile, {upsert:false}).then(function(res){
+    subirFoto('boletas-despacho', path, despachoFile, {upsert:false}).then(function(res){
       if(res.error){ btn.disabled=false; toast('No se pudo subir la imagen: '+errMsg(res.error)); return; }
       guardar(path);
     });
@@ -11273,7 +11723,7 @@ function submitDespachoPv(){
   }
   if(st.file){
     var path = st.v.numero_pedido+'/'+Date.now()+'.'+extArchivo(st.file);
-    sb.storage.from('boletas-despacho').upload(path, st.file, {upsert:false}).then(function(res){
+    subirFoto('boletas-despacho', path, st.file, {upsert:false}).then(function(res){
       if(res.error){ btn.disabled=false; toast('No se pudo subir la imagen: '+errMsg(res.error)); return; }
       guardar(path);
     });
@@ -12583,7 +13033,7 @@ function submitCompraMultiple(lineasOverride){
     if(!file){ cb(null); return; }
     var ext = ((file.name||'').split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
     var path = 'compra_'+ts+'_'+sufijo+'.'+ext;
-    sb.storage.from(bucket).upload(path, file, {upsert:false, contentType: file.type||undefined}).then(function(res){
+    subirFoto(bucket, path, file, {upsert:false, contentType: file.type||undefined}).then(function(res){
       if(res.error){ toast('No se pudo subir el archivo: '+errMsg(res.error)); fin(); cb(false); return; }
       cb(path);
     });
@@ -12708,7 +13158,7 @@ function submitCompra(){
     if(!file){ cb(null); return; }
     var ext = ((file.name||'').split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
     var path = 'compra_'+ts+'_'+sufijo+'.'+ext;
-    sb.storage.from(bucket).upload(path, file, {upsert:false}).then(function(res){
+    subirFoto(bucket, path, file, {upsert:false}).then(function(res){
       if(res.error){ toast('No se pudo subir la foto: '+errMsg(res.error)); fin(); cb(false); return; }
       cb(path);
     });
@@ -13431,7 +13881,7 @@ function subirVariosArchivos(files, bucket, prefijo, cb){
     var f = files[i];
     var ext = ((f.name||'').split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
     var path = prefijo+'_'+ts+'_'+(i+1)+'.'+ext;
-    sb.storage.from(bucket).upload(path, f, {upsert:false, contentType: f.type||undefined}).then(function(res){
+    subirFoto(bucket, path, f, {upsert:false, contentType: f.type||undefined}).then(function(res){
       if(res.error){ toast('No se pudo subir «'+(f.name||'archivo')+'»: '+errMsg(res.error)); cb(false); return; }
       paths.push(path); i++; sig();
     });
