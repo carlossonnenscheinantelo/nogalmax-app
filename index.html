@@ -10703,7 +10703,7 @@ new MutationObserver(function(ms){
   });
 }).observe(document.body, {childList:true, subtree:true, attributes:true, attributeFilter:['src']});
 
-/* ================= ASISTENTE (chat de consultas con Claude, solo lectura, solo administrador) ================= */
+/* ================= ASISTENTE (chat de consultas con Claude, solo lectura, para todos los usuarios) ================= */
 var chatState = {abierto:false, msgs:[], cargando:false};
 try{ chatState.msgs = JSON.parse(localStorage.getItem('nx_chat')||'[]') || []; }catch(e){ chatState.msgs = []; }
 function chatGuardar(){ try{ localStorage.setItem('nx_chat', JSON.stringify(chatState.msgs.slice(-40))); }catch(e){} }
@@ -10789,9 +10789,9 @@ function chatAbrir(si){
   document.getElementById('chatForm').addEventListener('submit', function(e){ e.preventDefault(); chatEnviar(inp.value); });
   inp.addEventListener('keydown', function(e){ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); chatEnviar(inp.value); } });
   inp.addEventListener('input', function(){ inp.style.height = ''; inp.style.height = Math.min(120, inp.scrollHeight)+'px'; });
-  // visible solo para administradores con sesión iniciada, y nunca en el modo planta
+  // visible para todos los usuarios con sesión iniciada (nunca en el modo planta). Los que no son admin no ven comisiones.
   setInterval(function(){
-    var ver = !!(currentProfile && esAdminUsr() && !document.body.classList.contains('planta-on'));
+    var ver = !!(currentProfile && !document.body.classList.contains('planta-on'));
     fab.style.display = ver && !chatState.abierto ? '' : 'none';
     if(!ver && chatState.abierto) chatAbrir(false);
   }, 1000);
